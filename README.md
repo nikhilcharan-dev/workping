@@ -71,4 +71,4 @@ cd centralized-server/server && npm start
 
 ## License
 
-MIT — Copyright 2026 Nikhil Charan
+MIT — Copyright 2026 Team WorkPing
