@@ -1,0 +1,1572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WorkPing - WhatsApp Bot Dashboard</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg: #0f1117;
+            --surface: #1a1d27;
+            --surface2: #232733;
+            --border: #2d3148;
+            --text: #e4e6f0;
+            --text2: #8b8fa3;
+            --accent: #25D366;
+            --accent2: #128C7E;
+            --blue: #4f8ff7;
+            --orange: #f7954f;
+            --red: #f74f4f;
+            --purple: #9b59b6;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+        .header {
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            padding: 16px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header h1 {
+            font-size: 20px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .header h1 .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--accent);
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        .provider-switch {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--surface2);
+            padding: 6px 8px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+        .provider-switch label {
+            font-size: 12px;
+            color: var(--text2);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .provider-btn {
+            padding: 6px 14px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: transparent;
+            color: var(--text2);
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .provider-btn.active {
+            background: var(--accent);
+            color: #000;
+            border-color: var(--accent);
+            font-weight: 600;
+        }
+        .provider-btn:hover:not(.active) {
+            border-color: var(--text2);
+            color: var(--text);
+        }
+        .health-badge {
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .health-badge.ok { background: rgba(37,211,102,0.15); color: var(--accent); }
+        .health-badge.down { background: rgba(247,79,79,0.15); color: var(--red); }
+
+        .main {
+            padding: 24px 32px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        /* Stat Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        .stat-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+        }
+        .stat-card .label {
+            font-size: 12px;
+            color: var(--text2);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+        .stat-card .value {
+            font-size: 32px;
+            font-weight: 700;
+        }
+        .stat-card .sub {
+            font-size: 12px;
+            color: var(--text2);
+            margin-top: 4px;
+        }
+        .stat-card .value.green { color: var(--accent); }
+        .stat-card .value.blue { color: var(--blue); }
+        .stat-card .value.orange { color: var(--orange); }
+        .stat-card .value.purple { color: var(--purple); }
+
+        /* Charts Row */
+        .charts-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        .chart-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+        }
+        .chart-card h3 {
+            font-size: 14px;
+            color: var(--text2);
+            margin-bottom: 16px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .chart-card canvas {
+            width: 100% !important;
+            height: 220px !important;
+        }
+
+        /* Intent Bars */
+        .intent-bars {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .intent-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .intent-row .name {
+            width: 130px;
+            font-size: 12px;
+            color: var(--text2);
+            text-align: right;
+            flex-shrink: 0;
+        }
+        .intent-row .bar-bg {
+            flex: 1;
+            height: 24px;
+            background: var(--surface2);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .intent-row .bar-fill {
+            height: 100%;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            padding-left: 8px;
+            font-size: 11px;
+            font-weight: 600;
+            color: #fff;
+            min-width: fit-content;
+            transition: width 0.6s ease;
+        }
+
+        /* Messages Table */
+        .table-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            overflow-x: auto;
+        }
+        .table-card h3 {
+            font-size: 14px;
+            color: var(--text2);
+            margin-bottom: 16px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th {
+            text-align: left;
+            font-size: 11px;
+            color: var(--text2);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 8px 12px;
+            border-bottom: 1px solid var(--border);
+        }
+        td {
+            padding: 10px 12px;
+            font-size: 13px;
+            border-bottom: 1px solid var(--border);
+            max-width: 250px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        tr:last-child td { border-bottom: none; }
+        .tag {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .tag.template { background: rgba(37,211,102,0.15); color: var(--accent); }
+        .tag.llm { background: rgba(79,143,247,0.15); color: var(--blue); }
+        .tag.guard { background: rgba(247,79,79,0.15); color: var(--red); }
+        .tag.intent { background: rgba(155,89,182,0.15); color: var(--purple); }
+
+        .user-group {
+            margin-bottom: 2px;
+        }
+        .user-group-header {
+            background: var(--surface2);
+            padding: 8px 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-radius: 6px;
+            user-select: none;
+            transition: background 0.15s;
+        }
+        .user-group-header:hover {
+            background: var(--border);
+        }
+        .user-group-header .arrow {
+            font-size: 10px;
+            transition: transform 0.2s;
+            color: var(--text2);
+        }
+        .user-group-header.open .arrow {
+            transform: rotate(90deg);
+        }
+        .user-group-header .user-name {
+            font-weight: 600;
+            font-size: 13px;
+        }
+        .user-group-header .msg-count {
+            font-size: 11px;
+            color: var(--text2);
+            margin-left: auto;
+        }
+        .user-group-body {
+            display: none;
+            width: 100%;
+        }
+        .user-group-header.open + .user-group-body {
+            display: table;
+        }
+
+        .status-banned {
+            background: rgba(247,79,79,0.15);
+            color: var(--red);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .status-limited {
+            background: rgba(247,149,79,0.15);
+            color: var(--orange);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .btn-action {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 4px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+            margin-right: 4px;
+            transition: background 0.15s;
+        }
+        .btn-action:hover {
+            background: var(--border);
+        }
+        .btn-action.danger {
+            border-color: var(--red);
+            color: var(--red);
+        }
+        .btn-action.danger:hover {
+            background: rgba(247,79,79,0.15);
+        }
+        .btn-action.warn {
+            border-color: var(--orange);
+            color: var(--orange);
+        }
+        .btn-action.warn:hover {
+            background: rgba(247,149,79,0.15);
+        }
+
+        .pagination {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin-top: 16px;
+        }
+        .pagination button {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 6px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .pagination button:hover:not(:disabled) {
+            background: var(--border);
+        }
+        .pagination button:disabled {
+            opacity: 0.4;
+            cursor: default;
+        }
+        .pagination .page-info {
+            font-size: 12px;
+            color: var(--text2);
+        }
+
+        /* Mode split */
+        .mode-split {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+            justify-content: center;
+            height: 220px;
+        }
+        .mode-block {
+            text-align: center;
+        }
+        .mode-circle {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            font-weight: 700;
+            margin: 0 auto 8px;
+        }
+        .mode-circle.tmpl { background: rgba(37,211,102,0.15); color: var(--accent); border: 3px solid var(--accent); }
+        .mode-circle.llm { background: rgba(79,143,247,0.15); color: var(--blue); border: 3px solid var(--blue); }
+        .mode-label { font-size: 12px; color: var(--text2); }
+
+        /* Hourly chart bars */
+        .hourly-chart {
+            display: flex;
+            align-items: flex-end;
+            gap: 3px;
+            height: 180px;
+            padding-top: 10px;
+        }
+        .hour-bar-wrapper {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100%;
+            justify-content: flex-end;
+        }
+        .hour-bar {
+            width: 100%;
+            background: var(--accent);
+            border-radius: 3px 3px 0 0;
+            min-height: 2px;
+            transition: height 0.4s ease;
+            opacity: 0.8;
+        }
+        .hour-bar:hover { opacity: 1; }
+        .hour-label {
+            font-size: 9px;
+            color: var(--text2);
+            margin-top: 4px;
+        }
+        .hour-count {
+            font-size: 9px;
+            color: var(--text2);
+            margin-bottom: 2px;
+        }
+
+        /* Settings Panel */
+        .settings-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.6);
+            z-index: 100;
+            justify-content: center;
+            align-items: center;
+        }
+        .settings-overlay.open { display: flex; }
+        .settings-panel {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            width: 560px;
+            max-width: 95vw;
+            max-height: 90vh;
+            overflow-y: auto;
+            padding: 28px;
+        }
+        .settings-panel h2 {
+            font-size: 18px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .settings-panel .close-btn {
+            background: none;
+            border: none;
+            color: var(--text2);
+            font-size: 22px;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 6px;
+        }
+        .settings-panel .close-btn:hover { background: var(--surface2); color: var(--text); }
+        .settings-tabs {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 20px;
+            background: var(--surface2);
+            border-radius: 8px;
+            padding: 4px;
+        }
+        .settings-tab {
+            flex: 1;
+            padding: 8px;
+            text-align: center;
+            border: none;
+            border-radius: 6px;
+            background: transparent;
+            color: var(--text2);
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .settings-tab.active {
+            background: var(--accent);
+            color: #000;
+            font-weight: 600;
+        }
+        .settings-section { display: none; }
+        .settings-section.active { display: block; }
+        .form-group {
+            margin-bottom: 16px;
+        }
+        .form-group label {
+            display: block;
+            font-size: 12px;
+            color: var(--text2);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+        }
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 10px 12px;
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
+            font-size: 14px;
+            font-family: inherit;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .form-group input:focus, .form-group select:focus {
+            border-color: var(--accent);
+        }
+        .form-group input::placeholder { color: var(--text2); opacity: 0.6; }
+        .form-group .hint {
+            font-size: 11px;
+            color: var(--text2);
+            margin-top: 4px;
+        }
+        .form-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-primary {
+            background: var(--accent);
+            color: #000;
+        }
+        .btn-primary:hover { opacity: 0.9; }
+        .btn-secondary {
+            background: var(--surface2);
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+        .btn-secondary:hover { border-color: var(--text2); }
+        .btn-test {
+            background: var(--blue);
+            color: #fff;
+        }
+        .btn-sync {
+            background: var(--orange);
+            color: #000;
+        }
+        .btn-sync:hover { opacity: 0.9; }
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 500;
+            z-index: 200;
+            transition: opacity 0.3s, transform 0.3s;
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        .toast.show { opacity: 1; transform: translateY(0); }
+        .toast.success { background: rgba(37,211,102,0.9); color: #000; }
+        .toast.error { background: rgba(247,79,79,0.9); color: #fff; }
+        .settings-gear {
+            background: none;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text2);
+            padding: 6px 10px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .settings-gear:hover { border-color: var(--text2); color: var(--text); }
+
+        /* Login Screen */
+        .login-overlay {
+            position: fixed;
+            inset: 0;
+            background: var(--bg);
+            z-index: 9999;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .login-overlay.hidden { display: none; }
+        .login-box {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 40px;
+            width: 360px;
+            max-width: 90vw;
+            text-align: center;
+        }
+        .login-box h2 {
+            font-size: 20px;
+            margin-bottom: 8px;
+        }
+        .login-box .subtitle {
+            font-size: 13px;
+            color: var(--text2);
+            margin-bottom: 24px;
+        }
+        .login-box input {
+            width: 100%;
+            padding: 12px 14px;
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
+            font-size: 14px;
+            font-family: inherit;
+            outline: none;
+            margin-bottom: 12px;
+        }
+        .login-box input:focus { border-color: var(--accent); }
+        .login-box input::placeholder { color: var(--text2); opacity: 0.6; }
+        .login-box .login-btn {
+            width: 100%;
+            padding: 12px;
+            background: var(--accent);
+            color: #000;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 4px;
+        }
+        .login-box .login-btn:hover { opacity: 0.9; }
+        .login-box .login-error {
+            color: var(--red);
+            font-size: 13px;
+            margin-top: 12px;
+            display: none;
+        }
+        .login-box .login-error.show { display: block; }
+
+        @media (max-width: 768px) {
+            .charts-row { grid-template-columns: 1fr; }
+            .header { padding: 12px 16px; flex-wrap: wrap; gap: 12px; }
+            .main { padding: 16px; }
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+            .settings-panel { padding: 20px; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Login Screen -->
+    <div class="login-overlay" id="loginOverlay">
+        <div class="login-box">
+            <h2>WorkPing Dashboard</h2>
+            <div class="subtitle">Sign in to continue</div>
+            <input type="text" id="login-username" placeholder="Username" autocomplete="username" onkeydown="if(event.key==='Enter')document.getElementById('login-password').focus()">
+            <input type="password" id="login-password" placeholder="Password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+            <button class="login-btn" onclick="doLogin()">Sign In</button>
+            <div class="login-error" id="login-error">Invalid username or password</div>
+        </div>
+    </div>
+
+    <div class="header">
+        <h1><div class="dot"></div> WorkPing Dashboard</h1>
+        <div class="header-right">
+            <div class="provider-switch">
+                <label>LLM:</label>
+                <button class="provider-btn" data-provider="ollama" onclick="switchProvider('ollama')">Ollama</button>
+                <button class="provider-btn" data-provider="bedrock" onclick="switchProvider('bedrock')">Bedrock</button>
+                <button class="provider-btn" data-provider="custom" onclick="switchProvider('custom')">Custom</button>
+            </div>
+            <button class="settings-gear" onclick="openSettings()">&#9881;</button>
+            <span class="health-badge" id="healthBadge">checking...</span>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div class="settings-overlay" id="settingsOverlay" onclick="if(event.target===this)closeSettings()">
+        <div class="settings-panel">
+            <h2>
+                LLM Provider Settings
+                <button class="close-btn" onclick="closeSettings()">&times;</button>
+            </h2>
+            <div class="settings-tabs">
+                <button class="settings-tab active" data-tab="ollama" onclick="switchSettingsTab('ollama')">Ollama</button>
+                <button class="settings-tab" data-tab="bedrock" onclick="switchSettingsTab('bedrock')">Bedrock</button>
+                <button class="settings-tab" data-tab="custom" onclick="switchSettingsTab('custom')">Custom</button>
+                <button class="settings-tab" data-tab="test-llm" onclick="switchSettingsTab('test-llm')">Test LLM</button>
+            </div>
+
+            <!-- Ollama Settings -->
+            <div class="settings-section active" id="settings-ollama">
+                <div class="form-group">
+                    <label>Base URL</label>
+                    <input type="text" id="ollama-baseUrl" placeholder="http://localhost:11434">
+                    <div class="hint">Ollama server endpoint</div>
+                </div>
+                <div class="form-group">
+                    <label>Model</label>
+                    <input type="text" id="ollama-model" placeholder="qwen2.5:3b">
+                    <div class="hint">Model name as shown in "ollama list"</div>
+                </div>
+                <div class="form-actions">
+                    <button class="btn btn-primary" onclick="saveConfig('ollama')">Save</button>
+                    <button class="btn btn-test" onclick="testProvider('ollama')">Test Connection</button>
+                    <button class="btn btn-secondary" onclick="activateProvider('ollama')">Set as Active</button>
+                    <button class="btn btn-sync" onclick="syncToDisk('ollama')">Sync to Disk</button>
+                </div>
+            </div>
+
+            <!-- Bedrock Settings -->
+            <div class="settings-section" id="settings-bedrock">
+                <div class="form-group">
+                    <label>AWS Region</label>
+                    <select id="bedrock-region">
+                        <option value="us-east-1">us-east-1 (N. Virginia)</option>
+                        <option value="us-west-2">us-west-2 (Oregon)</option>
+                        <option value="eu-west-1">eu-west-1 (Ireland)</option>
+                        <option value="eu-central-1">eu-central-1 (Frankfurt)</option>
+                        <option value="ap-south-1">ap-south-1 (Mumbai)</option>
+                        <option value="ap-southeast-1">ap-southeast-1 (Singapore)</option>
+                        <option value="ap-northeast-1">ap-northeast-1 (Tokyo)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Access Key ID</label>
+                    <input type="text" id="bedrock-accessKeyId" placeholder="AKIA...">
+                </div>
+                <div class="form-group">
+                    <label>Secret Access Key</label>
+                    <input type="password" id="bedrock-secretAccessKey" placeholder="Enter secret key">
+                    <div class="hint">In memory until you click "Sync to Disk" to persist to .env</div>
+                </div>
+                <div class="form-group">
+                    <label>Model ID</label>
+                    <input type="text" id="bedrock-modelId" placeholder="amazon.nova-micro-v1:0">
+                    <div class="hint">e.g. amazon.nova-micro-v1:0, anthropic.claude-3-haiku-20240307-v1:0</div>
+                </div>
+                <div class="form-group">
+                    <label>Model Name (Display)</label>
+                    <input type="text" id="bedrock-modelName" placeholder="e.g. Nova Micro">
+                    <div class="hint">Friendly name for display purposes</div>
+                </div>
+                <div class="form-actions">
+                    <button class="btn btn-primary" onclick="saveConfig('bedrock')">Save</button>
+                    <button class="btn btn-test" onclick="testProvider('bedrock')">Test Connection</button>
+                    <button class="btn btn-secondary" onclick="activateProvider('bedrock')">Set as Active</button>
+                    <button class="btn btn-sync" onclick="syncToDisk('bedrock')">Sync to Disk</button>
+                </div>
+            </div>
+
+            <!-- Custom Self-Hosted Settings -->
+            <div class="settings-section" id="settings-custom">
+                <div class="form-group">
+                    <label>Base URL</label>
+                    <input type="text" id="custom-baseUrl" placeholder="http://your-server:8000">
+                    <div class="hint">Your self-hosted model server endpoint</div>
+                </div>
+                <div class="form-group">
+                    <label>Chat Endpoint</label>
+                    <input type="text" id="custom-chatEndpoint" placeholder="/v1/chat">
+                    <div class="hint">Path for chat completions (appended to base URL)</div>
+                </div>
+                <div class="form-group">
+                    <label>Generate Endpoint</label>
+                    <input type="text" id="custom-generateEndpoint" placeholder="/v1/generate">
+                    <div class="hint">Path for text generation (leave same as chat if not separate)</div>
+                </div>
+                <div class="form-group">
+                    <label>API Key</label>
+                    <input type="password" id="custom-apiKey" placeholder="Optional bearer token">
+                    <div class="hint">Sent as Authorization: Bearer header (leave empty if none)</div>
+                </div>
+                <div class="form-group">
+                    <label>Model Name</label>
+                    <input type="text" id="custom-modelName" placeholder="my-model">
+                    <div class="hint">Model identifier sent in requests</div>
+                </div>
+                <div class="form-group">
+                    <label>Request Format</label>
+                    <select id="custom-requestFormat">
+                        <option value="openai">OpenAI-compatible (vLLM, LiteLLM, TGI)</option>
+                        <option value="ollama">Ollama-compatible</option>
+                        <option value="raw">Raw (send messages + options as-is)</option>
+                    </select>
+                    <div class="hint">How to format the request body for your server</div>
+                </div>
+                <div class="form-group">
+                    <label>Timeout (ms)</label>
+                    <input type="number" id="custom-timeout" placeholder="60000">
+                    <div class="hint">Request timeout in milliseconds</div>
+                </div>
+                <div class="form-actions">
+                    <button class="btn btn-primary" onclick="saveConfig('custom')">Save</button>
+                    <button class="btn btn-test" onclick="testProvider('custom')">Test Connection</button>
+                    <button class="btn btn-secondary" onclick="activateProvider('custom')">Set as Active</button>
+                    <button class="btn btn-sync" onclick="syncToDisk('custom')">Sync to Disk</button>
+                </div>
+            </div>
+
+            <!-- Test LLM -->
+            <div class="settings-section" id="settings-test-llm">
+                <div style="margin-bottom:16px">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+                        <div>
+                            <span style="font-size:13px;color:var(--text2)">Active provider: </span>
+                            <span style="font-size:13px;font-weight:600" id="test-active-provider">--</span>
+                        </div>
+                        <span class="health-badge" id="test-health-badge" style="font-size:11px">--</span>
+                    </div>
+                    <div id="test-config-summary" style="font-size:12px;color:var(--text2);background:var(--surface2);padding:10px 12px;border-radius:8px;border:1px solid var(--border)">
+                        Loading config...
+                    </div>
+                </div>
+
+                <div id="test-chat-log" style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px;min-height:180px;max-height:300px;overflow-y:auto;margin-bottom:12px;font-size:13px;line-height:1.6">
+                    <div style="color:var(--text2);text-align:center;padding:20px">Send a message to test the active LLM provider</div>
+                </div>
+
+                <div style="display:flex;gap:8px">
+                    <input type="text" id="test-chat-input" placeholder="Type a test message..." style="flex:1;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;font-family:inherit;outline:none" onkeydown="if(event.key==='Enter')sendTestChat()">
+                    <button class="btn btn-primary" onclick="sendTestChat()" id="test-send-btn">Send</button>
+                </div>
+                <div style="display:flex;gap:10px;margin-top:12px">
+                    <button class="btn btn-secondary" onclick="clearTestChat()" style="font-size:12px">Clear Chat</button>
+                    <button class="btn btn-sync" onclick="syncToDisk(document.getElementById('test-active-provider').textContent)" style="font-size:12px">Sync to Disk</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast notification -->
+    <div class="toast" id="toast"></div>
+
+    <div class="main">
+        <!-- Stat Cards -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="label">Total Messages</div>
+                <div class="value green" id="totalMessages">0</div>
+                <div class="sub" id="uptimeSub">uptime: 0s</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">Unique Users</div>
+                <div class="value blue" id="uniqueUsers">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">Avg Response Time</div>
+                <div class="value orange" id="avgResponseTime">0ms</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">Errors</div>
+                <div class="value" id="totalErrors" style="color:var(--red)">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">Rate Limited</div>
+                <div class="value" id="rateLimitedCount" style="color:var(--orange)">0</div>
+                <div class="sub">users today</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">Banned</div>
+                <div class="value" id="bannedCount" style="color:var(--red)">0</div>
+                <div class="sub">active bans</div>
+            </div>
+        </div>
+
+        <!-- Charts -->
+        <div class="charts-row">
+            <div class="chart-card">
+                <h3>Intent Distribution</h3>
+                <div class="intent-bars" id="intentBars">
+                    <div style="color:var(--text2);text-align:center;padding:40px">No data yet</div>
+                </div>
+            </div>
+            <div class="chart-card">
+                <h3>Response Mode Split</h3>
+                <div class="mode-split" id="modeSplit">
+                    <div class="mode-block">
+                        <div class="mode-circle tmpl" id="tmplCount">0</div>
+                        <div class="mode-label">Template</div>
+                    </div>
+                    <div class="mode-block">
+                        <div class="mode-circle llm" id="llmCount">0</div>
+                        <div class="mode-label">LLM</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="charts-row">
+            <div class="chart-card" style="grid-column: 1 / -1;">
+                <h3>Messages by Hour (Today)</h3>
+                <div class="hourly-chart" id="hourlyChart"></div>
+            </div>
+        </div>
+
+        <!-- Guarded Users -->
+        <div class="table-card" id="guardedUsersCard" style="display:none">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+                <h3 style="margin-bottom:0">Restricted Users</h3>
+                <button onclick="fetchGuardedUsers()" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:4px 12px;border-radius:6px;cursor:pointer;font-size:11px">Refresh</button>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Phone</th>
+                        <th>Status</th>
+                        <th>Details</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="guardedUsersBody">
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Recent Messages -->
+        <div class="table-card">
+            <h3>Recent Messages</h3>
+            <div id="messagesContainer">
+                <p style="text-align:center;color:var(--text2);padding:40px 0">No messages yet</p>
+            </div>
+            <div class="pagination" id="pagination" style="display:none">
+                <button id="prevPage" onclick="changePage(-1)">Prev</button>
+                <span class="page-info" id="pageInfo">Page 1</span>
+                <button id="nextPage" onclick="changePage(1)">Next</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API = '/api/dashboard';
+        let authToken = sessionStorage.getItem('dashboard_token') || '';
+
+        // Auth wrapper for all API calls
+        async function authFetch(url, options = {}) {
+            options.headers = options.headers || {};
+            if (authToken) options.headers['x-dashboard-token'] = authToken;
+            const res = await fetch(url, options);
+            if (res.status === 401) {
+                sessionStorage.removeItem('dashboard_token');
+                authToken = '';
+                showLogin();
+                throw new Error('Not authenticated');
+            }
+            return res;
+        }
+
+        async function doLogin() {
+            const username = document.getElementById('login-username').value.trim();
+            const password = document.getElementById('login-password').value;
+            const errorEl = document.getElementById('login-error');
+            errorEl.classList.remove('show');
+            try {
+                const res = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                const data = await res.json();
+                if (data.ok) {
+                    authToken = data.token;
+                    sessionStorage.setItem('dashboard_token', authToken);
+                    document.getElementById('loginOverlay').classList.add('hidden');
+                    initDashboard();
+                } else {
+                    errorEl.classList.add('show');
+                }
+            } catch (e) {
+                errorEl.classList.add('show');
+            }
+        }
+
+        function showLogin() {
+            document.getElementById('loginOverlay').classList.remove('hidden');
+            document.getElementById('login-username').value = '';
+            document.getElementById('login-password').value = '';
+        }
+
+        // Check if we have a valid token on load
+        async function checkAuth() {
+            if (!authToken) { showLogin(); return; }
+            try {
+                const res = await authFetch(`${API}/stats`);
+                if (res.ok) {
+                    document.getElementById('loginOverlay').classList.add('hidden');
+                    initDashboard();
+                }
+            } catch {
+                showLogin();
+            }
+        }
+
+        const INTENT_COLORS = [
+            '#25D366', '#4f8ff7', '#f7954f', '#9b59b6', '#e74c3c',
+            '#1abc9c', '#f39c12', '#3498db', '#e67e22', '#2ecc71',
+            '#e91e63', '#00bcd4'
+        ];
+
+        async function fetchStats() {
+            try {
+                const res = await authFetch(`${API}/stats`);
+                const data = await res.json();
+                render(data);
+            } catch (e) {
+                console.error('Failed to fetch stats:', e);
+            }
+        }
+
+        async function fetchHealth() {
+            try {
+                const res = await authFetch(`${API}/health`);
+                const data = await res.json();
+                const badge = document.getElementById('healthBadge');
+                if (data.ok) {
+                    badge.textContent = `${data.provider} OK`;
+                    badge.className = 'health-badge ok';
+                } else {
+                    badge.textContent = `${data.provider || 'LLM'} DOWN`;
+                    badge.className = 'health-badge down';
+                }
+            } catch {
+                const badge = document.getElementById('healthBadge');
+                badge.textContent = 'OFFLINE';
+                badge.className = 'health-badge down';
+            }
+        }
+
+        async function fetchProvider() {
+            try {
+                const res = await authFetch(`${API}/provider`);
+                const data = await res.json();
+                updateProviderButtons(data.provider);
+            } catch (e) {
+                console.error('Failed to fetch provider:', e);
+            }
+        }
+
+        async function switchProvider(provider) {
+            try {
+                const res = await authFetch(`${API}/provider`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ provider })
+                });
+                const data = await res.json();
+                if (data.provider) {
+                    updateProviderButtons(data.provider);
+                    fetchHealth();
+                } else if (data.error) {
+                    alert(data.error);
+                }
+            } catch (e) {
+                alert('Failed to switch provider');
+            }
+        }
+
+        function updateProviderButtons(active) {
+            document.querySelectorAll('.provider-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.provider === active);
+            });
+        }
+
+        function formatTime(ts) {
+            return new Date(ts).toLocaleTimeString('en-US', {
+                hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+            });
+        }
+
+        function formatUptime(seconds) {
+            if (seconds < 60) return `${seconds}s`;
+            if (seconds < 3600) return `${Math.floor(seconds/60)}m ${seconds%60}s`;
+            const h = Math.floor(seconds/3600);
+            const m = Math.floor((seconds%3600)/60);
+            return `${h}h ${m}m`;
+        }
+
+        function render(data) {
+            // Stat cards
+            document.getElementById('totalMessages').textContent = data.totalMessages;
+            document.getElementById('uniqueUsers').textContent = data.uniqueUsers;
+            document.getElementById('avgResponseTime').textContent = data.avgResponseTime + 'ms';
+            document.getElementById('totalErrors').textContent = data.totalErrors;
+            document.getElementById('rateLimitedCount').textContent = data.rateLimitedCount || 0;
+            document.getElementById('bannedCount').textContent = data.bannedCount || 0;
+            document.getElementById('uptimeSub').textContent = `uptime: ${formatUptime(data.uptime)}`;
+
+            // Intent bars
+            renderIntentBars(data.intentCounts);
+
+            // Mode split
+            document.getElementById('tmplCount').textContent = data.modeCounts.TEMPLATE || 0;
+            document.getElementById('llmCount').textContent = data.modeCounts.LLM || 0;
+
+            // Hourly chart
+            renderHourlyChart(data.hourlyMessages);
+
+            // Recent messages
+            renderMessages(data.recentMessages);
+        }
+
+        function renderIntentBars(intentCounts) {
+            const container = document.getElementById('intentBars');
+            const entries = Object.entries(intentCounts).sort((a, b) => b[1] - a[1]);
+            if (!entries.length) {
+                container.innerHTML = '<div style="color:var(--text2);text-align:center;padding:40px">No data yet</div>';
+                return;
+            }
+            const max = entries[0][1];
+            container.innerHTML = entries.map(([intent, count], i) => {
+                const pct = Math.max((count / max) * 100, 8);
+                const color = INTENT_COLORS[i % INTENT_COLORS.length];
+                return `<div class="intent-row">
+                    <div class="name">${intent}</div>
+                    <div class="bar-bg">
+                        <div class="bar-fill" style="width:${pct}%;background:${color}">${count}</div>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        function renderHourlyChart(hourly) {
+            const container = document.getElementById('hourlyChart');
+            const max = Math.max(...hourly, 1);
+            container.innerHTML = hourly.map((count, h) => {
+                const pct = (count / max) * 100;
+                const now = new Date().getHours();
+                const opacity = h === now ? '1' : '0.6';
+                return `<div class="hour-bar-wrapper">
+                    <div class="hour-count">${count || ''}</div>
+                    <div class="hour-bar" style="height:${Math.max(pct, 2)}%;opacity:${opacity}"></div>
+                    <div class="hour-label">${h.toString().padStart(2,'0')}</div>
+                </div>`;
+            }).join('');
+        }
+
+        const MSG_PAGE_SIZE = 10;
+        let msgPage = 0;
+        let allMessages = [];
+
+        function modeClass(mode) {
+            if (mode === 'TEMPLATE') return 'template';
+            if (mode === 'GUARD') return 'guard';
+            return 'llm';
+        }
+
+        function renderMessages(messages) {
+            allMessages = messages || [];
+            msgPage = 0;
+            renderMessagePage();
+        }
+
+        function changePage(delta) {
+            const totalPages = Math.ceil(allMessages.length / MSG_PAGE_SIZE) || 1;
+            msgPage = Math.max(0, Math.min(msgPage + delta, totalPages - 1));
+            renderMessagePage();
+        }
+
+        function renderMessagePage() {
+            const container = document.getElementById('messagesContainer');
+            const pag = document.getElementById('pagination');
+
+            if (!allMessages.length) {
+                container.innerHTML = '<p style="text-align:center;color:var(--text2);padding:40px 0">No messages yet</p>';
+                pag.style.display = 'none';
+                return;
+            }
+
+            const totalPages = Math.ceil(allMessages.length / MSG_PAGE_SIZE);
+            const pageMessages = allMessages.slice(msgPage * MSG_PAGE_SIZE, (msgPage + 1) * MSG_PAGE_SIZE);
+
+            // Group by user
+            const groups = new Map();
+            for (const m of pageMessages) {
+                const key = m.username || m.from;
+                if (!groups.has(key)) groups.set(key, []);
+                groups.get(key).push(m);
+            }
+
+            let html = '';
+            for (const [user, msgs] of groups) {
+                const groupId = 'ug-' + msgPage + '-' + user.replace(/\W/g, '_');
+                html += `<div class="user-group">`;
+                html += `<div class="user-group-header open" onclick="this.classList.toggle('open')">
+                    <span class="arrow">&#9654;</span>
+                    <span class="user-name">${escapeHtml(user)}</span>
+                    <span class="msg-count">${msgs.length} message${msgs.length > 1 ? 's' : ''}</span>
+                </div>`;
+                html += `<table class="user-group-body"><thead><tr>
+                    <th>Time</th><th>Message</th><th>Intent</th><th>Mode</th><th>Latency</th>
+                </tr></thead><tbody>`;
+                for (const m of msgs) {
+                    html += `<tr>
+                        <td>${formatTime(m.timestamp)}</td>
+                        <td title="${escapeHtml(m.text)}">${escapeHtml(m.text)}</td>
+                        <td><span class="tag intent">${m.intent}</span></td>
+                        <td><span class="tag ${modeClass(m.mode)}">${m.mode}</span></td>
+                        <td>${m.responseTimeMs ? m.responseTimeMs + 'ms' : '-'}</td>
+                    </tr>`;
+                }
+                html += `</tbody></table></div>`;
+            }
+
+            container.innerHTML = html;
+
+            // Pagination controls
+            if (totalPages > 1) {
+                pag.style.display = 'flex';
+                document.getElementById('prevPage').disabled = msgPage === 0;
+                document.getElementById('nextPage').disabled = msgPage >= totalPages - 1;
+                document.getElementById('pageInfo').textContent = `Page ${msgPage + 1} of ${totalPages}`;
+            } else {
+                pag.style.display = 'none';
+            }
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        }
+
+        // ---- Guarded Users ----
+        async function fetchGuardedUsers() {
+            try {
+                const res = await authFetch(`${API}/guarded-users`);
+                const users = await res.json();
+                renderGuardedUsers(users);
+            } catch (e) {
+                console.error('Failed to fetch guarded users:', e);
+            }
+        }
+
+        function renderGuardedUsers(users) {
+            const card = document.getElementById('guardedUsersCard');
+            const tbody = document.getElementById('guardedUsersBody');
+
+            if (!users.length) {
+                card.style.display = 'none';
+                return;
+            }
+
+            card.style.display = 'block';
+            tbody.innerHTML = users.map(u => {
+                const statuses = [];
+                if (u.banned) statuses.push('<span class="status-banned">BANNED</span>');
+                if (u.rateLimited) statuses.push('<span class="status-limited">RATE LIMITED</span>');
+
+                const details = [];
+                if (u.banned) details.push(`Ban expires in ${u.banHoursLeft}h`);
+                if (u.warnings) details.push(`${u.warnings} warning(s)`);
+                if (u.rateLimited) details.push(`${u.messagesUsed} msgs used today`);
+
+                const actions = [];
+                if (u.banned) {
+                    actions.push(`<button class="btn-action danger" onclick="doUnban('${u.phone}')">Remove Ban</button>`);
+                }
+                if (u.rateLimited) {
+                    actions.push(`<button class="btn-action warn" onclick="doUnrestrict('${u.phone}')">Reset Limit</button>`);
+                }
+
+                return `<tr>
+                    <td style="font-family:monospace;font-size:12px">${u.phone}</td>
+                    <td>${statuses.join(' ')}</td>
+                    <td style="font-size:12px;color:var(--text2)">${details.join(' / ')}</td>
+                    <td>${actions.join('')}</td>
+                </tr>`;
+            }).join('');
+        }
+
+        async function doUnban(phone) {
+            if (!confirm(`Remove ban for ${phone}?`)) return;
+            try {
+                await authFetch(`${API}/unban`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phone })
+                });
+                fetchGuardedUsers();
+                fetchStats();
+            } catch (e) {
+                alert('Failed to unban user');
+            }
+        }
+
+        async function doUnrestrict(phone) {
+            if (!confirm(`Reset daily limit for ${phone}?`)) return;
+            try {
+                await authFetch(`${API}/unrestrict`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phone })
+                });
+                fetchGuardedUsers();
+                fetchStats();
+            } catch (e) {
+                alert('Failed to reset limit');
+            }
+        }
+
+        // ---- Settings Panel ----
+        function openSettings() {
+            document.getElementById('settingsOverlay').classList.add('open');
+            loadConfig('ollama');
+            loadConfig('bedrock');
+            loadConfig('custom');
+        }
+
+        function closeSettings() {
+            document.getElementById('settingsOverlay').classList.remove('open');
+        }
+
+        function switchSettingsTab(tab) {
+            document.querySelectorAll('.settings-tab').forEach(t =>
+                t.classList.toggle('active', t.dataset.tab === tab));
+            document.querySelectorAll('.settings-section').forEach(s =>
+                s.classList.toggle('active', s.id === `settings-${tab}`));
+        }
+
+        async function loadConfig(provider) {
+            try {
+                const res = await authFetch(`${API}/config/${provider}`);
+                const data = await res.json();
+                if (provider === 'ollama') {
+                    document.getElementById('ollama-baseUrl').value = data.baseUrl || '';
+                    document.getElementById('ollama-model').value = data.model || '';
+                } else if (provider === 'bedrock') {
+                    document.getElementById('bedrock-region').value = data.region || 'us-east-1';
+                    document.getElementById('bedrock-accessKeyId').value = '';
+                    document.getElementById('bedrock-accessKeyId').placeholder =
+                        data.accessKeyId ? `Key is set (${data.accessKeyId})` : 'AKIA...';
+                    document.getElementById('bedrock-secretAccessKey').value = '';
+                    document.getElementById('bedrock-secretAccessKey').placeholder =
+                        data.secretAccessKey ? 'Key is set (enter new to change)' : 'Enter secret key';
+                    document.getElementById('bedrock-modelId').value = data.modelId || '';
+                    document.getElementById('bedrock-modelName').value = data.modelName || '';
+                } else if (provider === 'custom') {
+                    document.getElementById('custom-baseUrl').value = data.baseUrl || '';
+                    document.getElementById('custom-chatEndpoint').value = data.chatEndpoint || '/v1/chat';
+                    document.getElementById('custom-generateEndpoint').value = data.generateEndpoint || '/v1/generate';
+                    document.getElementById('custom-apiKey').value = '';
+                    document.getElementById('custom-apiKey').placeholder =
+                        data.apiKey ? 'Key is set (enter new to change)' : 'Optional bearer token';
+                    document.getElementById('custom-modelName').value = data.modelName || '';
+                    document.getElementById('custom-requestFormat').value = data.requestFormat || 'openai';
+                    document.getElementById('custom-timeout').value = data.timeout || 60000;
+                }
+            } catch (e) {
+                console.error(`Failed to load ${provider} config:`, e);
+            }
+        }
+
+        async function saveConfig(provider) {
+            let body = {};
+            if (provider === 'ollama') {
+                body.baseUrl = document.getElementById('ollama-baseUrl').value;
+                body.model = document.getElementById('ollama-model').value;
+            } else if (provider === 'bedrock') {
+                body.region = document.getElementById('bedrock-region').value;
+                body.modelId = document.getElementById('bedrock-modelId').value;
+                body.modelName = document.getElementById('bedrock-modelName').value;
+                const accessKey = document.getElementById('bedrock-accessKeyId').value;
+                const secretKey = document.getElementById('bedrock-secretAccessKey').value;
+                if (accessKey) body.accessKeyId = accessKey;
+                if (secretKey) body.secretAccessKey = secretKey;
+            } else if (provider === 'custom') {
+                body.baseUrl = document.getElementById('custom-baseUrl').value;
+                body.chatEndpoint = document.getElementById('custom-chatEndpoint').value;
+                body.generateEndpoint = document.getElementById('custom-generateEndpoint').value;
+                body.modelName = document.getElementById('custom-modelName').value;
+                body.requestFormat = document.getElementById('custom-requestFormat').value;
+                body.timeout = document.getElementById('custom-timeout').value;
+                const apiKey = document.getElementById('custom-apiKey').value;
+                if (apiKey) body.apiKey = apiKey;
+            }
+
+            try {
+                const res = await authFetch(`${API}/config/${provider}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                const data = await res.json();
+                if (data.error) {
+                    showToast(data.error, 'error');
+                } else {
+                    showToast(`${provider} config saved`, 'success');
+                    loadConfig(provider);
+                }
+            } catch (e) {
+                showToast('Failed to save config', 'error');
+            }
+        }
+
+        async function testProvider(provider) {
+            showToast(`Saving & activating ${provider}...`, 'success');
+            // Save config and set as active provider
+            await saveConfig(provider);
+            await switchProvider(provider);
+            // Switch to Test LLM tab
+            switchSettingsTab('test-llm');
+        }
+
+        async function activateProvider(provider) {
+            await saveConfig(provider);
+            await switchProvider(provider);
+            showToast(`Switched to ${provider}`, 'success');
+            closeSettings();
+        }
+
+        async function syncToDisk(provider) {
+            // Save runtime config first
+            await saveConfig(provider);
+            try {
+                const res = await authFetch(`${API}/sync`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ provider })
+                });
+                const data = await res.json();
+                if (data.synced) {
+                    showToast(`${provider} config written to .env (${data.keys.length} keys)`, 'success');
+                } else {
+                    showToast(data.error || 'Sync failed', 'error');
+                }
+            } catch (e) {
+                showToast('Failed to sync to disk: ' + e.message, 'error');
+            }
+        }
+
+        function showToast(msg, type) {
+            const toast = document.getElementById('toast');
+            toast.textContent = msg;
+            toast.className = `toast ${type} show`;
+            clearTimeout(toast._timer);
+            toast._timer = setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+
+        // ---- Test LLM Chat ----
+        async function loadTestLLMInfo() {
+            try {
+                const [provRes, healthRes] = await Promise.all([
+                    authFetch(`${API}/provider`),
+                    authFetch(`${API}/health`)
+                ]);
+                const prov = await provRes.json();
+                const health = await healthRes.json();
+
+                document.getElementById('test-active-provider').textContent = prov.provider;
+
+                const badge = document.getElementById('test-health-badge');
+                if (health.ok) {
+                    badge.textContent = 'OK';
+                    badge.className = 'health-badge ok';
+                } else {
+                    badge.textContent = health.error || 'DOWN';
+                    badge.className = 'health-badge down';
+                }
+
+                const cfgRes = await authFetch(`${API}/config/${prov.provider}`);
+                const cfg = await cfgRes.json();
+                let summary = '';
+                if (prov.provider === 'ollama') {
+                    summary = `URL: ${cfg.baseUrl || '(default)'} | Model: ${cfg.model || '(default)'}`;
+                } else if (prov.provider === 'bedrock') {
+                    summary = `Region: ${cfg.region} | Model: ${cfg.modelId}${cfg.modelName ? ' (' + cfg.modelName + ')' : ''} | Key: ${cfg.accessKeyId || '(not set)'}`;
+                } else if (prov.provider === 'custom') {
+                    summary = `URL: ${cfg.baseUrl || '(not set)'} | Model: ${cfg.modelName || '(not set)'} | Format: ${cfg.requestFormat}`;
+                }
+                document.getElementById('test-config-summary').textContent = summary;
+            } catch (e) {
+                document.getElementById('test-config-summary').textContent = 'Failed to load config';
+            }
+        }
+
+        async function sendTestChat() {
+            const input = document.getElementById('test-chat-input');
+            const message = input.value.trim();
+            if (!message) return;
+
+            const log = document.getElementById('test-chat-log');
+            const sendBtn = document.getElementById('test-send-btn');
+
+            // Clear placeholder if first message
+            if (log.querySelector('div[style*="text-align:center"]')) {
+                log.innerHTML = '';
+            }
+
+            // Show user message
+            log.innerHTML += `<div style="margin-bottom:8px"><span style="color:var(--blue);font-weight:600">You:</span> ${escapeHtml(message)}</div>`;
+            input.value = '';
+            sendBtn.disabled = true;
+            sendBtn.textContent = '...';
+
+            // Show thinking indicator
+            const thinkingId = 'thinking-' + Date.now();
+            log.innerHTML += `<div id="${thinkingId}" style="margin-bottom:8px;color:var(--text2)">Thinking...</div>`;
+            log.scrollTop = log.scrollHeight;
+
+            try {
+                const res = await authFetch(`${API}/test-chat`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message })
+                });
+                const data = await res.json();
+
+                const thinkingEl = document.getElementById(thinkingId);
+                if (thinkingEl) thinkingEl.remove();
+
+                if (data.ok) {
+                    log.innerHTML += `<div style="margin-bottom:8px"><span style="color:var(--accent);font-weight:600">LLM (${escapeHtml(data.provider)}):</span> ${escapeHtml(data.response)} <span style="color:var(--text2);font-size:11px">${data.elapsed}ms</span></div>`;
+                } else {
+                    log.innerHTML += `<div style="margin-bottom:8px;color:var(--red)">Error (${escapeHtml(data.provider)}): ${escapeHtml(data.error)}</div>`;
+                }
+            } catch (e) {
+                const thinkingEl = document.getElementById(thinkingId);
+                if (thinkingEl) thinkingEl.remove();
+                log.innerHTML += `<div style="margin-bottom:8px;color:var(--red)">Request failed: ${escapeHtml(e.message)}</div>`;
+            }
+
+            sendBtn.disabled = false;
+            sendBtn.textContent = 'Send';
+            log.scrollTop = log.scrollHeight;
+        }
+
+        function clearTestChat() {
+            document.getElementById('test-chat-log').innerHTML = '<div style="color:var(--text2);text-align:center;padding:20px">Send a message to test the active LLM provider</div>';
+        }
+
+        // Load test info when switching to test tab
+        const origSwitchTab = switchSettingsTab;
+        switchSettingsTab = function(tab) {
+            origSwitchTab(tab);
+            if (tab === 'test-llm') loadTestLLMInfo();
+        };
+
+        // ---- Init ----
+        let refreshIntervals = [];
+        function initDashboard() {
+            fetchStats();
+            fetchHealth();
+            fetchProvider();
+            fetchGuardedUsers();
+            // Clear old intervals if re-initing
+            refreshIntervals.forEach(clearInterval);
+            refreshIntervals = [
+                setInterval(fetchStats, 5000),
+                setInterval(fetchHealth, 15000),
+                setInterval(fetchGuardedUsers, 10000),
+            ];
+        }
+        checkAuth();
+    </script>
+</body>
+</html>

@@ -1,0 +1,76 @@
+// ─── Theme switch: suppress all transitions for one frame so every element
+//     changes colour at the same time (no stagger between 0.2s and 0.3s rules)
+html.theme-switching *,
+html.theme-switching *::before,
+html.theme-switching *::after {
+  transition:
+    color 0.4s ease,
+    background-color 0.4s ease,
+    border-color 0.4s ease,
+    box-shadow 0.4s ease,
+    fill 0.4s ease,
+    stroke 0.4s ease !important;
+}
+
+// ─── Logo text visibility (mirrors logo-lg behaviour for condensed sidebar) ──
+
+// Condensed: hide text label
+html[data-menu-size='condensed'] .main-nav .logo-text,
+html[data-menu-size='sm-hover'] .main-nav:not(:hover) .logo-text {
+  display: none;
+}
+
+// ─── Shimmer skeleton for stat cards ───────────────────────────────────────
+
+@keyframes shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+
+@keyframes stat-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.55; transform: scale(0.97); }
+}
+
+.stat-skeleton {
+  display: inline-block;
+  border-radius: 6px;
+  background: linear-gradient(
+    90deg,
+    #e2e8f0 25%,
+    #f1f5f9 50%,
+    #e2e8f0 75%
+  );
+  background-size: 800px 100%;
+  animation: shimmer 1.4s infinite linear;
+}
+
+.stat-skeleton-value {
+  @extend .stat-skeleton;
+  height: 36px;
+  width: 72px;
+  margin: 0 auto 6px;
+  display: block;
+  border-radius: 8px;
+}
+
+.stat-skeleton-label {
+  @extend .stat-skeleton;
+  height: 12px;
+  width: 52px;
+  margin: 0 auto;
+  display: block;
+  border-radius: 4px;
+}
+
+// ─── Count-up number pop-in ─────────────────────────────────────────────────
+
+@keyframes stat-pop {
+  0%   { opacity: 0; transform: translateY(8px) scale(0.88); }
+  60%  { transform: translateY(-3px) scale(1.06); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.stat-value-enter {
+  animation: stat-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}

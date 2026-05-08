@@ -1,0 +1,45 @@
+# Dependencies
+node_modules/
+
+# Environment — never commit real credentials
+.env
+.env.local
+.env.*.local
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime generated directories
+server/uploads/
+server/temp/
+
+# Scratch / experimental code — not part of the product
+server/scratch/
+server/cleanup/rough.js
+
+# API doc snapshots (generated, not source)
+server/ALL_FRONTEND_BACKEND_ROUTES.json
+server/OTP_API_DOCS.json
+server/2FA_API_DOCS.json
+server/HOLIDAY_API_DOCS.json
+server/integration_guide.json
+server/SUBSCRIPTION_API_DOCS.json
+
+# Misc dev artefacts
+server/test_phonepe_webhook.js
+face-api.txt
+workping-mobile
+todo.txt
+
+# Editor
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Claude
+/.claude

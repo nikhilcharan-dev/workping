@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>WorkPing — Live Request Flow</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#060910;color:#f0f6fc;font-family:'Segoe UI',sans-serif;overflow-x:hidden;min-height:100vh}
+h1{text-align:center;padding:20px 0 4px;font-size:1.5rem;font-weight:800}
+h1 span{background:linear-gradient(90deg,#6366f1,#22d3ee);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.sub{text-align:center;color:#64748b;font-size:.8rem;margin-bottom:20px}
+canvas{display:block;margin:0 auto}
+.controls{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;padding:16px}
+.btn{border:none;border-radius:6px;padding:7px 16px;font-size:.78rem;font-weight:600;cursor:pointer;transition:opacity .2s}
+.btn:hover{opacity:.8}
+.legend{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;padding:0 0 20px}
+.leg{display:flex;align-items:center;gap:6px;font-size:.72rem;color:#94a3b8}
+.leg-dot{width:10px;height:10px;border-radius:50%}
+.active-flow{text-align:center;font-size:.8rem;color:#94a3b8;padding:0 0 12px;min-height:20px}
+</style>
+</head>
+<body>
+<h1><span>WorkPing</span> — Live Service Request Flow</h1>
+<p class="sub">Watch requests travel between services in real time</p>
+<p class="active-flow" id="flowLabel">Click a scenario below to simulate a request flow</p>
+
+<canvas id="c" width="980" height="460"></canvas>
+
+<div class="controls">
+  <button class="btn" style="background:#6366f1" onclick="simulate('login')">🔐 Employee Login</button>
+  <button class="btn" style="background:#10b981" onclick="simulate('checkin')">📍 Face Check-In</button>
+  <button class="btn" style="background:#f59e0b" onclick="simulate('payment')">💳 Subscription Payment</button>
+  <button class="btn" style="background:#ec4899" onclick="simulate('whatsapp')">💬 WhatsApp Chat</button>
+  <button class="btn" style="background:#8b5cf6" onclick="simulate('file')">📁 File Upload</button>
+  <button class="btn" style="background:#475569" onclick="startContinuous()">▶ Auto Demo</button>
+  <button class="btn" style="background:#334155" onclick="stopContinuous()">⏹ Stop</button>
+</div>
+
+<div class="legend">
+  <div class="leg"><div class="leg-dot" style="background:#6366f1"></div>Web/Mobile Client</div>
+  <div class="leg"><div class="leg-dot" style="background:#22d3ee"></div>Core Backend</div>
+  <div class="leg"><div class="leg-dot" style="background:#f59e0b"></div>Microservices</div>
+  <div class="leg"><div class="leg-dot" style="background:#8b5cf6"></div>Databases</div>
+  <div class="leg"><div class="leg-dot" style="background:#ef4444"></div>External APIs</div>
+  <div class="leg"><div class="leg-dot" style="background:#ec4899"></div>AI/ML</div>
+</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+// Responsive
+function resize(){
+  const w = Math.min(980, window.innerWidth - 20);
+  canvas.width = w; canvas.height = Math.round(w * 0.47);
+  draw();
+}
+window.addEventListener('resize', resize);
+
+const NODES = {
+  client:  {label:'Web / Mobile',  sub:'React / RN',       color:'#6366f1', x:.07, y:.45},
+  backend: {label:'Core Backend',  sub:'Express + Cluster', color:'#22d3ee', x:.35, y:.45},
+  mailer:  {label:'Mailer',        sub:'Node · Nodemailer', color:'#f59e0b', x:.62, y:.12},
+  whatsapp:{label:'WhatsApp Svc',  sub:'Meta API · LLM',    color:'#f59e0b', x:.62, y:.30},
+  phonepe: {label:'PhonePe GW',    sub:'UPI Payments',      color:'#f59e0b', x:.62, y:.48},
+  oracle:  {label:'Oracle Storage',sub:'OCI Object Store',  color:'#f59e0b', x:.62, y:.66},
+  faceapi: {label:'Face API',      sub:'Python · InsightFace',color:'#ec4899',x:.62, y:.84},
+  mongo:   {label:'MongoDB Atlas', sub:'20+ collections',   color:'#8b5cf6', x:.85, y:.28},
+  redis:   {label:'Redis Cache',   sub:'OTPs · Queue',      color:'#8b5cf6', x:.85, y:.55},
+  extauth: {label:'Google / MS',   sub:'OAuth2 SSO',        color:'#ef4444', x:.85, y:.82},
+};
+
+const SCENARIOS = {
+  login:{
+    label:'🔐 Employee Login via Google OAuth',
+    hops:[
+      {from:'client',to:'backend',msg:'POST /auth/google'},
+      {from:'backend',to:'extauth',msg:'OAuth2 redirect'},
+      {from:'extauth',to:'backend',msg:'Token callback'},
+      {from:'backend',to:'mongo',msg:'Fetch user record'},
+      {from:'backend',to:'redis',msg:'Store refresh token'},
+      {from:'backend',to:'client',msg:'JWT access token'},
+    ]
+  },
+  checkin:{
+    label:'📍 Face Attendance Check-In',
+    hops:[
+      {from:'client',to:'backend',msg:'POST /attendance (selfie + GPS)'},
+      {from:'backend',to:'faceapi',msg:'POST /api/v1/detect'},
+      {from:'faceapi',to:'redis',msg:'Queue ticket'},
+      {from:'faceapi',to:'mongo',msg:'Load embeddings'},
+      {from:'faceapi',to:'backend',msg:'Match result'},
+      {from:'backend',to:'mongo',msg:'Write Attendance record'},
+      {from:'backend',to:'whatsapp',msg:'Send confirmation'},
+      {from:'backend',to:'client',msg:'200 OK'},
+    ]
+  },
+  payment:{
+    label:'💳 Subscription Payment via PhonePe',
+    hops:[
+      {from:'client',to:'backend',msg:'POST /payments/initiate'},
+      {from:'backend',to:'mongo',msg:'Create Order doc'},
+      {from:'backend',to:'phonepe',msg:'POST /api/payment/initiate'},
+      {from:'phonepe',to:'extauth',msg:'PhonePe OAuth token',color:'#ef4444'},
+      {from:'phonepe',to:'backend',msg:'Payment URL'},
+      {from:'client',to:'phonepe',msg:'UPI redirect'},
+      {from:'phonepe',to:'backend',msg:'Webhook status'},
+      {from:'backend',to:'mongo',msg:'Activate subscription'},
+    ]
+  },
+  whatsapp:{
+    label:'💬 WhatsApp LLM Chatbot',
+    hops:[
+      {from:'extauth',to:'whatsapp',msg:'Meta webhook POST',color:'#ef4444'},
+      {from:'whatsapp',to:'redis',msg:'Queue message (BullMQ)'},
+      {from:'whatsapp',to:'faceapi',msg:'LLM intent detect',color:'#ec4899'},
+      {from:'faceapi',to:'whatsapp',msg:'Intent + response',color:'#ec4899'},
+      {from:'whatsapp',to:'mongo',msg:'Fetch context'},
+      {from:'whatsapp',to:'extauth',msg:'Send reply via Meta'},
+    ]
+  },
+  file:{
+    label:'📁 File Upload (Pre-signed URL)',
+    hops:[
+      {from:'client',to:'backend',msg:'GET presigned-url'},
+      {from:'backend',to:'oracle',msg:'Request OCI URL'},
+      {from:'oracle',to:'backend',msg:'Pre-signed URL (15 min)'},
+      {from:'backend',to:'client',msg:'Return URL'},
+      {from:'client',to:'oracle',msg:'Direct PUT to OCI'},
+      {from:'backend',to:'mongo',msg:'Save object reference'},
+    ]
+  }
+};
+
+let particles = [];
+let animId;
+let autoTimer;
+
+function px(node){
+  const w = canvas.width, h = canvas.height;
+  return {x: node.x*w, y: node.y*h};
+}
+
+function drawNode(key){
+  const node = NODES[key];
+  const {x,y} = px(node);
+  const r = canvas.width < 700 ? 28 : 34;
+  ctx.save();
+  ctx.shadowBlur = 18; ctx.shadowColor = node.color;
+  ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2);
+  ctx.fillStyle = node.color+'22'; ctx.fill();
+  ctx.strokeStyle = node.color; ctx.lineWidth = 2; ctx.stroke();
+  ctx.restore();
+  ctx.fillStyle = '#f0f6fc';
+  const fs = canvas.width < 700 ? 8 : 9.5;
+  ctx.font = `700 ${fs}px 'Segoe UI', sans-serif`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  const lines = node.label.split(' ');
+  if(lines.length===1){
+    ctx.fillText(node.label, x, y-3);
+  } else {
+    ctx.fillText(lines[0], x, y-6);
+    ctx.fillText(lines.slice(1).join(' '), x, y+6);
+  }
+  ctx.fillStyle = '#94a3b8';
+  ctx.font = `${fs-1.5}px 'Segoe UI', sans-serif`;
+  ctx.fillText(node.sub, x, y + r + 9);
+}
+
+function drawArrow(fromKey, toKey, color='#475569', alpha=0.3){
+  const f = px(NODES[fromKey]), t = px(NODES[toKey]);
+  const dx=t.x-f.x, dy=t.y-f.y, len=Math.sqrt(dx*dx+dy*dy);
+  const r = canvas.width < 700 ? 28 : 34;
+  const sx=f.x+dx/len*r, sy=f.y+dy/len*r;
+  const ex=t.x-dx/len*r, ey=t.y-dy/len*r;
+  ctx.save(); ctx.globalAlpha=alpha;
+  ctx.strokeStyle=color; ctx.lineWidth=1.5;
+  ctx.setLineDash([5,4]);
+  ctx.beginPath(); ctx.moveTo(sx,sy); ctx.lineTo(ex,ey); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.restore();
+}
+
+function draw(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  // Subtle grid
+  ctx.fillStyle='#060910'; ctx.fillRect(0,0,canvas.width,canvas.height);
+  // Base connections
+  const lines=[['client','backend'],['backend','mailer'],['backend','whatsapp'],
+    ['backend','phonepe'],['backend','oracle'],['backend','faceapi'],
+    ['backend','mongo'],['backend','redis'],['backend','extauth'],
+    ['faceapi','mongo'],['faceapi','redis'],['phonepe','extauth'],['whatsapp','extauth']];
+  lines.forEach(([a,b])=>drawArrow(a,b,'#334155',0.5));
+  Object.keys(NODES).forEach(k=>drawNode(k));
+  particles.forEach(p=>p.draw());
+}
+
+class Particle {
+  constructor(fromKey,toKey,color,label,onDone){
+    this.from=px(NODES[fromKey]); this.to=px(NODES[toKey]);
+    this.r=canvas.width<700?28:34;
+    const dx=this.to.x-this.from.x, dy=this.to.y-this.from.y;
+    const len=Math.sqrt(dx*dx+dy*dy);
+    this.sx=this.from.x+dx/len*this.r; this.sy=this.from.y+dy/len*this.r;
+    this.ex=this.to.x-dx/len*this.r; this.ey=this.to.y-dy/len*this.r;
+    this.t=0; this.speed=0.022; this.color=color||'#22d3ee'; this.label=label||'';
+    this.onDone=onDone; this.done=false;
+  }
+  update(){if(!this.done){this.t+=this.speed; if(this.t>=1){this.t=1;this.done=true;if(this.onDone)this.onDone();}}}
+  draw(){
+    const x=this.sx+(this.ex-this.sx)*this.t;
+    const y=this.sy+(this.ey-this.sy)*this.t;
+    ctx.save();
+    ctx.shadowBlur=12; ctx.shadowColor=this.color;
+    ctx.beginPath(); ctx.arc(x,y,5,0,Math.PI*2);
+    ctx.fillStyle=this.color; ctx.fill();
+    ctx.restore();
+    if(this.label){
+      ctx.save(); ctx.globalAlpha=Math.min(1,this.t*3);
+      ctx.fillStyle='#e2e8f0';
+      ctx.font=`600 9px 'Segoe UI',sans-serif`;
+      ctx.textAlign='center';
+      ctx.fillText(this.label, x, y-10);
+      ctx.restore();
+    }
+    // Trail
+    ctx.save(); ctx.globalAlpha=0.3;
+    ctx.beginPath(); ctx.arc(x,y,8,0,Math.PI*2);
+    ctx.fillStyle=this.color+'55'; ctx.fill();
+    ctx.restore();
+  }
+}
+
+function simulate(name){
+  stopContinuous();
+  if(animId) cancelAnimationFrame(animId);
+  particles=[];
+  const s=SCENARIOS[name];
+  document.getElementById('flowLabel').textContent=s.label;
+  let idx=0;
+  function nextHop(){
+    if(idx>=s.hops.length){loop();return;}
+    const h=s.hops[idx++];
+    const color=h.color||(NODES[h.to].color);
+    const p=new Particle(h.from,h.to,color,h.msg,()=>{
+      particles=particles.filter(x=>x!==p);
+      setTimeout(nextHop,180);
+    });
+    particles.push(p);
+  }
+  nextHop();
+  loop();
+}
+
+function loop(){
+  if(animId) cancelAnimationFrame(animId);
+  function frame(){
+    particles.forEach(p=>p.update());
+    draw();
+    animId=requestAnimationFrame(frame);
+  }
+  frame();
+}
+
+const ORDER=['login','checkin','payment','whatsapp','file'];
+let autoIdx=0;
+function startContinuous(){
+  stopContinuous();
+  function next(){
+    simulate(ORDER[autoIdx%ORDER.length]);
+    autoIdx++;
+    autoTimer=setTimeout(next,3500);
+  }
+  next();
+}
+function stopContinuous(){
+  if(autoTimer) clearTimeout(autoTimer);
+  autoTimer=null;
+}
+
+resize();
+loop();
+</script>
+</body>
+</html>

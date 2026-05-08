@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Performance Dashboard</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #000000; color: #ffffff; min-height: 100vh; padding: 40px;
+    -webkit-font-smoothing: antialiased;
+  }
+  header {
+    display: flex; justify-content: space-between; align-items: flex-end;
+    margin-bottom: 48px; border-bottom: 1px solid #222; padding-bottom: 24px;
+    flex-wrap: wrap; gap: 20px;
+  }
+  header h1 { font-size: 2.2rem; font-weight: 700; letter-spacing: -0.03em; }
+  #uptime { color: #888; font-size: 0.9rem; font-weight: 300; margin-top: 4px; display: block; }
+  .header-right { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  #last-updated { color: #444; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; }
+
+  .export-btn {
+    background: transparent; color: #fff; border: 1px solid #444;
+    padding: 8px 18px; border-radius: 4px; font-size: 0.8rem; cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;
+  }
+  .export-btn:hover { background: #fff; color: #000; border-color: #fff; transform: translateY(-1px); }
+
+  .cards {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 20px; margin-bottom: 40px;
+  }
+  .card {
+    background: #080808; border-radius: 4px; padding: 32px;
+    border: 1px solid #1a1a1a; transition: border-color 0.3s;
+  }
+  .card:hover { border-color: #444; }
+  .card-label { font-size: 0.75rem; color: #666; text-transform: uppercase; letter-spacing: 0.15em; margin-bottom: 16px; font-weight: 600; }
+  .card-value { font-size: 2.4rem; font-weight: 300; letter-spacing: -0.02em; }
+  .card-value.blue { color: #fff; } /* Monochrome override */
+  .card-value.yellow { color: #fff; } /* Monochrome override */
+  .card-value.green { color: #22c55e; } /* Status kept */
+  .card-value.red { color: #ef4444; } /* Status kept */
+
+  .section { background: #080808; border-radius: 4px; padding: 32px; border: 1px solid #1a1a1a; margin-bottom: 24px; }
+  .section-title { font-size: 0.85rem; font-weight: 700; margin-bottom: 32px; text-transform: uppercase; letter-spacing: 0.2em; color: #888; }
+
+  /* Status code bars */
+  .bar-group { margin-bottom: 20px; }
+  .bar-label { display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 8px; color: #888; }
+  .bar-track { background: #111; border-radius: 2px; height: 4px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 2px; transition: width 1s cubic-bezier(0.4, 0, 0.2, 1); min-width: 0; }
+  .bar-fill.green { background: #22c55e; }
+  .bar-fill.yellow { background: #fff; } /* Monochrome override */
+  .bar-fill.orange { background: #fff; } /* Monochrome override */
+  .bar-fill.red { background: #ef4444; }
+
+  /* Route table */
+  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  th { text-align: left; color: #555; font-weight: 600; padding: 12px 16px; border-bottom: 1px solid #222; text-transform: uppercase; letter-spacing: 0.1em; }
+  td { padding: 16px; border-bottom: 1px solid #111; color: #eee; }
+  .method { font-weight: 700; color: #fff; }
+  .route { color: #888; font-family: 'Outfit', sans-serif; }
+
+  /* Status dots */
+  .dots { display: flex; flex-wrap: wrap; gap: 8px; }
+  .dot {
+    width: 6px; height: 6px; border-radius: 0; cursor: default;
+    position: relative; flex-shrink: 0;
+  }
+  .dot.up { background: #22c55e; }
+  .dot.down { background: #ef4444; }
+  .dot:hover::after {
+    content: attr(data-tip); position: absolute; bottom: 150%; left: 50%;
+    transform: translateX(-50%); background: #fff; color: #000;
+    padding: 6px 10px; border-radius: 0; font-size: 0.7rem; white-space: nowrap;
+    pointer-events: none; z-index: 10; font-weight: 600;
+  }
+
+  /* Daily history chart */
+  .daily-chart { display: flex; align-items: flex-end; gap: 6px; height: 160px; padding-top: 20px; }
+  .daily-bar-group { display: flex; flex-direction: column; align-items: center; flex: 1; min-width: 0; height: 100%; }
+  .daily-bar-track { flex: 1; width: 100%; display: flex; align-items: flex-end; }
+  .daily-bar {
+    width: 100%; border-radius: 0; background: #fff;
+    transition: all 0.5s ease; position: relative; cursor: default; min-height: 2px;
+  }
+  .daily-bar:hover { background: #888; }
+  .daily-bar:hover::after {
+    content: attr(data-tip); position: absolute; bottom: 110%; left: 50%;
+    transform: translateX(-50%); background: #fff; color: #000;
+    padding: 6px 10px; border-radius: 0; font-size: 0.7rem; white-space: nowrap;
+    pointer-events: none; z-index: 10; font-weight: 600;
+  }
+  .daily-date { font-size: 0.65rem; color: #444; margin-top: 12px; font-weight: 600; }
+  .daily-legend { display: flex; gap: 24px; margin-top: 24px; font-size: 0.75rem; color: #555; text-transform: uppercase; letter-spacing: 0.1em; }
+  .daily-legend span::before { content: ''; display: inline-block; width: 8px; height: 8px; margin-right: 8px; vertical-align: middle; }
+  .legend-requests::before { background: #fff; }
+  .legend-errors::before { background: #ef4444; }
+
+  .error-banner {
+    background: #000; border: 1px solid #ef4444; border-radius: 0;
+    padding: 16px 20px; margin-bottom: 32px; color: #ef4444; display: none;
+    font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; font-size: 0.8rem;
+  }
+
+  .empty-state { color: #52525b; padding: 12px; text-align: center; }
+
+  @media (max-width: 600px) {
+    body { padding: 12px; }
+    .card-value { font-size: 1.4rem; }
+  }
+</style>
+</head>
+<body>
+  <div class="error-banner" id="error-banner"></div>
+  <header>
+    <div>
+      <h1>Performance Dashboard</h1>
+      <span id="uptime">Uptime: —</span>
+    </div>
+    <div class="header-right">
+      <span id="last-updated"></span>
+      <button class="export-btn" onclick="exportData('json')">Export JSON</button>
+      <button class="export-btn" onclick="exportData('csv')">Export CSV</button>
+    </div>
+  </header>
+
+  <div class="cards">
+    <div class="card">
+      <div class="card-label">Total Requests</div>
+      <div class="card-value blue" id="total-requests">—</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Avg Response Time</div>
+      <div class="card-value green" id="avg-response">— ms</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Error Rate</div>
+      <div class="card-value red" id="error-rate">— %</div>
+    </div>
+    <div class="card">
+      <div class="card-label">p95 Response Time</div>
+      <div class="card-value yellow" id="p95-response">— ms</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Status Codes</div>
+    <div id="status-bars">
+      <div class="bar-group"><div class="bar-label"><span>2xx Success</span><span id="sc-2xx">0</span></div><div class="bar-track"><div class="bar-fill green" id="bar-2xx"></div></div></div>
+      <div class="bar-group"><div class="bar-label"><span>3xx Redirect</span><span id="sc-3xx">0</span></div><div class="bar-track"><div class="bar-fill yellow" id="bar-3xx"></div></div></div>
+      <div class="bar-group"><div class="bar-label"><span>4xx Client Error</span><span id="sc-4xx">0</span></div><div class="bar-track"><div class="bar-fill orange" id="bar-4xx"></div></div></div>
+      <div class="bar-group"><div class="bar-label"><span>5xx Server Error</span><span id="sc-5xx">0</span></div><div class="bar-track"><div class="bar-fill red" id="bar-5xx"></div></div></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Daily History (Last 30 Days)</div>
+    <div class="daily-chart" id="daily-chart"></div>
+    <div class="daily-legend">
+      <span class="legend-requests">Requests</span>
+      <span class="legend-errors">Errors</span>
+    </div>
+    <div class="empty-state" id="no-daily">No daily data yet</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Per-Endpoint Breakdown</div>
+    <div style="overflow-x: auto;">
+      <table>
+        <thead>
+          <tr><th>Method</th><th>Route</th><th>Requests</th><th>Avg Time</th><th>p95</th><th>Errors</th></tr>
+        </thead>
+        <tbody id="route-table"></tbody>
+      </table>
+    </div>
+    <div class="empty-state" id="no-routes" style="display:none;">No endpoint data yet</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Uptime Timeline</div>
+    <div class="dots" id="status-dots"></div>
+    <div class="empty-state" id="no-dots">Waiting for status checks (every 30s)…</div>
+  </div>
+
+<script>
+  const POLL_INTERVAL = 10000;
+  let apiKey = localStorage.getItem("dashboard_api_key");
+
+  function promptKey() {
+    const key = prompt("Enter API key to access metrics:");
+    if (key) { apiKey = key; localStorage.setItem("dashboard_api_key", key); }
+    return key;
+  }
+
+  if (!apiKey) promptKey();
+
+  async function fetchMetrics() {
+    if (!apiKey) return null;
+    try {
+      const res = await fetch("/api/metrics", { headers: { "x-api-key": apiKey } });
+      if (res.status === 401) {
+        localStorage.removeItem("dashboard_api_key");
+        apiKey = null;
+        showError("Unauthorized — invalid API key. Refresh to re-enter.");
+        promptKey();
+        if (apiKey) return fetchMetrics();
+        return null;
+      }
+      if (!res.ok) { showError("Failed to fetch metrics: " + res.statusText); return null; }
+      hideError();
+      return await res.json();
+    } catch (e) {
+      showError("Network error: " + e.message);
+      return null;
+    }
+  }
+
+  function showError(msg) { const b = document.getElementById("error-banner"); b.textContent = msg; b.style.display = "block"; }
+  function hideError() { document.getElementById("error-banner").style.display = "none"; }
+
+  function exportData(format) {
+    if (!apiKey) { promptKey(); if (!apiKey) return; }
+    const url = "/api/metrics/export?format=" + format;
+    const a = document.createElement("a");
+    // Use fetch to include auth header, then trigger download
+    fetch(url, { headers: { "x-api-key": apiKey } })
+      .then(res => {
+        if (res.status === 401) { showError("Unauthorized"); return null; }
+        return res.blob();
+      })
+      .then(blob => {
+        if (!blob) return;
+        const objUrl = URL.createObjectURL(blob);
+        a.href = objUrl;
+        a.download = "metrics-" + new Date().toISOString().slice(0, 10) + "." + format;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(objUrl);
+      })
+      .catch(e => showError("Export failed: " + e.message));
+  }
+
+  function updateDashboard(data) {
+    if (!data) return;
+
+    document.getElementById("uptime").textContent = "Uptime: " + data.uptimeFormatted;
+    document.getElementById("last-updated").textContent = "Updated " + new Date().toLocaleTimeString();
+
+    document.getElementById("total-requests").textContent = data.totalRequests.toLocaleString();
+    document.getElementById("avg-response").textContent = data.avgResponseTime.toFixed(2) + " ms";
+    document.getElementById("error-rate").textContent = data.errorRate.toFixed(2) + " %";
+    document.getElementById("p95-response").textContent = data.p95ResponseTime.toFixed(2) + " ms";
+
+    // Status code bars
+    const sc = data.statusCodes;
+    const maxSc = Math.max(sc["2xx"], sc["3xx"], sc["4xx"], sc["5xx"], 1);
+    for (const code of ["2xx", "3xx", "4xx", "5xx"]) {
+      document.getElementById("sc-" + code).textContent = sc[code];
+      document.getElementById("bar-" + code).style.width = ((sc[code] / maxSc) * 100) + "%";
+    }
+
+    // Daily history chart
+    const chart = document.getElementById("daily-chart");
+    const noDaily = document.getElementById("no-daily");
+    const daily = data.dailyHistory || [];
+    if (daily.length === 0) {
+      chart.innerHTML = "";
+      noDaily.style.display = "block";
+    } else {
+      noDaily.style.display = "none";
+      const maxReqs = Math.max(...daily.map(d => d.requests), 1);
+      chart.innerHTML = daily.map(d => {
+        const reqH = Math.max((d.requests / maxReqs) * 100, 2);
+        const errH = d.requests > 0 ? Math.max((d.errors / maxReqs) * 100, 0) : 0;
+        const shortDate = d.date.slice(5); // MM-DD
+        const tip = `${d.date}: ${d.requests} req, ${d.errors} err, avg ${d.avgTime}ms`;
+        return `<div class="daily-bar-group">
+          <div class="daily-bar-track">
+            <div style="width:100%;display:flex;align-items:flex-end;gap:1px;justify-content:center;">
+              <div class="daily-bar" style="height:${reqH}%;width:48%;background:#fff;" data-tip="${esc(tip)}"></div>
+              <div class="daily-bar" style="height:${errH > 0 ? Math.max(errH, 2) : 0}%;width:48%;background:#ef4444;${errH === 0 ? 'visibility:hidden;' : ''}" data-tip="${esc(tip)}"></div>
+            </div>
+          </div>
+          <div class="daily-date">${shortDate}</div>
+        </div>`;
+      }).join("");
+    }
+
+    // Route table
+    const tbody = document.getElementById("route-table");
+    const noRoutes = document.getElementById("no-routes");
+    if (data.routes.length === 0) {
+      tbody.innerHTML = "";
+      noRoutes.style.display = "block";
+    } else {
+      noRoutes.style.display = "none";
+      tbody.innerHTML = data.routes.map(r =>
+        `<tr>
+          <td class="method">${esc(r.method)}</td>
+          <td class="route">${esc(r.route)}</td>
+          <td>${r.requests}</td>
+          <td>${r.avgTime.toFixed(2)} ms</td>
+          <td>${r.p95.toFixed(2)} ms</td>
+          <td>${r.errors}</td>
+        </tr>`
+      ).join("");
+    }
+
+    // Status dots
+    const dotsEl = document.getElementById("status-dots");
+    const noDots = document.getElementById("no-dots");
+    if (data.statusHistory.length === 0) {
+      dotsEl.innerHTML = "";
+      noDots.style.display = "block";
+    } else {
+      noDots.style.display = "none";
+      dotsEl.innerHTML = data.statusHistory.map(s => {
+        const t = new Date(s.timestamp).toLocaleTimeString();
+        return `<div class="dot ${s.status}" data-tip="${t} — ${s.status}"></div>`;
+      }).join("");
+    }
+  }
+
+  function esc(str) {
+    const d = document.createElement("div");
+    d.textContent = str;
+    return d.innerHTML;
+  }
+
+  async function poll() {
+    const data = await fetchMetrics();
+    updateDashboard(data);
+  }
+
+  poll();
+  setInterval(poll, POLL_INTERVAL);
+</script>
+</body>
+</html>

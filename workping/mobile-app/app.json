@@ -1,0 +1,70 @@
+{
+  "expo": {
+    "name": "WorkPing",
+    "slug": "workping-mobile",
+    "scheme": "workping",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#3762ea"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.workping.mobile",
+      "infoPlist": {
+        "NSCameraUsageDescription": "WorkPing needs camera access for face recognition attendance.",
+        "NSLocationWhenInUseUsageDescription": "WorkPing uses your location to verify you are at the office when marking attendance."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#3762ea",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "package": "com.workping.mobile",
+      "permissions": [
+        "CAMERA",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "RECEIVE_BOOT_COMPLETED",
+      "VIBRATE"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-web-browser",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#3762ea",
+          "defaultChannel": "workping-default",
+          "sounds": []
+        }
+      ],
+      [
+        "react-native-vision-camera",
+        {
+          "cameraPermissionText": "WorkPing needs camera access for face recognition attendance.",
+          "enableMicrophonePermission": false
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "isAndroidBackgroundLocationEnabled": false
+        }
+      ],
+      "expo-font",
+      "expo-audio"
+    ]
+  }
+}

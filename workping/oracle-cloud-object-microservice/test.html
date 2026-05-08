@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>OCI Pre-Signed Upload Test</title>
+</head>
+<body>
+<h2>Upload File via Pre-Signed URL</h2>
+
+<label>Bucket Name:</label>
+<input type="text" id="bucketName" placeholder="my-bucket" />
+<br><br>
+
+<input type="file" id="fileInput" />
+<br><br>
+
+<button onclick="uploadFile()">Upload</button>
+
+<p id="status"></p>
+
+<script>
+    async function uploadFile() {
+        const bucketName = document.getElementById("bucketName").value;
+        const fileInput = document.getElementById("fileInput");
+        const status = document.getElementById("status");
+
+        if (!bucketName || fileInput.files.length === 0) {
+            status.innerText = "Bucket name and file are required.";
+            return;
+        }
+
+        const file = fileInput.files[0];
+
+        try {
+            status.innerText = "Requesting pre-signed URL...";
+
+            // 1️⃣ Get pre-signed URL from your backend
+            const response = await fetch(
+                `http://localhost:8000/api/presigned/upload/${bucketName}`,
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        objectName: file.name
+                    })
+                }
+            );
+
+            const data = await response.json();
+
+            if (!data.uploadUrl) {
+                throw new Error("Failed to get upload URL");
+            }
+
+            const uploadUrl = data.uploadUrl;
+
+            status.innerText = "Uploading to OCI...";
+
+            // 2️⃣ Upload directly to OCI
+            const uploadResponse = await fetch(uploadUrl, {
+                method: "PUT",
+                body: file
+            });
+
+            if (!uploadResponse.ok) {
+                throw new Error("Upload failed");
+            }
+
+            status.innerText = "✅ Upload successful!";
+
+        } catch (err) {
+            console.error(err);
+            status.innerText = "❌ Error: " + err.message;
+        }
+    }
+</script>
+</body>
+</html>

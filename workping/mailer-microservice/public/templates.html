@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Email Templates Gallery | Mailer Service</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #f8fafc;
+            --text: #0f172a;
+            --text-muted: #64748b;
+            --accent: #2563eb;
+            --accent-soft: rgba(37, 99, 235, 0.1);
+            --card: #ffffff;
+            --border: #e2e8f0;
+            --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+            --radius: 16px;
+            --success: #16a34a;
+            --warning: #d97706;
+            --danger: #dc2626;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #020617;
+                --text: #f8fafc;
+                --text-muted: #94a3b8;
+                --accent: #3b82f6;
+                --accent-soft: rgba(59, 130, 246, 0.1);
+                --card: #0f172a;
+                --border: #1e293b;
+                --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.5);
+            }
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            transition: background 0.3s ease;
+        }
+
+        /* ─── Header ─── */
+        header {
+            background: var(--card);
+            border-bottom: 1px solid var(--border);
+            padding: 2rem 4rem;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            backdrop-filter: blur(12px);
+        }
+
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo h1 {
+            font-size: 1.5rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--accent), #9333ea);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* ─── Main Layout ─── */
+        main {
+            max-width: 1300px;
+            margin: 2rem auto;
+            display: grid;
+            grid-template-columns: 280px 1fr;
+            gap: 2rem;
+            padding: 0 2rem;
+        }
+
+        /* ─── Sidebar Nav ─── */
+        .sidebar {
+            position: sticky;
+            top: 7rem;
+            height: calc(100vh - 9rem);
+            overflow-y: auto;
+            padding-right: 1rem;
+        }
+
+        .nav-group-label {
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin: 1.5rem 0 0.75rem 0.5rem;
+        }
+
+        .nav-btn {
+            width: 100%;
+            text-align: left;
+            padding: 0.75rem 1rem;
+            border: none;
+            background: transparent;
+            color: var(--text);
+            font-size: 0.9rem;
+            font-weight: 600;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-bottom: 0.25rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .nav-btn:hover {
+            background: var(--accent-soft);
+            color: var(--accent);
+        }
+
+        .nav-btn.active {
+            background: var(--accent);
+            color: #fff;
+        }
+
+        /* ─── Content ─── */
+        .content-area {
+            background: var(--card);
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            min-height: 800px;
+        }
+
+        .content-header {
+            padding: 1.5rem 2rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .template-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+        }
+
+        .badge {
+            padding: 4px 12px;
+            border-radius: 99px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        /* ─── Grid for Preview & Info ─── */
+        .template-grid {
+            display: grid;
+            grid-template-columns: 1fr 400px;
+            height: 100%;
+            flex-grow: 1;
+        }
+
+        .preview-pane {
+            background: #f1f5f9;
+            padding: 2rem;
+            display: flex;
+            justify-content: center;
+            overflow-y: auto;
+        }
+        
+        @media (prefers-color-scheme: dark) {
+            .preview-pane { background: #000; }
+        }
+
+        iframe {
+            width: 100%;
+            max-width: 600px;
+            height: 700px;
+            border: none;
+            border-radius: 8px;
+            background: white;
+            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1);
+        }
+
+        /* ─── Info Pane (Documentation) ─── */
+        .info-pane {
+            padding: 1.5rem 2rem;
+            border-left: 1px solid var(--border);
+            background: var(--card);
+            overflow-y: auto;
+        }
+
+        .info-section { margin-bottom: 2rem; }
+        .info-label {
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            margin-bottom: 0.75rem;
+            text-transform: uppercase;
+        }
+
+        .route-box {
+            background: var(--bg);
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            margin-bottom: 1rem;
+            border: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .method-tag {
+            color: var(--accent);
+            font-weight: 800;
+        }
+
+        .payload-box {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 1.25rem;
+            border-radius: 12px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            position: relative;
+            overflow-x: auto;
+        }
+
+        .copy-btn {
+            position: absolute;
+            top: 0.75rem;
+            right: 0.75rem;
+            background: rgba(255,255,255,0.1);
+            border: none;
+            color: #fff;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 0.7rem;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .copy-btn:hover { background: rgba(255,255,255,0.2); }
+
+        .hidden { display: none; }
+
+        @media (max-width: 1000px) {
+            main { grid-template-columns: 1fr; }
+            .sidebar { display: none; } /* Could be a mobile menu */
+            .template-grid { grid-template-columns: 1fr; }
+            .info-pane { border-left: none; border-top: 1px solid var(--border); }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="header-content">
+            <div class="logo">
+                <h1>📧 Mailer Microservice</h1>
+            </div>
+            <nav>
+                <a href="/" style="text-decoration: none; color: var(--accent); font-weight: 600; font-size: 0.9rem;">← Back to Dash</a>
+            </nav>
+        </div>
+    </header>
+
+    <main>
+        <aside class="sidebar">
+            <div class="nav-group-label">OTP Routes</div>
+            <div id="otp-nav"></div>
+
+            <div class="nav-group-label">Mail Routes</div>
+            <div id="mail-nav"></div>
+
+            <div class="nav-group-label">Alert Routes</div>
+            <div id="alert-nav"></div>
+        </aside>
+
+        <section class="content-area" id="main-content">
+            <div class="content-header">
+                <h2 id="current-title" class="template-title">Template Preview</h2>
+                <span id="current-badge" class="badge"></span>
+            </div>
+            
+            <div class="template-grid">
+                <div class="preview-pane">
+                    <iframe id="preview-frame"></iframe>
+                </div>
+                <div class="info-pane">
+                    <div class="info-section">
+                        <div class="info-label">API Endpoint</div>
+                        <div class="route-box">
+                            <span class="method-tag" id="current-method">POST</span>
+                            <span id="current-path">/api/v1/...</span>
+                        </div>
+                    </div>
+
+                    <div class="info-section">
+                        <div class="info-label">Request Payload (JSON)</div>
+                        <div class="payload-box">
+                            <button class="copy-btn" onclick="copyJSON()">Copy JSON</button>
+                            <pre id="current-payload"></pre>
+                        </div>
+                    </div>
+
+                    <div class="info-section">
+                        <div class="info-label">Description</div>
+                        <p id="current-desc" style="font-size: 0.9rem; color: var(--text-muted);"></p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        const templates = [
+            {
+                id: 'otp-verify',
+                group: 'otp',
+                title: 'Email Verification OTP',
+                badge: 'OTP',
+                path: '/api/v1/otp/send-email-otp',
+                method: 'POST',
+                desc: 'Sends a 6-digit cryptographically secure OTP for email ownership verification.',
+                payload: { email: "user@example.com" },
+                html: (accent) => `
+                    <div style="padding: 32px;">
+                        <h1 style="font-size: 22px; font-weight: 700; margin: 0 0 8px; color: #1e293b;">Verify Your Email</h1>
+                        <p style="font-size: 15px; color: #64748b; margin: 0 0 16px;">Hi <strong style="color:#1e293b">JOHN.DOE</strong>, use the code below to verify your email address.</p>
+                        <div style="text-align: center; margin: 28px 0;">
+                            <div style="display: inline-block; padding: 16px 36px; font-size: 32px; font-weight: 800; letter-spacing: 10px; color: ${accent}; background: #f8fafc; border: 2px dashed ${accent}; border-radius: 10px;">482937</div>
+                        </div>
+                        <div style="background: #f8fafc; border-left: 4px solid ${accent}; padding: 14px 18px; border-radius: 0 8px 8px 0; margin: 20px 0; font-size: 13px; color: #64748b;">⏱ This code expires in <strong>30 minutes</strong>. Do not share it with anyone.</div>
+                        <p style="font-size: 13px;">If you didn't request this, you can safely ignore this email.</p>
+                    </div>`
+            },
+            {
+                id: 'reset-otp',
+                group: 'otp',
+                title: 'Reset Password OTP',
+                badge: 'Security',
+                path: '/api/v1/otp/send-reset-password-otp',
+                method: 'POST',
+                desc: 'Sends an OTP specifically for the password reset flow. Enhanced security with shorter expiry.',
+                payload: { email: "user@example.com" },
+                accent: '#d97706',
+                html: (accent) => `
+                    <div style="padding: 32px;">
+                        <h1 style="font-size: 22px; font-weight: 700; margin: 0 0 8px; color: #1e293b;">Reset Your Password</h1>
+                        <p style="font-size: 15px; color: #64748b; margin: 0 0 16px;">Hi <strong style="color:#1e293b">JOHN.DOE</strong>, we received a request to reset your password. Use the OTP below to proceed.</p>
+                        <div style="text-align: center; margin: 28px 0;">
+                            <div style="display: inline-block; padding: 16px 36px; font-size: 32px; font-weight: 800; letter-spacing: 10px; color: ${accent}; background: #f8fafc; border: 2px dashed ${accent}; border-radius: 10px;">719284</div>
+                        </div>
+                        <div style="background: #f8fafc; border-left: 4px solid ${accent}; padding: 14px 18px; border-radius: 0 8px 8px 0; margin: 20px 0; font-size: 13px; color: #64748b;">⚠️ This code is valid for <strong>10 minutes</strong>.</div>
+                    </div>`
+            },
+            {
+                id: 'verify-password',
+                group: 'mail',
+                title: 'Password Verified',
+                badge: 'Security',
+                path: '/api/v1/mail/verify-password',
+                method: 'POST',
+                desc: 'Confirmation email sent after a successful password change or verification.',
+                payload: { email: "user@example.com" },
+                accent: '#16a34a',
+                html: (accent) => `
+                    <div style="padding: 32px;">
+                        <h1 style="font-size: 22px; font-weight: 700; margin: 0 0 8px; color: #1e293b;">Password Verified ✓</h1>
+                        <p style="font-size: 15px; color: #64748b; margin: 0 0 16px;">Hi <strong style="color:#1e293b">JOHN.DOE</strong>, your password has been successfully verified.</p>
+                        <div style="background: #f8fafc; border-left: 4px solid ${accent}; padding: 14px 18px; border-radius: 0 8px 8px 0; margin: 20px 0; font-size: 13px; color: #64748b;">✅ Your identity has been confirmed. You can now proceed.</div>
+                    </div>`
+            },
+            {
+                id: 'forgot-password',
+                group: 'mail',
+                title: 'Forgot Password (Link)',
+                badge: 'Account',
+                path: '/api/v1/mail/forgot-password',
+                method: 'POST',
+                desc: 'Sends a password reset email with a direct action button and a fallback link.',
+                payload: { email: "user@example.com", resetLink: "https://app.com/reset?token=xyz" },
+                accent: '#d97706',
+                html: (accent) => `
+                    <div style="padding: 32px;">
+                        <h1 style="font-size: 22px; font-weight: 700; margin: 0 0 8px; color: #1e293b;">Forgot Your Password?</h1>
+                        <p style="font-size: 15px; color: #64748b; margin: 0 0 16px;">Hi <strong style="color:#1e293b">JOHN.DOE</strong>, click the button below to set a new password.</p>
+                        <div style="text-align: center; margin: 28px 0;"><a href="#" style="display: inline-block; padding: 14px 36px; font-size: 15px; font-weight: 600; color: #fff !important; background: ${accent}; border-radius: 8px; text-decoration: none;">Reset Password →</a></div>
+                        <p style="font-size: 13px; word-break: break-all;">Or copy this link: <a href="#" style="color: ${accent};">https://app.com/reset?token=xyz</a></p>
+                    </div>`
+            },
+            {
+                id: 'greeting',
+                group: 'mail',
+                title: 'Welcome / Greeting',
+                badge: 'General',
+                path: '/api/v1/mail/greeting',
+                method: 'POST',
+                desc: 'Official onboarding email template for new users or team members.',
+                payload: { email: "user@example.com", name: "John Doe", org: "WorkPing", role: "Developer" },
+                html: (accent) => `
+                    <div style="padding: 32px;">
+                        <h1 style="font-size: 22px; font-weight: 700; margin: 0 0 8px; color: #1e293b;">Welcome Aboard! 🎉</h1>
+                        <p style="font-size: 15px; color: #64748b; margin: 0 0 16px;">Hi <strong style="color:#1e293b">John Doe</strong>, welcome to <strong>WorkPing</strong>!</p>
+                        <p style="font-size: 15px; color: #64748b;">You've been added as <strong style="color: ${accent};">Developer</strong>.</p>
+                        <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;" />
+                        <p style="font-size:13px;">Get started by exploring your dashboard.</p>
+                    </div>`
+            },
+            {
+                id: 'alert-info',
+                group: 'alert',
+                title: 'Alert: Information',
+                badge: 'Info',
+                path: '/api/v1/mail/alert/info',
+                method: 'POST',
+                desc: 'Informational alert for updates, maintenance, or announcements.',
+                payload: { email: "user@example.com", title: "Maintenance", message: "Servers will be down at..."},
+                html: (accent) => `
+                    <div style="padding: 32px;">
+                        <h1 style="font-size: 22px; font-weight: 700; margin: 0 0 8px; color: #1e293b;">📢 Maintenance</h1>
+                        <p style="font-size: 15px; color: #64748b;">Servers will be down for scheduled maintenance tonight.</p>
+                        <div style="background: #f8fafc; border-left: 4px solid ${accent}; padding: 14px 18px; border-radius: 0 8px 8px 0; margin: 20px 0; font-size: 13px; color: #64748b;">ℹ️ No action is required from your side.</div>
+                    </div>`
+            },
+            {
+                id: 'alert-warning',
+                group: 'alert',
+                title: 'Alert: Warning',
+                badge: 'Warning',
+                path: '/api/v1/mail/alert/warning',
+                method: 'POST',
+                desc: 'Warning alert for unusual activity, near-limits notifications, or low-priority issues.',
+                payload: { email: "user@example.com", title: "Unusual Login", message: "Detected from a new device.", actionLink: "https://app.com/activity"},
+                accent: '#d97706',
+                html: (accent) => `
+                    <div style="padding: 32px;">
+                        <h1 style="font-size: 22px; font-weight: 700; margin: 0 0 8px; color: #1e293b;">⚠️ Unusual Activity</h1>
+                        <p style="font-size: 15px; color: #64748b;">We detected a login from a new device in London, UK.</p>
+                        <div style="background: #f8fafc; border-left: 4px solid ${accent}; padding: 14px 18px; border-radius: 0 8px 8px 0; margin: 20px 0; font-size: 13px; color: #64748b;">⚠️ Please review this and take action if necessary.</div>
+                        <div style="text-align: center; margin: 28px 0;"><a href="#" style="display: inline-block; padding: 14px 36px; font-size: 15px; font-weight: 600; color: #fff !important; background: ${accent}; border-radius: 8px; text-decoration: none;">Review Activity →</a></div>
+                    </div>`
+            },
+            {
+                id: 'alert-danger',
+                group: 'alert',
+                title: 'Alert: Danger',
+                badge: 'Critical',
+                path: '/api/v1/mail/alert/danger',
+                method: 'POST',
+                desc: 'High-priority alert for security breaches, billing failures, or account issues.',
+                payload: { email: "user@example.com", title: "Breach", message: "Unusual activity detected.", actionLink: "https://app.com/secure"},
+                accent: '#dc2626',
+                html: (accent) => `
+                    <div style="padding: 32px;">
+                        <h1 style="font-size: 22px; font-weight: 700; margin: 0 0 8px; color: #1e293b;">🚨 Critical Security Alert</h1>
+                        <p style="font-size: 15px; color: #64748b;">We detected unusual login activity from a new location.</p>
+                        <div style="background: #f8fafc; border-left: 4px solid ${accent}; padding: 14px 18px; border-radius: 0 8px 8px 0; margin: 20px 0; font-size: 13px; color: #64748b;">🚨 Immediate action is required.</div>
+                        <div style="text-align: center; margin: 28px 0;"><a href="#" style="display: inline-block; padding: 14px 36px; font-size: 15px; font-weight: 600; color: #fff !important; background: ${accent}; border-radius: 8px; text-decoration: none;">Secure Account →</a></div>
+                    </div>`
+            },
+            {
+                id: 'alert-success',
+                group: 'alert',
+                title: 'Alert: Success',
+                badge: 'Success',
+                path: '/api/v1/mail/alert/success',
+                method: 'POST',
+                desc: 'Confirmation alert for successful payments, completed tasks, or resolved issues.',
+                payload: { email: "user@example.com", title: "Payment Success", message: "Your subscription is now active."},
+                accent: '#16a34a',
+                html: (accent) => `
+                    <div style="padding: 32px;">
+                        <h1 style="font-size: 22px; font-weight: 700; margin: 0 0 8px; color: #1e293b;">✅ Payment Received</h1>
+                        <p style="font-size: 15px; color: #64748b;">Your primary payment method has been successfully charged.</p>
+                        <div style="background: #f8fafc; border-left: 4px solid ${accent}; padding: 14px 18px; border-radius: 0 8px 8px 0; margin: 20px 0; font-size: 13px; color: #64748b;">✅ Everything looks good. No further action is needed.</div>
+                    </div>`
+            },
+            {
+                id: 'notification',
+                group: 'mail',
+                title: 'Notification',
+                badge: 'Update',
+                path: '/api/v1/mail/notification',
+                method: 'POST',
+                desc: 'Default notification template for generic system messages and updates.',
+                payload: { email: "user@example.com", title: "New Feature", message: "Team collaboration is here!"},
+                html: (accent) => `
+                    <div style="padding: 32px;">
+                        <h1 style="font-size: 22px; font-weight: 700; margin: 0 0 8px; color: #1e293b;">New Feature: Teams</h1>
+                        <p style="font-size: 15px; color: #64748b;">You can now invite your team members to collaborate in real-time.</p>
+                        <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;" />
+                        <p style="font-size: 13px;">Check our help center for more details.</p>
+                    </div>`
+            }
+        ];
+
+        function emailShell(bodyHtml, accent = '#2563eb') {
+            return `<!DOCTYPE html><html><body style="margin:0; background:#f8fafc; font-family:sans-serif;">
+                <div style="width:100%; padding:40px 16px; box-sizing:border-box;">
+                    <div style="max-width:560px; margin:0 auto; background:#fff; border-radius:12px; border:1px solid #e2e8f0; overflow:hidden;">
+                        <div style="height:4px; background:${accent};"></div>
+                        <div style="padding:32px 32px 0; text-align:center;"><div style="font-size:22px; font-weight:700; color:${accent};">WorkPing</div></div>
+                        ${bodyHtml}
+                        <div style="padding:20px 32px; text-align:center; font-size:12px; color:#64748b; border-top:1px solid #e2e8f0;">&copy; 2026 WorkPing &middot; Automated Message</div>
+                    </div>
+                </div></body></html>`;
+        }
+
+        function switchTemplate(id) {
+            const t = templates.find(x => x.id === id);
+            if (!t) return;
+
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+            document.querySelector(`[data-id="${id}"]`).classList.add('active');
+
+            document.getElementById('current-title').innerText = t.title;
+            const badge = document.getElementById('current-badge');
+            badge.innerText = t.badge;
+            badge.style.background = t.accent || 'var(--accent)';
+            badge.style.color = '#fff';
+
+            document.getElementById('current-method').innerText = t.method;
+            document.getElementById('current-path').innerText = t.path;
+            document.getElementById('current-desc').innerText = t.desc;
+            document.getElementById('current-payload').innerText = JSON.stringify(t.payload, null, 2);
+
+            const frame = document.getElementById('preview-frame');
+            frame.srcdoc = emailShell(t.html(t.accent || '#2563eb'), t.accent || '#2563eb');
+        }
+
+        function copyJSON() {
+            const text = document.getElementById('current-payload').innerText;
+            navigator.clipboard.writeText(text).then(() => {
+                const btn = document.querySelector('.copy-btn');
+                btn.innerText = 'Copied!';
+                setTimeout(() => btn.innerText = 'Copy JSON', 2000);
+            });
+        }
+
+        // Initialize Nav
+        const navContainers = {
+            otp: document.getElementById('otp-nav'),
+            mail: document.getElementById('mail-nav'),
+            alert: document.getElementById('alert-nav')
+        };
+
+        templates.forEach(t => {
+            const btn = document.createElement('button');
+            btn.className = 'nav-btn';
+            btn.setAttribute('data-id', t.id);
+            btn.innerHTML = `<span>•</span> ${t.title}`;
+            btn.onclick = () => switchTemplate(t.id);
+            navContainers[t.group].appendChild(btn);
+        });
+
+        // Load Initial
+        switchTemplate('otp-verify');
+    </script>
+</body>
+</html>

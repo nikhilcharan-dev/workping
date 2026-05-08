@@ -1,0 +1,111 @@
+WHATSAPP MICROSERVICE — PENDING ITEMS
+======================================
+Last updated: 2026-04-18
+
+
+== HIGH PRIORITY ==
+
+[x] 1. Remove insecure fallback secret
+      routes/origin.router.js — now throws at startup if WHATSAPP_VERIFY_TOKEN missing.
+
+[x] 2. Move dashboard credentials to env vars
+      server.js — DASHBOARD_USER / DASHBOARD_PASS read from env, throws if missing.
+      .env updated with defaults.
+
+[x] 3. Fix null crash in LLM response generator
+      response/llm.generator.js — guarded employee, attendance, frs fields with
+      optional chaining and ?? "N/A" fallbacks. Also fixed getHistory to be awaited.
+
+[ ] 4. Add startup env-var validation
+      server.js
+      No check that required vars exist before the server starts. App boots
+      then fails cryptically on first request. Add a guard block that checks:
+      WHATSAPP_API_KEY, WHATSAPP_META_BASE_URI, WHATSAPP_PHONE_NUMBER_ID,
+      ORIGIN, INTERNAL_SECRET, WHATSAPP_VERIFY_TOKEN — and exits with a
+      clear message if any are missing.
+
+[ ] 5. Implement /internal/shifts/upcoming-reminders on main server
+      (Dependency — main server side)
+      The old polling approach was removed and replaced with BullMQ, so this
+      endpoint is no longer needed. CONFIRM this is intentional and close out
+      the dependency. Document that reminders are now event-driven via
+      POST /api/secure/whatsapp/schedule-reminder.
+
+
+== MEDIUM PRIORITY ==
+
+[x] 6. Replace in-memory conversation state with Redis
+      utils/conversation.state.js — full rewrite using wa:session:{phone} JSON
+      keys with 30-min TTL. All functions now async.
+
+[x] 7. Replace in-memory rate limiter with Redis
+      utils/rate.limiter.js — full rewrite. Daily counts use wa:rate:{phone}:{date}
+      INCR with midnight expiry. Ban state uses wa:ban:{phone} JSON with TTL.
+      File I/O removed entirely.
+
+[x] 8. Replace in-memory first-time user tracker with Redis
+      utils/user.tracker.js — uses SET NX on wa:known:{phone}. Safe across
+      restarts and multiple instances.
+
+[ ] 9. Guard employee data before injecting into LLM prompt
+      response/llm.generator.js:74-75
+      Employee name/department/role are interpolated without null checks.
+      When a user isn't registered: "Employee: User (undefined, undefined)"
+      is sent to the LLM. Add a check for employee.found === true.
+
+[x] 10. Wire ProjectMember add/remove to schedule/cancel reminders
+       teams.controller.js — addProjectMember calls scheduleShiftReminders for
+       the project after insert. removeProjectMembers fetches member userIds
+       before deletion then calls cancelShiftReminder for each.
+
+
+== LOW PRIORITY ==
+
+[ ] 11. Fix deduplication LRU in webhook
+       webhook/whatsapp.webhook.js:15-23
+       Set.values().next() does not guarantee insertion order in all runtimes.
+       Replace with a Map<messageId, timestamp> for correct FIFO eviction.
+
+[ ] 12. Status update handler is a stub
+       webhook/whatsapp.webhook.js:7-10, 26-27
+       handleStatusUpdate() only logs. Comment says "Next Version needs —
+       status updates if user doesn't reply". Either implement or remove the
+       dead code so it doesn't mislead future devs.
+
+[ ] 13. Validate /internal/frs-ticket response
+       response/templates.js:543
+       ticketId is read from the response without checking if the call
+       succeeded. Wrap in try/catch and return a user-friendly error if
+       the endpoint fails or ticketId is missing.
+
+[ ] 14. Add login rate limiting on dashboard
+       server.js:50-58
+       No rate limiting on POST /api/login. Brute-force is trivial.
+       Add a simple in-memory counter (or use existing rate.limiter pattern)
+       to block after N failed attempts.
+
+[ ] 15. Redact PII from console logs
+       webhook/whatsapp.webhook.js, scheduler/shift.reminder.js
+       Phone numbers and full names are logged in plain text. Replace with
+       partial masking (e.g. 91XXXXXX3210) for log aggregation safety.
+
+[ ] 16. Null-return from templates not handled explicitly
+       response/templates.js:398,421,573
+       Several cases return null. The pipeline falls through to LLM, which
+       may not be intentional for LEAVE_APPROVE_DECISION / LEAVE_REJECT_DECISION.
+       Add explicit handling or log a warning when null is returned for
+       flow-gated intents.
+
+
+== DONE (this sprint) ==
+
+[x] Shift reminder — BullMQ + Redis delayed job implementation
+    scheduler/shift.reminder.js — scheduleShiftReminder, cancelShiftReminder,
+    startReminderWorker
+[x] Schedule/cancel reminder API endpoints
+    routes/origin.router.js — POST /schedule-reminder, POST /cancel-reminder
+[x] Daily cron on main server to enqueue all shift reminders at 00:05 IST
+    server/services/shiftReminder/shiftReminder.cron.js
+[x] Trigger reschedule on project shift create/update
+    server/controllers/web/admin/project/project.controller.js
+[x] node-cron polling approach removed (was hitting DB every minute)

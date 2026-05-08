@@ -1,0 +1,5 @@
+User-agent: *
+Disallow: /
+
+# This is an authenticated employee portal — no public content to index.
+# Crawlers must not index any routes.

@@ -1,0 +1,38 @@
+{
+  "name": "oracle-cloud-express-for-object-storage",
+  "version": "1.0.0",
+  "description": "REST API wrapper for Oracle Cloud Infrastructure Object Storage",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "nodemon app.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nikhilcharan-dev/oracle-cloud-express.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/nikhilcharan-dev/oracle-cloud-express/issues"
+  },
+  "homepage": "https://github.com/nikhilcharan-dev/oracle-cloud-express#readme",
+  "dependencies": {
+    "content-disposition": "^1.0.1",
+    "cors": "^2.8.6",
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.2.1",
+    "helmet": "^8.1.0",
+    "morgan": "^1.10.1",
+    "multer": "^2.0.2",
+    "oci-sdk": "^2.125.2",
+    "pino": "^10.3.1",
+    "pino-pretty": "^13.1.3"
+  }
+}

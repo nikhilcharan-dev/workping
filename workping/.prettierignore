@@ -1,0 +1,38 @@
+# Dependencies
+**/node_modules/**
+
+# Build outputs
+**/dist/**
+**/build/**
+**/.expo/**
+**/web-build/**
+
+# Generated / binary
+**/package-lock.json
+**/*.min.js
+**/*.min.css
+
+# Python
+**/__pycache__/**
+**/*.py
+
+# Docker / config files that shouldn't be reformatted
+**/Dockerfile
+**/.env*
+
+# Large data / asset files
+**/*.zip
+**/*.png
+**/*.jpg
+**/*.ico
+**/*.svg
+
+# Markdown (preserve manual formatting)
+**/*.md
+
+# Android generated code
+**/android/**
+**/ios/**
+
+# Specific generated files
+**/present-demo-flow.html

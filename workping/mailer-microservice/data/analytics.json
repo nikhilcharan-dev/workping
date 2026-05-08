@@ -1,0 +1,14 @@
+{
+  "totalSent": 0,
+  "success": 0,
+  "failure": 0,
+  "byType": {
+    "otp": 0,
+    "forgotPassword": 0,
+    "greeting": 0,
+    "alert": 0,
+    "notification": 0,
+    "raw": 0
+  },
+  "lastUpdated": "2026-03-14T19:54:20Z"
+}

@@ -1,0 +1,31 @@
+{
+  "name": "whatsapp-microservice",
+  "version": "1.0.1",
+  "description": "MicroService Whatsapp API SDK",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "npx nodemon"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nikhilcharan-dev/whatsapp-microservice.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/nikhilcharan-dev/whatsapp-microservice/issues"
+  },
+  "homepage": "https://github.com/nikhilcharan-dev/whatsapp-microservice#readme",
+  "dependencies": {
+    "@aws-sdk/client-bedrock-runtime": "^3.1002.0",
+    "axios": "^1.13.2",
+    "bullmq": "^5.74.1",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^5.2.1",
+    "node-cron": "^4.2.1"
+  }
+}

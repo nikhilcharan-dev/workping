@@ -1,0 +1,55 @@
+# Dependencies
+node_modules/
+
+# Expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# Native — generated folders, never commit
+/ios/
+/android/
+
+# Android local config — contains absolute paths to developer's local SDK
+android/local.properties
+
+# Bug reports and crash dumps — contain device/build metadata
+*.zip
+bugreport*
+
+# Keystores and signing files — SECURITY: never commit
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.keystore
+
+# Metro bundler
+.metro-health-check*
+
+# Kotlin incremental build cache
+.kotlin/
+
+# Environment — never commit real credentials
+.env
+.env.local
+.env.*.local
+
+# Logs / debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+*.log
+logs/
+
+# TypeScript incremental build cache
+*.tsbuildinfo
+
+# Editor
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.pem

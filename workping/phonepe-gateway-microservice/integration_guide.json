@@ -1,0 +1,83 @@
+{
+  "service_name": "PhonePe Gateway Microservice",
+  "version": "1.0.0",
+  "description": "A plug-and-play microservice for PhonePe payment integration.",
+  "base_url": "http://localhost:3000",
+  "endpoints": {
+    "payment": {
+      "initiate": {
+        "path": "/api/payments/initiate-payment",
+        "method": "POST",
+        "request_body": {
+          "amount": "number (in INR)",
+          "orderId": "string (unique)",
+          "userId": "string"
+        },
+        "response_example": {
+          "success": true,
+          "data": {
+            "instrumentResponse": {
+              "redirectInfo": {
+                "url": "https://mercury.phonepe.com/transact/pg?token=..."
+              }
+            }
+          }
+        }
+      },
+      "get_status": {
+        "path": "/api/payments/get-payment-status",
+        "method": "POST",
+        "request_body": {
+          "orderId": "string"
+        },
+        "response_example": {
+          "success": true,
+          "code": "PAYMENT_SUCCESS",
+          "data": {
+            "merchantOrderId": "MT7850590068188100",
+            "amount": 100,
+            "state": "COMPLETED"
+          }
+        }
+      }
+    },
+    "refund": {
+      "initiate": {
+        "path": "/api/refund/initiate-refund",
+        "method": "POST",
+        "request_body": {
+          "refundId": "string (unique)",
+          "orderId": "string (original order id)",
+          "amount": "number"
+        }
+      },
+      "get_status": {
+        "path": "/api/refund/get-refund-status",
+        "method": "POST",
+        "request_body": {
+          "refundId": "string"
+        }
+      }
+    }
+  },
+  "webhook_integration": {
+    "callback_url_in_backend": "BACKEND_URL/api/admin/phonepe/webhook",
+    "delivery_method": "POST",
+    "security": {
+      "header_key": "X-Webhook-Secret",
+      "verification_value": "Defined in ORIGIN_WEBHOOK_SECRET env variable"
+    },
+    "payload_structure": {
+      "merchantOrderId": "string",
+      "amount": "number (paise)",
+      "state": "string (COMPLETED, FAILED, etc.)",
+      "userId": "string (from udf1)",
+      "paymentDetails": "object",
+      "event": "string"
+    }
+  },
+  "health_check": {
+    "path": "/health",
+    "method": "GET"
+  }
+}

@@ -1,0 +1,51 @@
+name: Deploy to Server
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    name: CI/CD Pipeline
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.WORKPING_SERVER_HOST }}
+          username: ${{ secrets.WORKPING_SERVER_USER }}
+          key: ${{ secrets.WORKPING_SERVER_SSH_KEY }}
+          port: ${{ secrets.WORKPING_SERVER_PORT }}
+
+          script: |
+            set -e
+
+            APP_DIR="/var/www/work-ping-server"
+
+            echo "--- Pulling latest code ---"
+            cd $APP_DIR
+            git pull origin main
+
+            echo "--- Installing dependencies ---"
+            cd $APP_DIR/server
+            npm ci --omit=dev
+
+            echo "--- Reloading PM2 process ---"
+
+            if pm2 list | grep -q "agentic-ai"; then
+              pm2 reload agentic-ai --update-env
+            else
+              cd $APP_DIR
+              pm2 start server/server.js \
+                --name agentic-ai \
+                --node-args="--experimental-vm-modules" \
+                --env production \
+                --max-memory-restart 512M \
+                --restart-delay 3000
+              pm2 save
+            fi
+
+            echo "--- PM2 status ---"
+            pm2 status agentic-ai

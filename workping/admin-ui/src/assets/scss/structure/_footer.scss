@@ -1,0 +1,92 @@
+//
+// _footer.scss
+//
+
+.footer {
+    bottom: 0;
+    right: 0;
+    left: 0;
+    position: absolute;
+    display: flex;
+    align-items: center;
+    padding: 0 calc(#{$spacer} * 1.5);
+    color: $footer-color;
+    height: $footer-height;
+    background-color: $card-bg;
+    box-shadow: $box-shadow;
+    border-top: 1px solid $border-color;
+}
+
+.footer-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.footer-copy {
+    font-size: 0.8125rem;
+    color: $text-muted;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.footer-nav {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    flex-wrap: wrap;
+}
+
+.footer-nav-item {
+    display: flex;
+    align-items: center;
+}
+
+.footer-link {
+    font-size: 0.8125rem;
+    color: $text-muted;
+    text-decoration: none;
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    transition: color 0.15s ease, background-color 0.15s ease;
+    white-space: nowrap;
+
+    &:hover {
+        color: $primary;
+        background-color: rgba(var(--#{$prefix}primary-rgb), 0.08);
+    }
+}
+
+.footer-sep {
+    display: inline-block;
+    width: 1px;
+    height: 12px;
+    background-color: $border-color;
+    flex-shrink: 0;
+}
+
+.footer-text {
+    background: linear-gradient(
+        to right,
+        $primary 10%,
+        $warning 50%,
+        $success 60%
+    );
+    background-size: 200% auto;
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: textclip 2.5s linear infinite;
+    display: inline-block;
+    text-fill-color: transparent;
+}
+
+@keyframes textclip {
+    to {
+        background-position: 200% center;
+    }
+}
