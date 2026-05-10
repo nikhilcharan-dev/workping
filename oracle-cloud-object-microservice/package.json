@@ -23,7 +23,7 @@
   },
   "homepage": "https://github.com/nikhilcharan-dev/oracle-cloud-express#readme",
   "dependencies": {
-    "content-disposition": "^1.0.1",
+    "content-disposition": "^1.1.0",
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
