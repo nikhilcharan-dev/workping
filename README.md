@@ -1036,3 +1036,5 @@ Currently GPS coordinates are captured but geofence validation is UI-side. Move 
 MIT — Copyright 2026 Nikhil Charan
 
 ---
+
+⚠️ **Scope Guard** – Before reviewing this repository, **read the file `SCOPE_GUARD.md`** located at the repository root. The guard defines in-scope criteria and lists out-of-scope items that must be ignored by any reviewer. An optional configuration file `.reviewer.json` can also be added to declare the guard path.

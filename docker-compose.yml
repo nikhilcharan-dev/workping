@@ -30,9 +30,46 @@ networks:
 volumes:
   redis_data:
   biometric_models:
+  nginx_ssl:
 
 # ─── Services ───────────────────────────────────────────────────────────────
 services:
+
+  # ── Nginx (reverse proxy / API gateway) ────────────────────────────────
+  nginx:
+    image: nginx:alpine
+    container_name: workping-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      # Mount SSL certificates — place workping.crt and workping.key here
+      - nginx_ssl:/etc/nginx/ssl:ro
+      # Mount compiled SPA builds for static serving
+      - ./admin-ui/dist:/var/www/workping/admin-ui/dist:ro
+      - ./employees-ui/dist:/var/www/workping/employees-ui/dist:ro
+    depends_on:
+      workping-api:
+        condition: service_healthy
+      workping-biometric:
+        condition: service_healthy
+      workping-mailer:
+        condition: service_healthy
+      workping-payments:
+        condition: service_healthy
+      workping-chatbot:
+        condition: service_healthy
+      workping-storage:
+        condition: service_healthy
+    networks:
+      - workping
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
   # ── Redis (shared by all backend services) ──────────────────────────────
   redis:
