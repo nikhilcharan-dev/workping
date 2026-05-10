@@ -1,19 +1,19 @@
 import { Router } from "express";
 import {
-    createTeam,
-    getTeam,
-    getAllTeams,
-    updateTeam,
-    deleteTeam,
-    getTeamsPagination,
-    getManagerTeams,
+  createTeam,
+  getTeam,
+  getAllTeams,
+  updateTeam,
+  deleteTeam,
+  getTeamsPagination,
+  getManagerTeams,
 } from "#webController/admin/team/team.controller.js";
 import {
-    addTeamMemberToTeam,
-    removeTeamMemberFromTeam,
-    getTeamMembers,
-    getUserTeams,
-    getEligibleEmployeesForTeam,
+  addTeamMemberToTeam,
+  removeTeamMemberFromTeam,
+  getTeamMembers,
+  getUserTeams,
+  getEligibleEmployeesForTeam,
 } from "#webController/admin/team/member.controller.js";
 import requireRole from "#middleware/requireRole.js";
 import authorizeManager from "#middleware/authorizeManager.js";

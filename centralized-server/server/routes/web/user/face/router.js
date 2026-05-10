@@ -5,8 +5,8 @@ import { enrollOwnFace, getFaceStatus } from "#webController/user/face/controlle
 const router = Router();
 
 const faceUpload = multer({
-    storage: multer.memoryStorage(),
-    limits: { fileSize: 5 * 1024 * 1024 },
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
 });
 
 router.get("/status", getFaceStatus);

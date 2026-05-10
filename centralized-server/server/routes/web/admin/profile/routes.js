@@ -1,9 +1,9 @@
 import { Router } from "express";
 import {
-    getProfile,
-    updateProfile,
-    changePassword,
-    getProfileByEmail,
+  getProfile,
+  updateProfile,
+  changePassword,
+  getProfileByEmail,
 } from "#webController/admin/profile/controller.js";
 
 const router = Router();

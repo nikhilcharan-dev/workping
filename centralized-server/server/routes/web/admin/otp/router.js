@@ -1,9 +1,9 @@
 import { Router } from "express";
 import {
-    send_email_otp,
-    verify_email_otp,
-    send_phone_otp,
-    verify_phone_otp,
+  send_email_otp,
+  verify_email_otp,
+  send_phone_otp,
+  verify_phone_otp,
 } from "#webController/admin/otp/controller.js";
 
 const router = Router();

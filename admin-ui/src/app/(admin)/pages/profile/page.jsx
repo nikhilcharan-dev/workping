@@ -520,7 +520,7 @@ const Profile = () => {
                     <Col md={6}>
                       <Form.Label>Name</Form.Label>
                       <Form.Control
-                        value={isEditing ? editForm.name : (profile?.name ?? '--')}
+                        value={isEditing ? editForm.name : profile?.name ?? '--'}
                         onChange={(e) => handleEditField('name', e.target.value)}
                         placeholder="Enter full name"
                         disabled={!isEditing}
@@ -534,7 +534,7 @@ const Profile = () => {
                     <Col md={6}>
                       <Form.Label>Phone Number</Form.Label>
                       <Form.Control
-                        value={isEditing ? editForm.phoneNumber : (profile?.phoneNumber ?? '--')}
+                        value={isEditing ? editForm.phoneNumber : profile?.phoneNumber ?? '--'}
                         onChange={(e) => handleEditField('phoneNumber', e.target.value)}
                         placeholder="Enter phone number"
                         disabled={!isEditing}

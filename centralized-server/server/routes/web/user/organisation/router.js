@@ -1,9 +1,9 @@
 import { Router } from "express";
 import {
-    getMyOrganization,
-    getMyTeam,
-    getMyTeamMembers,
-    getAllMyTeams,
+  getMyOrganization,
+  getMyTeam,
+  getMyTeamMembers,
+  getAllMyTeams,
 } from "#webController/user/organisation/controller.js";
 
 const router = Router();

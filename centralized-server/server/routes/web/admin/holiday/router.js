@@ -1,9 +1,9 @@
 import {
-    addHoliday,
-    getHolidays,
-    getHolidayById,
-    updateHoliday,
-    deleteHolidays,
+  addHoliday,
+  getHolidays,
+  getHolidayById,
+  updateHoliday,
+  deleteHolidays,
 } from "#webController/admin/holiday/controller.js";
 import express from "express";
 

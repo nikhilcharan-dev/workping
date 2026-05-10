@@ -280,7 +280,9 @@ const CustomPlanBuilder = ({ catalogue, onBuild }) => {
             <IconifyIcon icon="bx:slider-alt" style={{ fontSize: 22, color: '#fd7e14' }} />
           </div>
           <div style={{ minWidth: 0, flex: '1 1 180px' }}>
-            <h5 className="mb-0 fw-bold" style={{ fontSize: 'clamp(16px,4vw,20px)' }}>Build Your Own Plan</h5>
+            <h5 className="mb-0 fw-bold" style={{ fontSize: 'clamp(16px,4vw,20px)' }}>
+              Build Your Own Plan
+            </h5>
             <span className="text-muted" style={{ fontSize: 13 }}>
               Pick only what you need — we calculate the bill
             </span>

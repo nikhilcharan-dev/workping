@@ -18,105 +18,105 @@ import { rotateRefreshToken } from "#utils/token.helper.js";
 import { setAuthCookie } from "#utils/cookie.helper.js";
 
 export default function centralRoutes(app) {
-    // cookie verify — works for both admin and user roles
-    app.get("/verify-cookie", async (req, res) => {
-        try {
-            let token = req.cookies?.accessToken;
-            if (!token && req.headers.authorization?.startsWith("Bearer ")) {
-                token = req.headers.authorization.split(" ")[1];
-            }
-            if (!token) {
-                return res.status(401).json({ type: "error", message: "Unauthorized" });
-            }
+  // cookie verify — works for both admin and user roles
+  app.get("/verify-cookie", async (req, res) => {
+    try {
+      let token = req.cookies?.accessToken;
+      if (!token && req.headers.authorization?.startsWith("Bearer ")) {
+        token = req.headers.authorization.split(" ")[1];
+      }
+      if (!token) {
+        return res.status(401).json({ type: "error", message: "Unauthorized" });
+      }
 
-            let decoded;
-            try {
-                decoded = jwt.verify(token, process.env.SECRET_KEY);
-            } catch (jwtErr) {
-                return res.status(401).json({ type: "error", message: "Unauthorized" });
-            }
+      let decoded;
+      try {
+        decoded = jwt.verify(token, process.env.SECRET_KEY);
+      } catch (jwtErr) {
+        return res.status(401).json({ type: "error", message: "Unauthorized" });
+      }
 
-            // Role is embedded in the JWT at login time — most reliable source
-            const { userId, role: tokenRole } = decoded;
+      // Role is embedded in the JWT at login time — most reliable source
+      const { userId, role: tokenRole } = decoded;
 
-            // Try Admin first, then User
-            let profile = await Admin.findById(userId).lean();
+      // Try Admin first, then User
+      let profile = await Admin.findById(userId).lean();
 
-            if (!profile) {
-                profile = await User.findById(userId).lean();
-            }
+      if (!profile) {
+        profile = await User.findById(userId).lean();
+      }
 
-            if (!profile) {
-                return res.status(404).json({ type: "error", message: "User not found" });
-            }
+      if (!profile) {
+        return res.status(404).json({ type: "error", message: "User not found" });
+      }
 
-            // JWT role is authoritative; fall back to profile.role only if missing
-            const role = tokenRole ?? profile.role ?? "user";
+      // JWT role is authoritative; fall back to profile.role only if missing
+      const role = tokenRole ?? profile.role ?? "user";
 
-            const authData = await Account.findOne({ email: profile.email }).lean();
+      const authData = await Account.findOne({ email: profile.email }).lean();
 
-            // Strip password from both documents before sending to client
-            const { password: _p1, ...safeAuthData } = authData ?? {};
-            const { password: _p2, ...safeProfile } = profile;
+      // Strip password from both documents before sending to client
+      const { password: _p1, ...safeAuthData } = authData ?? {};
+      const { password: _p2, ...safeProfile } = profile;
 
-            res.status(200).json({
-                type: "success",
-                message: "Verified",
-                data: { ...safeAuthData, ...safeProfile, role },
-            });
-        } catch (err) {
-            console.log(err);
-            return res.status(500).json({ type: "error", message: "Internal Server Error" });
-        }
-    });
+      res.status(200).json({
+        type: "success",
+        message: "Verified",
+        data: { ...safeAuthData, ...safeProfile, role },
+      });
+    } catch (err) {
+      console.log(err);
+      return res.status(500).json({ type: "error", message: "Internal Server Error" });
+    }
+  });
 
-    // Refresh token — exchange a valid refresh token for a new access + refresh pair
-    app.post("/api/auth/refresh", authLimiter, async (req, res) => {
-        try {
-            const { refreshToken } = req.body;
-            if (!refreshToken) {
-                return res.status(400).json({ type: "error", message: "Refresh token is required" });
-            }
+  // Refresh token — exchange a valid refresh token for a new access + refresh pair
+  app.post("/api/auth/refresh", authLimiter, async (req, res) => {
+    try {
+      const { refreshToken } = req.body;
+      if (!refreshToken) {
+        return res.status(400).json({ type: "error", message: "Refresh token is required" });
+      }
 
-            const result = await rotateRefreshToken(refreshToken);
-            if (!result) {
-                return res.status(401).json({ type: "error", message: "Invalid or expired refresh token" });
-            }
+      const result = await rotateRefreshToken(refreshToken);
+      if (!result) {
+        return res.status(401).json({ type: "error", message: "Invalid or expired refresh token" });
+      }
 
-            // Also set cookie for web clients
-            setAuthCookie(res, req, result.accessToken);
+      // Also set cookie for web clients
+      setAuthCookie(res, req, result.accessToken);
 
-            return res.status(200).json({
-                type: "success",
-                message: "Token refreshed",
-                data: {
-                    token: result.accessToken,
-                    refreshToken: result.refreshToken,
-                },
-            });
-        } catch (err) {
-            console.error("[RefreshToken] Error:", err);
-            return res.status(500).json({ type: "error", message: "Internal Server Error" });
-        }
-    });
+      return res.status(200).json({
+        type: "success",
+        message: "Token refreshed",
+        data: {
+          token: result.accessToken,
+          refreshToken: result.refreshToken,
+        },
+      });
+    } catch (err) {
+      console.error("[RefreshToken] Error:", err);
+      return res.status(500).json({ type: "error", message: "Internal Server Error" });
+    }
+  });
 
-    // Verification
-    app.use("/api/otp", authLimiter, otpRoutes);
+  // Verification
+  app.use("/api/otp", authLimiter, otpRoutes);
 
-    app.use("/api/admin/forgot-password", authLimiter, forgotPasswordRouter);
+  app.use("/api/admin/forgot-password", authLimiter, forgotPasswordRouter);
 
-    // Google SignIn
-    app.use("/auth/google", googleServicesRoutes);
+  // Google SignIn
+  app.use("/auth/google", googleServicesRoutes);
 
-    // Microsoft SignIn
-    app.use("/auth/microsoft", microservicesRoutes);
+  // Microsoft SignIn
+  app.use("/auth/microsoft", microservicesRoutes);
 
-    // Attendance
-    app.use("/api/attendance", validateCookie, attendanceRoutes);
+  // Attendance
+  app.use("/api/attendance", validateCookie, attendanceRoutes);
 
-    // PhonePe webhook — no auth (PhonePe calls this directly, verified by signature)
-    app.use("/api/phonepe", phonepeWebhookRouter);
+  // PhonePe webhook — no auth (PhonePe calls this directly, verified by signature)
+  app.use("/api/phonepe", phonepeWebhookRouter);
 
-    // Public stats — no auth
-    app.use("/api/public", publicStatsRouter);
+  // Public stats — no auth
+  app.use("/api/public", publicStatsRouter);
 }

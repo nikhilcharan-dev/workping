@@ -23,13 +23,13 @@ server.use(express.urlencoded({ extended: true }));
 
 /* ─── Liveness probe — bypasses auth, used by load balancers and Docker HEALTHCHECK ─── */
 server.get("/health", (_req, res) => {
-    res.status(200).json({ status: "UP", service: "workping-mailer", timestamp: new Date().toISOString() });
+  res.status(200).json({ status: "UP", service: "workping-mailer", timestamp: new Date().toISOString() });
 });
 
 /* ─── Public: Landing Page ─── */
 server.get("/", (req, res) => {
-    return res.status(200).send(
-        `
+  return res.status(200).send(
+    `
         <!DOCTYPE html>
         <html lang="en">
         <head>
@@ -159,14 +159,14 @@ server.get("/", (req, res) => {
         </body>
         </html>
         `
-    );
+  );
 });
 
 /* ─── Public: Analytics Dashboard ─── */
 server.get("/dashboard", async (req, res) => {
-    const stats = await getStats();
-    return res.status(200).send(
-        `
+  const stats = await getStats();
+  return res.status(200).send(
+    `
         <!DOCTYPE html>
         <html lang="en">
         <head>
@@ -329,52 +329,52 @@ server.get("/dashboard", async (req, res) => {
         </body>
         </html>
         `
-    );
+  );
 });
 
 /* ─── Public: Template Preview Page ─── */
 server.get("/templates", (req, res) => {
-    return res.sendFile(path.join(__dirname, "public", "templates.html"));
+  return res.sendFile(path.join(__dirname, "public", "templates.html"));
 });
 
 /* ─── Auth Middleware (protects API routes) ─── */
 server.use((req, res, next) => {
-    const token = req.headers.authorization;
-    if (!token || typeof token !== "string") {
-        return res.status(403).json({
-            status: "error",
-            error: "Unauthorized: Invalid or missing secret token",
-        });
-    }
+  const token = req.headers.authorization;
+  if (!token || typeof token !== "string") {
+    return res.status(403).json({
+      status: "error",
+      error: "Unauthorized: Invalid or missing secret token",
+    });
+  }
 
-    // Timing-safe comparison to prevent timing attacks on API key
-    const tokenBuf = Buffer.from(token);
-    const secretBuf = Buffer.from(SECRET);
-    if (tokenBuf.length !== secretBuf.length || !crypto.timingSafeEqual(tokenBuf, secretBuf)) {
-        return res.status(403).json({
-            status: "error",
-            error: "Unauthorized: Invalid or missing secret token",
-        });
-    }
+  // Timing-safe comparison to prevent timing attacks on API key
+  const tokenBuf = Buffer.from(token);
+  const secretBuf = Buffer.from(SECRET);
+  if (tokenBuf.length !== secretBuf.length || !crypto.timingSafeEqual(tokenBuf, secretBuf)) {
+    return res.status(403).json({
+      status: "error",
+      error: "Unauthorized: Invalid or missing secret token",
+    });
+  }
 
-    const { email } = req.body;
-    if (!email) {
-        return res.status(400).json({
-            status: "error",
-            error: "Bad Request: Recipient email is required",
-        });
-    }
+  const { email } = req.body;
+  if (!email) {
+    return res.status(400).json({
+      status: "error",
+      error: "Bad Request: Recipient email is required",
+    });
+  }
 
-    // Basic email format validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-        return res.status(400).json({
-            status: "error",
-            error: "Bad Request: Invalid email format",
-        });
-    }
+  // Basic email format validation
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    return res.status(400).json({
+      status: "error",
+      error: "Bad Request: Invalid email format",
+    });
+  }
 
-    next();
+  next();
 });
 
 server.use("/api/v1/mail", mailRoutes);
@@ -382,18 +382,18 @@ server.use("/api/v1/otp", otpRoutes);
 
 /* ─── API: Analytics Stats ─── */
 server.get("/api/v1/analytics/stats", async (req, res) => {
-    const stats = await getStats();
-    return res.status(200).json(stats);
+  const stats = await getStats();
+  return res.status(200).json(stats);
 });
 
 (async () => {
-    try {
-        await redis.connect();
-        server.listen(PORT, () => {
-            console.log(`[Server] Listening on port ${PORT}`);
-        });
-    } catch (error) {
-        console.error("[Server Initialization Error]", error);
-        process.exit(1);
-    }
+  try {
+    await redis.connect();
+    server.listen(PORT, () => {
+      console.log(`[Server] Listening on port ${PORT}`);
+    });
+  } catch (error) {
+    console.error("[Server Initialization Error]", error);
+    process.exit(1);
+  }
 })();

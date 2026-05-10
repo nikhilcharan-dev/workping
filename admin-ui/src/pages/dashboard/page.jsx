@@ -66,7 +66,7 @@ export default function Home() {
         axiosClient.get('/api/admin/organization/get-all-organization-ids', { silent: true }),
       ])
 
-      const orgInfo = orgInfoRes.status === 'fulfilled' ? (orgInfoRes.value?.data?.data ?? {}) : {}
+      const orgInfo = orgInfoRes.status === 'fulfilled' ? orgInfoRes.value?.data?.data ?? {} : {}
       const orgEntries = Object.entries(orgInfo)
 
       const organizationsByName = orgEntries.map(([name]) => name)

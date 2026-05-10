@@ -16,15 +16,15 @@ import requireRole from "#middleware/requireRole.js";
 const userOnly = [validateCookie, requireRole("user", "manager", "teamlead", "employee")];
 
 export default function userRoutesSetup(app) {
-    app.use("/api/auth", authRoutes);
-    app.use("/api/user", ...userOnly, userRoutes);
-    app.use("/api/user/leaves", ...userOnly, leaveRoutes);
-    app.use("/api/user/organisation", ...userOnly, organisationRoutes);
-    app.use("/api/user/payroll", ...userOnly, payrollRoutes);
-    app.use("/api/user/projects", ...userOnly, projectRoutes);
-    app.use("/api/user/attendance", ...userOnly, attendanceHistoryRoutes);
-    app.use("/api/user/attendance", ...userOnly, attendanceRouter);
-    app.use("/api/user/face", ...userOnly, faceRouter);
-    app.use("/api/user/holiday", ...userOnly, holidayRoutes);
-    app.use("/api/user/dashboard", ...userOnly, dashboardRoutes);
+  app.use("/api/auth", authRoutes);
+  app.use("/api/user", ...userOnly, userRoutes);
+  app.use("/api/user/leaves", ...userOnly, leaveRoutes);
+  app.use("/api/user/organisation", ...userOnly, organisationRoutes);
+  app.use("/api/user/payroll", ...userOnly, payrollRoutes);
+  app.use("/api/user/projects", ...userOnly, projectRoutes);
+  app.use("/api/user/attendance", ...userOnly, attendanceHistoryRoutes);
+  app.use("/api/user/attendance", ...userOnly, attendanceRouter);
+  app.use("/api/user/face", ...userOnly, faceRouter);
+  app.use("/api/user/holiday", ...userOnly, holidayRoutes);
+  app.use("/api/user/dashboard", ...userOnly, dashboardRoutes);
 }

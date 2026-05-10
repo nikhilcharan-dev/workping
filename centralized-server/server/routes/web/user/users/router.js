@@ -1,11 +1,11 @@
 import { Router } from "express";
 import multer from "multer";
 import {
-    getProfile,
-    updateProfile,
-    changePassword,
-    deactivateAccount,
-    uploadProfilePhoto,
+  getProfile,
+  updateProfile,
+  changePassword,
+  deactivateAccount,
+  uploadProfilePhoto,
 } from "#webController/user/profile/controller.js";
 
 const router = Router();

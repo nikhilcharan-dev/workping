@@ -1,8 +1,8 @@
 import { Router } from "express";
 import {
-    getMyAttendance,
-    getAttendanceByDate,
-    getMyAttendanceSummary,
+  getMyAttendance,
+  getAttendanceByDate,
+  getMyAttendanceSummary,
 } from "#webController/user/attendance/history.controller.js";
 
 const router = Router();

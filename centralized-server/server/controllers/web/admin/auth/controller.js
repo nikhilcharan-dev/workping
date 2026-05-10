@@ -8,384 +8,384 @@ import { setAuthCookie, clearAuthCookie } from "#utils/cookie.helper.js";
 import { generateTokenPair, revokeAllTokens, blacklistToken } from "#utils/token.helper.js";
 import { recordFailedAttempt, clearFailedAttempts } from "#middleware/bruteForce.js";
 import {
-    validateEmail,
-    validatePhone,
-    validatePassword,
-    validateName,
-    validateRequiredFields,
+  validateEmail,
+  validatePhone,
+  validatePassword,
+  validateName,
+  validateRequiredFields,
 } from "#utils/validators.js";
 
 export const register = asyncHandler(async (req, res) => {
-    const { name, email, password, number: phoneNumber } = req.body;
+  const { name, email, password, number: phoneNumber } = req.body;
 
-    const requiredCheck = validateRequiredFields({ name, email, password, phoneNumber }, [
-        "name",
-        "email",
-        "password",
-        "phoneNumber",
-    ]);
-    if (!requiredCheck.valid) return errorResponse(res, requiredCheck.error);
+  const requiredCheck = validateRequiredFields({ name, email, password, phoneNumber }, [
+    "name",
+    "email",
+    "password",
+    "phoneNumber",
+  ]);
+  if (!requiredCheck.valid) return errorResponse(res, requiredCheck.error);
 
-    const nameValidation = validateName(name);
-    if (!nameValidation.valid) return errorResponse(res, nameValidation.error);
+  const nameValidation = validateName(name);
+  if (!nameValidation.valid) return errorResponse(res, nameValidation.error);
 
-    const emailValidation = validateEmail(email);
-    if (!emailValidation.valid) return errorResponse(res, emailValidation.error);
+  const emailValidation = validateEmail(email);
+  if (!emailValidation.valid) return errorResponse(res, emailValidation.error);
 
-    const passwordValidation = validatePassword(password);
-    if (!passwordValidation.valid) return errorResponse(res, passwordValidation.error);
+  const passwordValidation = validatePassword(password);
+  if (!passwordValidation.valid) return errorResponse(res, passwordValidation.error);
 
-    const phoneValidation = validatePhone(phoneNumber);
-    if (!phoneValidation.valid) return errorResponse(res, phoneValidation.error);
+  const phoneValidation = validatePhone(phoneNumber);
+  if (!phoneValidation.valid) return errorResponse(res, phoneValidation.error);
 
-    const existingUser = await Admin.findOne({ email: emailValidation.normalized });
-    if (existingUser) return errorResponse(res, "Admin already exists", 409);
+  const existingUser = await Admin.findOne({ email: emailValidation.normalized });
+  if (existingUser) return errorResponse(res, "Admin already exists", 409);
 
-    const existingAccount = await Account.findOne({ email: emailValidation.normalized });
-    if (existingAccount) return errorResponse(res, "Account already exists with this email", 409);
+  const existingAccount = await Account.findOne({ email: emailValidation.normalized });
+  if (existingAccount) return errorResponse(res, "Account already exists with this email", 409);
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+  const hashedPassword = await bcrypt.hash(password, 10);
 
-    const session = await mongoose.startSession();
-    session.startTransaction();
-    let user;
-    try {
-        [user] = await Admin.create(
-            [
-                {
-                    name: nameValidation.normalized,
-                    email: emailValidation.normalized,
-                    phoneNumber: phoneValidation.normalized,
-                },
-            ],
-            { session }
-        );
-
-        await Account.create(
-            [
-                {
-                    password: hashedPassword,
-                    email: emailValidation.normalized,
-                    role: "admin",
-                    twoFactorEnabled: false,
-                },
-            ],
-            { session }
-        );
-
-        await session.commitTransaction();
-    } catch (err) {
-        await session.abortTransaction();
-        throw err;
-    } finally {
-        session.endSession();
-    }
-
-    const { accessToken, refreshToken } = await generateTokenPair({ userId: user._id, role: "admin" }, req);
-
-    setAuthCookie(res, req, accessToken);
-
-    return successResponse(
-        res,
-        "Register Successful",
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  let user;
+  try {
+    [user] = await Admin.create(
+      [
         {
-            id: user._id,
-            name: user.name,
-            email: user.email,
-            phoneNumber: user.phoneNumber,
-            token: accessToken,
-            refreshToken,
+          name: nameValidation.normalized,
+          email: emailValidation.normalized,
+          phoneNumber: phoneValidation.normalized,
         },
-        201
+      ],
+      { session }
     );
+
+    await Account.create(
+      [
+        {
+          password: hashedPassword,
+          email: emailValidation.normalized,
+          role: "admin",
+          twoFactorEnabled: false,
+        },
+      ],
+      { session }
+    );
+
+    await session.commitTransaction();
+  } catch (err) {
+    await session.abortTransaction();
+    throw err;
+  } finally {
+    session.endSession();
+  }
+
+  const { accessToken, refreshToken } = await generateTokenPair({ userId: user._id, role: "admin" }, req);
+
+  setAuthCookie(res, req, accessToken);
+
+  return successResponse(
+    res,
+    "Register Successful",
+    {
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      phoneNumber: user.phoneNumber,
+      token: accessToken,
+      refreshToken,
+    },
+    201
+  );
 }, "REGISTER_ADMIN_CONTROLLER_ERROR");
 
 export const login = asyncHandler(async (req, res) => {
-    const { email, password } = req.body;
+  const { email, password } = req.body;
 
-    const requiredCheck = validateRequiredFields({ email, password }, ["email", "password"]);
-    if (!requiredCheck.valid) return errorResponse(res, requiredCheck.error);
+  const requiredCheck = validateRequiredFields({ email, password }, ["email", "password"]);
+  if (!requiredCheck.valid) return errorResponse(res, requiredCheck.error);
 
-    const emailValidation = validateEmail(email);
-    if (!emailValidation.valid) return errorResponse(res, emailValidation.error);
+  const emailValidation = validateEmail(email);
+  if (!emailValidation.valid) return errorResponse(res, emailValidation.error);
 
-    const account = await Account.findOne({ email: emailValidation.normalized });
-    if (!account || account.role !== "admin") {
-        await recordFailedAttempt(emailValidation.normalized);
-        return errorResponse(res, "Admin does not exist", 401);
-    }
+  const account = await Account.findOne({ email: emailValidation.normalized });
+  if (!account || account.role !== "admin") {
+    await recordFailedAttempt(emailValidation.normalized);
+    return errorResponse(res, "Admin does not exist", 401);
+  }
 
-    if (account.isActive === false) {
-        return errorResponse(res, "Account has been deactivated. Please contact support.", 403);
-    }
+  if (account.isActive === false) {
+    return errorResponse(res, "Account has been deactivated. Please contact support.", 403);
+  }
 
-    const isMatch = await bcrypt.compare(password, account.password);
-    if (!isMatch) {
-        await recordFailedAttempt(emailValidation.normalized);
-        return errorResponse(res, "Invalid credentials", 401);
-    }
+  const isMatch = await bcrypt.compare(password, account.password);
+  if (!isMatch) {
+    await recordFailedAttempt(emailValidation.normalized);
+    return errorResponse(res, "Invalid credentials", 401);
+  }
 
-    await clearFailedAttempts(emailValidation.normalized);
+  await clearFailedAttempts(emailValidation.normalized);
 
-    const admin = await Admin.findOne({ email: emailValidation.normalized });
-    if (!admin) return errorResponse(res, "Admin profile not found", 401);
+  const admin = await Admin.findOne({ email: emailValidation.normalized });
+  if (!admin) return errorResponse(res, "Admin profile not found", 401);
 
-    const { accessToken, refreshToken } = await generateTokenPair({ userId: admin._id, role: "admin" }, req);
+  const { accessToken, refreshToken } = await generateTokenPair({ userId: admin._id, role: "admin" }, req);
 
-    setAuthCookie(res, req, accessToken);
+  setAuthCookie(res, req, accessToken);
 
-    return successResponse(res, "Login Successful", {
-        id: admin._id,
-        name: admin.name,
-        email: admin.email,
-        phoneNumber: admin.phoneNumber,
-        token: accessToken,
-        refreshToken,
-    });
+  return successResponse(res, "Login Successful", {
+    id: admin._id,
+    name: admin.name,
+    email: admin.email,
+    phoneNumber: admin.phoneNumber,
+    token: accessToken,
+    refreshToken,
+  });
 }, "LOGIN_ADMIN_ERROR");
 
 export const logout = asyncHandler(async (req, res) => {
-    if (req.user?.userId) {
-        await revokeAllTokens(req.user.userId);
-    }
-    if (req.accessToken) {
-        await blacklistToken(req.accessToken);
-    }
-    clearAuthCookie(res, req);
-    return successResponse(res, "Logout successful");
+  if (req.user?.userId) {
+    await revokeAllTokens(req.user.userId);
+  }
+  if (req.accessToken) {
+    await blacklistToken(req.accessToken);
+  }
+  clearAuthCookie(res, req);
+  return successResponse(res, "Logout successful");
 }, "ADMIN_LOGOUT_ERROR");
 
 export const forgot_password_send_otp = asyncHandler(async (req, res) => {
-    const { email } = req.body;
+  const { email } = req.body;
 
-    const emailValidation = validateEmail(email);
-    if (!emailValidation.valid) return errorResponse(res, emailValidation.error);
+  const emailValidation = validateEmail(email);
+  if (!emailValidation.valid) return errorResponse(res, emailValidation.error);
 
-    const admin = await Admin.findOne({ email: emailValidation.normalized });
-    if (!admin) return errorResponse(res, "Admin not found", 404);
+  const admin = await Admin.findOne({ email: emailValidation.normalized });
+  if (!admin) return errorResponse(res, "Admin not found", 404);
 
-    let result;
-    try {
-        result = await sendEmailOTP(emailValidation.normalized);
-    } catch (err) {
-        return errorResponse(res, "Failed to send OTP", 500);
-    }
-    if (!result || result.status !== "success") {
-        return errorResponse(res, "Something went wrong", 401);
-    }
-    return successResponse(res, "OTP sent successfully");
+  let result;
+  try {
+    result = await sendEmailOTP(emailValidation.normalized);
+  } catch (err) {
+    return errorResponse(res, "Failed to send OTP", 500);
+  }
+  if (!result || result.status !== "success") {
+    return errorResponse(res, "Something went wrong", 401);
+  }
+  return successResponse(res, "OTP sent successfully");
 }, "FORGOT_PASSWORD_SEND_OTP_ERROR");
 
 export const forgot_password_verify_otp = asyncHandler(async (req, res) => {
-    const { email, otp } = req.body;
+  const { email, otp } = req.body;
 
-    const requiredCheck = validateRequiredFields({ email, otp }, ["email", "otp"]);
-    if (!requiredCheck.valid) return errorResponse(res, requiredCheck.error);
+  const requiredCheck = validateRequiredFields({ email, otp }, ["email", "otp"]);
+  if (!requiredCheck.valid) return errorResponse(res, requiredCheck.error);
 
-    const emailValidation = validateEmail(email);
-    if (!emailValidation.valid) return errorResponse(res, emailValidation.error);
+  const emailValidation = validateEmail(email);
+  if (!emailValidation.valid) return errorResponse(res, emailValidation.error);
 
-    let result;
-    try {
-        result = await verifyEmailOTP(emailValidation.normalized, otp);
-    } catch (err) {
-        return errorResponse(res, "Failed to verify OTP", 500);
-    }
-    if (!result || result.status !== "success") {
-        return errorResponse(res, "Invalid OTP", 401);
-    }
-    return successResponse(res, "OTP Verification Successful");
+  let result;
+  try {
+    result = await verifyEmailOTP(emailValidation.normalized, otp);
+  } catch (err) {
+    return errorResponse(res, "Failed to verify OTP", 500);
+  }
+  if (!result || result.status !== "success") {
+    return errorResponse(res, "Invalid OTP", 401);
+  }
+  return successResponse(res, "OTP Verification Successful");
 }, "FORGOT_PASSWORD_VERIFY_OTP_ERROR");
 
 export const forgot_password_reset = asyncHandler(async (req, res) => {
-    const { email, otp, newPassword } = req.body;
+  const { email, otp, newPassword } = req.body;
 
-    const requiredCheck = validateRequiredFields({ email, otp, newPassword }, ["email", "otp", "newPassword"]);
-    if (!requiredCheck.valid) return errorResponse(res, requiredCheck.error);
+  const requiredCheck = validateRequiredFields({ email, otp, newPassword }, ["email", "otp", "newPassword"]);
+  if (!requiredCheck.valid) return errorResponse(res, requiredCheck.error);
 
-    const emailValidation = validateEmail(email);
-    if (!emailValidation.valid) return errorResponse(res, emailValidation.error);
+  const emailValidation = validateEmail(email);
+  if (!emailValidation.valid) return errorResponse(res, emailValidation.error);
 
-    const passwordValidation = validatePassword(newPassword);
-    if (!passwordValidation.valid) return errorResponse(res, passwordValidation.error);
+  const passwordValidation = validatePassword(newPassword);
+  if (!passwordValidation.valid) return errorResponse(res, passwordValidation.error);
 
-    let result;
-    try {
-        result = await verifyEmailOTP(emailValidation.normalized, otp);
-    } catch (err) {
-        return errorResponse(res, "Failed to verify OTP", 500);
-    }
-    if (!result || result.status !== "success") {
-        return errorResponse(res, "Invalid OTP", 401);
-    }
+  let result;
+  try {
+    result = await verifyEmailOTP(emailValidation.normalized, otp);
+  } catch (err) {
+    return errorResponse(res, "Failed to verify OTP", 500);
+  }
+  if (!result || result.status !== "success") {
+    return errorResponse(res, "Invalid OTP", 401);
+  }
 
-    const account = await Account.findOne({ email: emailValidation.normalized, role: "admin" });
-    if (!account) return errorResponse(res, "Admin account not found", 404);
+  const account = await Account.findOne({ email: emailValidation.normalized, role: "admin" });
+  if (!account) return errorResponse(res, "Admin account not found", 404);
 
-    const isSamePassword = await bcrypt.compare(newPassword, account.password);
-    if (isSamePassword) return errorResponse(res, "New password cannot be the same as current password");
+  const isSamePassword = await bcrypt.compare(newPassword, account.password);
+  if (isSamePassword) return errorResponse(res, "New password cannot be the same as current password");
 
-    account.password = await bcrypt.hash(newPassword, 10);
-    await account.save();
+  account.password = await bcrypt.hash(newPassword, 10);
+  await account.save();
 
-    return successResponse(res, "Password reset successful");
+  return successResponse(res, "Password reset successful");
 }, "FORGOT_PASSWORD_RESET_ERROR");
 
 export const getProfile = asyncHandler(async (req, res) => {
-    const { userId } = req.user;
-    const [admin] = await Admin.aggregate([
-        { $match: { _id: new mongoose.Types.ObjectId(userId) } },
-        {
-            $lookup: {
-                from: "accounts",
-                localField: "email",
-                foreignField: "email",
-                as: "account",
-            },
-        },
-        { $unwind: { path: "$account", preserveNullAndEmptyArrays: true } },
-        {
-            $addFields: {
-                role: "$account.role",
-                twoFactorEnabled: "$account.twoFactorEnabled",
-            },
-        },
-    ]);
-    if (!admin) return errorResponse(res, "Admin not found", 404);
-    return successResponse(res, "Admin profile fetched", admin);
+  const { userId } = req.user;
+  const [admin] = await Admin.aggregate([
+    { $match: { _id: new mongoose.Types.ObjectId(userId) } },
+    {
+      $lookup: {
+        from: "accounts",
+        localField: "email",
+        foreignField: "email",
+        as: "account",
+      },
+    },
+    { $unwind: { path: "$account", preserveNullAndEmptyArrays: true } },
+    {
+      $addFields: {
+        role: "$account.role",
+        twoFactorEnabled: "$account.twoFactorEnabled",
+      },
+    },
+  ]);
+  if (!admin) return errorResponse(res, "Admin not found", 404);
+  return successResponse(res, "Admin profile fetched", admin);
 }, "ADMIN_GET_PROFILE_ERROR");
 
 export const updateProfile = asyncHandler(async (req, res) => {
-    const { userId } = req.user;
-    const admin = await Admin.findById(userId);
-    if (!admin) return errorResponse(res, "Admin not found", 404);
+  const { userId } = req.user;
+  const admin = await Admin.findById(userId);
+  if (!admin) return errorResponse(res, "Admin not found", 404);
 
-    const updates = {};
-    if (req.body.name !== undefined) {
-        const nameValidation = validateName(req.body.name);
-        if (!nameValidation.valid) return errorResponse(res, nameValidation.error);
-        updates.name = nameValidation.normalized;
+  const updates = {};
+  if (req.body.name !== undefined) {
+    const nameValidation = validateName(req.body.name);
+    if (!nameValidation.valid) return errorResponse(res, nameValidation.error);
+    updates.name = nameValidation.normalized;
+  }
+
+  if (req.body.phone !== undefined || req.body.phoneNumber !== undefined) {
+    const phone = req.body.phone || req.body.phoneNumber;
+    const phoneValidation = validatePhone(phone);
+    if (!phoneValidation.valid) return errorResponse(res, phoneValidation.error);
+    updates.phoneNumber = phoneValidation.normalized;
+  }
+
+  if (req.body.profileImage !== undefined) {
+    updates.profileImage = req.body.profileImage;
+  }
+
+  const account = await Account.findOne({ email: admin.email, role: "admin" });
+  if (!account) return errorResponse(res, "Account not found", 404);
+
+  const accountUpdates = {};
+  if (req.body.email !== undefined) {
+    const emailValidation = validateEmail(req.body.email);
+    if (!emailValidation.valid) return errorResponse(res, emailValidation.error);
+    const emailLower = emailValidation.normalized.toLowerCase();
+    if (emailLower !== account.email.toLowerCase()) {
+      const existingAccount = await Account.findOne({ email: emailLower });
+      if (existingAccount) return errorResponse(res, "Email already in use", 409);
+      updates.email = emailLower;
+      accountUpdates.email = emailLower;
     }
+  }
 
-    if (req.body.phone !== undefined || req.body.phoneNumber !== undefined) {
-        const phone = req.body.phone || req.body.phoneNumber;
-        const phoneValidation = validatePhone(phone);
-        if (!phoneValidation.valid) return errorResponse(res, phoneValidation.error);
-        updates.phoneNumber = phoneValidation.normalized;
-    }
+  if (req.body.twoFactorEnabled !== undefined) {
+    accountUpdates.twoFactorEnabled = !!req.body.twoFactorEnabled;
+  }
 
-    if (req.body.profileImage !== undefined) {
-        updates.profileImage = req.body.profileImage;
-    }
+  if (Object.keys(updates).length === 0 && Object.keys(accountUpdates).length === 0) {
+    return errorResponse(res, "No valid fields to update");
+  }
 
-    const account = await Account.findOne({ email: admin.email, role: "admin" });
-    if (!account) return errorResponse(res, "Account not found", 404);
+  if (Object.keys(accountUpdates).length > 0) {
+    await Account.findByIdAndUpdate(account._id, accountUpdates);
+  }
 
-    const accountUpdates = {};
-    if (req.body.email !== undefined) {
-        const emailValidation = validateEmail(req.body.email);
-        if (!emailValidation.valid) return errorResponse(res, emailValidation.error);
-        const emailLower = emailValidation.normalized.toLowerCase();
-        if (emailLower !== account.email.toLowerCase()) {
-            const existingAccount = await Account.findOne({ email: emailLower });
-            if (existingAccount) return errorResponse(res, "Email already in use", 409);
-            updates.email = emailLower;
-            accountUpdates.email = emailLower;
-        }
-    }
-
-    if (req.body.twoFactorEnabled !== undefined) {
-        accountUpdates.twoFactorEnabled = !!req.body.twoFactorEnabled;
-    }
-
-    if (Object.keys(updates).length === 0 && Object.keys(accountUpdates).length === 0) {
-        return errorResponse(res, "No valid fields to update");
-    }
-
-    if (Object.keys(accountUpdates).length > 0) {
-        await Account.findByIdAndUpdate(account._id, accountUpdates);
-    }
-
-    const updatedAdmin = await Admin.findByIdAndUpdate(userId, updates, { new: true, runValidators: true });
-    return successResponse(res, "Admin profile updated", updatedAdmin);
+  const updatedAdmin = await Admin.findByIdAndUpdate(userId, updates, { new: true, runValidators: true });
+  return successResponse(res, "Admin profile updated", updatedAdmin);
 }, "ADMIN_UPDATE_PROFILE_ERROR");
 
 export const changePassword = asyncHandler(async (req, res) => {
-    const { userId } = req.user;
-    const { currentPassword, newPassword } = req.body;
+  const { userId } = req.user;
+  const { currentPassword, newPassword } = req.body;
 
-    const requiredCheck = validateRequiredFields({ currentPassword, newPassword }, ["currentPassword", "newPassword"]);
-    if (!requiredCheck.valid) return errorResponse(res, requiredCheck.error);
+  const requiredCheck = validateRequiredFields({ currentPassword, newPassword }, ["currentPassword", "newPassword"]);
+  if (!requiredCheck.valid) return errorResponse(res, requiredCheck.error);
 
-    const passwordValidation = validatePassword(newPassword);
-    if (!passwordValidation.valid) return errorResponse(res, passwordValidation.error);
+  const passwordValidation = validatePassword(newPassword);
+  if (!passwordValidation.valid) return errorResponse(res, passwordValidation.error);
 
-    const admin = await Admin.findById(userId);
-    if (!admin) return errorResponse(res, "Admin not found", 404);
+  const admin = await Admin.findById(userId);
+  if (!admin) return errorResponse(res, "Admin not found", 404);
 
-    const account = await Account.findOne({ email: admin.email, role: "admin" });
-    if (!account) return errorResponse(res, "Account not found", 404);
+  const account = await Account.findOne({ email: admin.email, role: "admin" });
+  if (!account) return errorResponse(res, "Account not found", 404);
 
-    const isMatch = await bcrypt.compare(currentPassword, account.password);
-    if (!isMatch) return errorResponse(res, "Current password is incorrect", 401);
+  const isMatch = await bcrypt.compare(currentPassword, account.password);
+  if (!isMatch) return errorResponse(res, "Current password is incorrect", 401);
 
-    const isSamePassword = await bcrypt.compare(newPassword, account.password);
-    if (isSamePassword) return errorResponse(res, "New password cannot be the same as current password");
+  const isSamePassword = await bcrypt.compare(newPassword, account.password);
+  if (isSamePassword) return errorResponse(res, "New password cannot be the same as current password");
 
-    account.password = await bcrypt.hash(newPassword, 10);
-    await account.save();
+  account.password = await bcrypt.hash(newPassword, 10);
+  await account.save();
 
-    // Invalidate all sessions so other devices must re-authenticate
-    await revokeAllTokens(userId);
-    if (req.accessToken) {
-        await blacklistToken(req.accessToken);
-    }
+  // Invalidate all sessions so other devices must re-authenticate
+  await revokeAllTokens(userId);
+  if (req.accessToken) {
+    await blacklistToken(req.accessToken);
+  }
 
-    return successResponse(res, "Password changed successfully");
+  return successResponse(res, "Password changed successfully");
 }, "ADMIN_CHANGE_PASSWORD_ERROR");
 
 export const deactivateAccount = asyncHandler(async (req, res) => {
-    const { userId } = req.user;
-    const { password } = req.body;
+  const { userId } = req.user;
+  const { password } = req.body;
 
-    if (!password) return errorResponse(res, "Password is required to deactivate account");
+  if (!password) return errorResponse(res, "Password is required to deactivate account");
 
-    const admin = await Admin.findById(userId);
-    if (!admin) return errorResponse(res, "Admin not found", 404);
+  const admin = await Admin.findById(userId);
+  if (!admin) return errorResponse(res, "Admin not found", 404);
 
-    const account = await Account.findOne({ email: admin.email, role: "admin" });
-    if (!account) return errorResponse(res, "Account not found", 404);
+  const account = await Account.findOne({ email: admin.email, role: "admin" });
+  if (!account) return errorResponse(res, "Account not found", 404);
 
-    const isMatch = await bcrypt.compare(password, account.password);
-    if (!isMatch) return errorResponse(res, "Invalid password", 401);
+  const isMatch = await bcrypt.compare(password, account.password);
+  if (!isMatch) return errorResponse(res, "Invalid password", 401);
 
-    // Deactivate the account — mark as inactive so login is blocked
-    account.isActive = false;
-    account.deactivatedAt = new Date();
-    await account.save();
+  // Deactivate the account — mark as inactive so login is blocked
+  account.isActive = false;
+  account.deactivatedAt = new Date();
+  await account.save();
 
-    // Revoke all refresh tokens so existing sessions are invalidated
-    await revokeAllTokens(userId);
+  // Revoke all refresh tokens so existing sessions are invalidated
+  await revokeAllTokens(userId);
 
-    clearAuthCookie(res, req);
+  clearAuthCookie(res, req);
 
-    return successResponse(res, "Account deactivated successfully");
+  return successResponse(res, "Account deactivated successfully");
 }, "ADMIN_DEACTIVATE_ACCOUNT_ERROR");
 
 export const verifyPassword = asyncHandler(async (req, res) => {
-    const { userId } = req.user;
-    const { password } = req.body;
+  const { userId } = req.user;
+  const { password } = req.body;
 
-    if (!password) return errorResponse(res, "Password is required");
+  if (!password) return errorResponse(res, "Password is required");
 
-    const admin = await Admin.findById(userId);
-    if (!admin) return errorResponse(res, "Admin not found", 404);
+  const admin = await Admin.findById(userId);
+  if (!admin) return errorResponse(res, "Admin not found", 404);
 
-    const account = await Account.findOne({ email: admin.email, role: "admin" });
-    if (!account) return errorResponse(res, "Account not found", 404);
+  const account = await Account.findOne({ email: admin.email, role: "admin" });
+  if (!account) return errorResponse(res, "Account not found", 404);
 
-    const isMatch = await bcrypt.compare(password, account.password);
-    if (!isMatch) return errorResponse(res, "Incorrect password", 401);
+  const isMatch = await bcrypt.compare(password, account.password);
+  if (!isMatch) return errorResponse(res, "Incorrect password", 401);
 
-    return successResponse(res, "Password verified");
+  return successResponse(res, "Password verified");
 }, "ADMIN_VERIFY_PASSWORD_ERROR");

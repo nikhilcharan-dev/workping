@@ -1,7 +1,7 @@
 import {
-    getActiveSubscription,
-    cancelSubscription,
-    getSubscriptionHistory,
+  getActiveSubscription,
+  cancelSubscription,
+  getSubscriptionHistory,
 } from "#webController/admin/subscriptions/controller.js";
 import express from "express";
 

@@ -8,7 +8,7 @@ const profile = process.env.OCI_PROFILE || "DEFAULT";
 const provider = new common.ConfigFileAuthenticationDetailsProvider(configPath, profile);
 
 const client = new objectStorage.ObjectStorageClient({
-    authenticationDetailsProvider: provider,
+  authenticationDetailsProvider: provider,
 });
 
 export default client;

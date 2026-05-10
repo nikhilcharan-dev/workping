@@ -10,53 +10,69 @@ const MODE = process.env.MODE;
 import { allowedOrigins } from "#config/cors.js";
 
 const corsOptions = {
-    origin: (origin, cb) =>
-        !origin || allowedOrigins.includes(origin) ? cb(null, true) : cb(new Error("CORS blocked")),
-    credentials: true,
+  origin: (origin, cb) => (!origin || allowedOrigins.includes(origin) ? cb(null, true) : cb(new Error("CORS blocked"))),
+  credentials: true,
 };
 
 // General limiter — all routes
 const generalLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 200,
-    standardHeaders: "draft-7",
-    legacyHeaders: false,
-    message: { type: "error", message: "Too many requests, please try again later." },
+  windowMs: 15 * 60 * 1000,
+  max: 200,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: { type: "error", message: "Too many requests, please try again later." },
 });
 
 // Strict limiter — auth, OTP, password reset (brute-force targets)
 export const authLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 10,
-    standardHeaders: "draft-7",
-    legacyHeaders: false,
-    message: { type: "error", message: "Too many attempts, please try again in 15 minutes." },
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: { type: "error", message: "Too many attempts, please try again in 15 minutes." },
 });
 
 export default function middlewares(app) {
-    app.set("trust proxy", 1);
+  app.set("trust proxy", 1);
 
-    // Security headers — CSP disabled since this is a pure JSON API
-    app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false }));
+  // Security headers — CSP locked down for a JSON-only API (no scripts/styles served)
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'none'"],
+          frameAncestors: ["'none'"],
+        },
+      },
+      crossOriginEmbedderPolicy: false,
+      crossOriginResourcePolicy: { policy: "cross-origin" },
+      referrerPolicy: { policy: "no-referrer" },
+      hsts: {
+        maxAge: 31536000,
+        includeSubDomains: true,
+        preload: true,
+      },
+    })
+  );
 
-    app.use(cors(corsOptions));
+  app.use(cors(corsOptions));
 
-    app.use(generalLimiter);
+  app.use(generalLimiter);
 
-    app.use(express.json({ limit: "10kb" }));
-    app.use(express.urlencoded({ extended: true, limit: "10kb" }));
+  app.use(express.json({ limit: "10kb" }));
+  app.use(express.urlencoded({ extended: true, limit: "10kb" }));
 
-    app.use(sanitizeMongo);
+  app.use(sanitizeMongo);
 
-    app.use(cookieParser());
+  app.use(cookieParser());
 
-    app.use((req, res, next) => {
-        console.log(`[Request] [${req.ip}] ${req.method} ${req.url}`);
-        if (req.headers["user-agent"]?.includes("PostmanRuntime") && MODE === "production") {
-            return res.status(403).json({
-                message: "Axios/Postman is fast, but not fast enough to be a browser.",
-            });
-        }
-        next();
-    });
+  app.use((req, res, next) => {
+    console.log(`[Request] [${req.ip}] ${req.method} ${req.url}`);
+    if (req.headers["user-agent"]?.includes("PostmanRuntime") && MODE === "production") {
+      return res.status(403).json({
+        message: "Axios/Postman is fast, but not fast enough to be a browser.",
+      });
+    }
+    next();
+  });
 }

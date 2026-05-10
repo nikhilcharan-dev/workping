@@ -1,10 +1,10 @@
 import { Router } from "express";
 import {
-    applyLeave,
-    getMyLeaves,
-    getLeaveById,
-    cancelLeave,
-    getLeaveBalance,
+  applyLeave,
+  getMyLeaves,
+  getLeaveById,
+  cancelLeave,
+  getLeaveBalance,
 } from "#webController/user/leaves/controller.js";
 
 const router = Router();

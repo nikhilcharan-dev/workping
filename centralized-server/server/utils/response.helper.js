@@ -7,11 +7,11 @@
  */
 
 export const successResponse = (res, message, data = null, statusCode = 200) => {
-    const payload = { type: "success", message };
-    if (data !== null) payload.data = data;
-    return res.status(statusCode).json(payload);
+  const payload = { type: "success", message };
+  if (data !== null) payload.data = data;
+  return res.status(statusCode).json(payload);
 };
 
 export const errorResponse = (res, message, statusCode = 400) => {
-    return res.status(statusCode).json({ type: "error", message });
+  return res.status(statusCode).json({ type: "error", message });
 };

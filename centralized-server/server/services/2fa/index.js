@@ -11,14 +11,14 @@ import validateCookie from "#middleware/jwtBearer.js";
  * @param {string} [config.appName] - Name of the application (for Authenticator app).
  */
 export function setup2FA(app, config) {
-    if (!config || typeof config.saveSecret !== "function" || typeof config.getSecret !== "function") {
-        throw new Error('2FA Service requires "saveSecret" and "getSecret" async functions in config.');
-    }
+  if (!config || typeof config.saveSecret !== "function" || typeof config.getSecret !== "function") {
+    throw new Error('2FA Service requires "saveSecret" and "getSecret" async functions in config.');
+  }
 
-    const controller = createController(config);
-    const router = createRoutes(controller);
+  const controller = createController(config);
+  const router = createRoutes(controller);
 
-    // app.use('/2fa', validateCookie,  router);
-    app.use("/api/auth/2fa", validateCookie, router);
-    return { controller, router };
+  // app.use('/2fa', validateCookie,  router);
+  app.use("/api/auth/2fa", validateCookie, router);
+  return { controller, router };
 }

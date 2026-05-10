@@ -5,7 +5,11 @@
   "main": "app.js",
   "scripts": {
     "start": "node app.js",
-    "dev": "nodemon app.js"
+    "dev": "nodemon app.js",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "engines": {
     "node": ">=18.0.0"
@@ -22,6 +26,13 @@
     "url": "https://github.com/nikhilcharan-dev/oracle-cloud-express/issues"
   },
   "homepage": "https://github.com/nikhilcharan-dev/oracle-cloud-express#readme",
+  "devDependencies": {
+    "@eslint/js": "^9.0.0",
+    "eslint": "^9.0.0",
+    "globals": "^15.0.0",
+    "nodemon": "^3.0.0",
+    "prettier": "^3.0.0"
+  },
   "dependencies": {
     "content-disposition": "^1.0.1",
     "cors": "^2.8.6",

@@ -1,15 +1,15 @@
 import {
-    getOrganizationById,
-    addOrganization,
-    updateOrganization,
-    deleteOrganization,
-    getOrganizationsOfAdmin,
-    getOrganizationIDsOfAdmin,
-    getOrgAdmins,
-    findAdminByEmail,
-    inviteAdmin,
-    removeAdmin,
-    uploadOrgLogo,
+  getOrganizationById,
+  addOrganization,
+  updateOrganization,
+  deleteOrganization,
+  getOrganizationsOfAdmin,
+  getOrganizationIDsOfAdmin,
+  getOrgAdmins,
+  findAdminByEmail,
+  inviteAdmin,
+  removeAdmin,
+  uploadOrgLogo,
 } from "#webController/admin/organization/controller.js";
 import express from "express";
 import multer from "multer";

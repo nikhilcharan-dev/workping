@@ -9,11 +9,11 @@ const API_SECRET = process.env.WHATSAPP_VERIFY_TOKEN;
 if (!API_SECRET) throw new Error("[CONFIG] WHATSAPP_VERIFY_TOKEN env var is required");
 
 function authGuard(req, res, next) {
-    const token = req.headers["authorization"];
-    if (token !== API_SECRET) {
-        return res.status(401).json({ error: "Unauthorized" });
-    }
-    next();
+  const token = req.headers["authorization"];
+  if (token !== API_SECRET) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  next();
 }
 
 /**
@@ -52,21 +52,21 @@ function authGuard(req, res, next) {
  *   }, { headers: { Authorization: 'earthisflat' } });
  */
 originRouter.post("/send", authGuard, async (req, res) => {
-    const { to, text } = req.body;
-    if (!to || !text) {
-        return res.status(400).json({ error: "Both 'to' and 'text' are required" });
-    }
-    if (!/^\d{10,15}$/.test(String(to).trim())) {
-        return res.status(400).json({ error: "'to' must be a phone number with country code (10-15 digits, no +)" });
-    }
-    try {
-        await sendWhatsAppMessage({ to, text });
-        console.log("Message sent to:", to);
-        res.json({ sent: true, to });
-    } catch (err) {
-        console.error("Send message failed:", err.message);
-        res.status(500).json({ error: err.message });
-    }
+  const { to, text } = req.body;
+  if (!to || !text) {
+    return res.status(400).json({ error: "Both 'to' and 'text' are required" });
+  }
+  if (!/^\d{10,15}$/.test(String(to).trim())) {
+    return res.status(400).json({ error: "'to' must be a phone number with country code (10-15 digits, no +)" });
+  }
+  try {
+    await sendWhatsAppMessage({ to, text });
+    console.log("Message sent to:", to);
+    res.json({ sent: true, to });
+  } catch (err) {
+    console.error("Send message failed:", err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 /**
@@ -78,12 +78,12 @@ originRouter.post("/send", authGuard, async (req, res) => {
  * Body: { phone, flow, step, data }
  */
 originRouter.post("/start-flow", authGuard, async (req, res) => {
-    const { phone, flow, step, data } = req.body;
-    if (!phone || !flow || !step) {
-        return res.status(400).json({ error: "phone, flow, and step are required" });
-    }
-    await startFlow(String(phone).trim(), flow, step, data || {});
-    res.json({ started: true, phone });
+  const { phone, flow, step, data } = req.body;
+  if (!phone || !flow || !step) {
+    return res.status(400).json({ error: "phone, flow, and step are required" });
+  }
+  await startFlow(String(phone).trim(), flow, step, data || {});
+  res.json({ started: true, phone });
 });
 
 /**
@@ -112,25 +112,25 @@ originRouter.post("/start-flow", authGuard, async (req, res) => {
  *          or { "skipped": true, "reason": "fire time in the past" }
  */
 originRouter.post("/schedule-reminder", authGuard, async (req, res) => {
-    const { userId, shiftDate, phone, name, role, shift } = req.body;
+  const { userId, shiftDate, phone, name, role, shift } = req.body;
 
-    if (!userId || !shiftDate || !phone || !shift?.startTime) {
-        return res.status(400).json({ error: "userId, shiftDate, phone, and shift.startTime are required" });
-    }
-    if (!/^\d{10,15}$/.test(String(phone).trim())) {
-        return res.status(400).json({ error: "'phone' must include country code (10-15 digits, no +)" });
-    }
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(shiftDate)) {
-        return res.status(400).json({ error: "'shiftDate' must be YYYY-MM-DD" });
-    }
+  if (!userId || !shiftDate || !phone || !shift?.startTime) {
+    return res.status(400).json({ error: "userId, shiftDate, phone, and shift.startTime are required" });
+  }
+  if (!/^\d{10,15}$/.test(String(phone).trim())) {
+    return res.status(400).json({ error: "'phone' must include country code (10-15 digits, no +)" });
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(shiftDate)) {
+    return res.status(400).json({ error: "'shiftDate' must be YYYY-MM-DD" });
+  }
 
-    try {
-        const result = await scheduleShiftReminder({ userId, shiftDate, phone, name, role, shift });
-        res.json(result);
-    } catch (err) {
-        console.error("[ROUTE] schedule-reminder failed:", err.message);
-        res.status(500).json({ error: err.message });
-    }
+  try {
+    const result = await scheduleShiftReminder({ userId, shiftDate, phone, name, role, shift });
+    res.json(result);
+  } catch (err) {
+    console.error("[ROUTE] schedule-reminder failed:", err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 /**
@@ -144,19 +144,19 @@ originRouter.post("/schedule-reminder", authGuard, async (req, res) => {
  * Success: { "cancelled": true } or { "cancelled": false, "reason": "not found" }
  */
 originRouter.post("/cancel-reminder", authGuard, async (req, res) => {
-    const { userId, shiftDate } = req.body;
+  const { userId, shiftDate } = req.body;
 
-    if (!userId || !shiftDate) {
-        return res.status(400).json({ error: "userId and shiftDate are required" });
-    }
+  if (!userId || !shiftDate) {
+    return res.status(400).json({ error: "userId and shiftDate are required" });
+  }
 
-    try {
-        const result = await cancelShiftReminder(userId, shiftDate);
-        res.json(result);
-    } catch (err) {
-        console.error("[ROUTE] cancel-reminder failed:", err.message);
-        res.status(500).json({ error: err.message });
-    }
+  try {
+    const result = await cancelShiftReminder(userId, shiftDate);
+    res.json(result);
+  } catch (err) {
+    console.error("[ROUTE] cancel-reminder failed:", err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 export default originRouter;

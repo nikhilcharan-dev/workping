@@ -1,28 +1,28 @@
 import { Router } from "express";
 import {
-    getEmployeeByPhone,
-    getAttendanceToday,
-    getAttendanceWeek,
-    getLeaveBalance,
-    getRecentLeaves,
-    applyLeave,
-    decideLeave,
-    getUserShift,
-    getUpcomingHolidays,
-    getSalarySlip,
-    fileComplaint,
-    raiseFrsTicket,
+  getEmployeeByPhone,
+  getAttendanceToday,
+  getAttendanceWeek,
+  getLeaveBalance,
+  getRecentLeaves,
+  applyLeave,
+  decideLeave,
+  getUserShift,
+  getUpcomingHolidays,
+  getSalarySlip,
+  fileComplaint,
+  raiseFrsTicket,
 } from "../../controllers/internal/controller.js";
 
 const router = Router();
 
 // Shared-secret guard — all internal routes require x-internal-secret
 router.use((req, res, next) => {
-    const secret = req.headers["x-internal-secret"];
-    if (!secret || secret !== process.env.INTERNAL_SECRET) {
-        return res.status(401).json({ error: "Unauthorized" });
-    }
-    next();
+  const secret = req.headers["x-internal-secret"];
+  if (!secret || secret !== process.env.INTERNAL_SECRET) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  next();
 });
 
 router.get("/employee/by-phone/:phone", getEmployeeByPhone);

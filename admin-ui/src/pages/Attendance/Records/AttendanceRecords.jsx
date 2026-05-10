@@ -52,8 +52,8 @@ const AttendanceRecords = () => {
         axiosClient.get('/api/admin/organization/get-all-organization-ids', { silent: true }),
         axiosClient.get('/api/admin/get-all-employees/get-organization-info', { silent: true }),
       ])
-      const orgs = orgIdsRes.status === 'fulfilled' ? (orgIdsRes.value?.data?.data ?? []) : []
-      const info = orgInfoRes.status === 'fulfilled' ? (orgInfoRes.value?.data?.data ?? {}) : {}
+      const orgs = orgIdsRes.status === 'fulfilled' ? orgIdsRes.value?.data?.data ?? [] : []
+      const info = orgInfoRes.status === 'fulfilled' ? orgInfoRes.value?.data?.data ?? {} : {}
       setOrganizations(orgs)
       setOrgInfo(info)
       if (orgs.length > 0) setOrgId(orgs[0].organizationId)
@@ -103,7 +103,7 @@ const AttendanceRecords = () => {
 
   const teams = useMemo(() => {
     const entry = Object.entries(orgInfo).find(([name]) => name === selectedOrgName)
-    return entry ? (entry[1]?.teams ?? []) : []
+    return entry ? entry[1]?.teams ?? [] : []
   }, [orgInfo, selectedOrgName])
 
   const filtered = useMemo(() => (statusFilter === 'all' ? records : records.filter((r) => r.status === statusFilter)), [records, statusFilter])

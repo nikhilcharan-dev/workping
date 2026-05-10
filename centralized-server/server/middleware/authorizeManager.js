@@ -5,33 +5,33 @@ import { errorResponse } from "../utils/response.helper.js";
  * Admins are allowed bypass. Managers are restricted to their own organization.
  */
 const authorizeManager = (req, res, next) => {
-    if (!req.user) {
-        return errorResponse(res, "Unauthorized", 401);
-    }
+  if (!req.user) {
+    return errorResponse(res, "Unauthorized", 401);
+  }
 
-    // Admins have cross-organization access
-    if (req.user.role === "admin") {
-        return next();
-    }
+  // Admins have cross-organization access
+  if (req.user.role === "admin") {
+    return next();
+  }
 
-    // Managers (and others like teamleads) are restricted to their own organization
-    const userOrgId = req.user.organizationId;
+  // Managers (and others like teamleads) are restricted to their own organization
+  const userOrgId = req.user.organizationId;
 
-    if (!userOrgId) {
-        return errorResponse(res, "Forbidden: manager account has no organization assigned", 403);
-    }
+  if (!userOrgId) {
+    return errorResponse(res, "Forbidden: manager account has no organization assigned", 403);
+  }
 
-    // Check for organizationId in body, query, or params
-    const reqOrgId = req.body?.organizationId || req.query?.organizationId || req.params?.organizationId;
+  // Check for organizationId in body, query, or params
+  const reqOrgId = req.body?.organizationId || req.query?.organizationId || req.params?.organizationId;
 
-    if (reqOrgId && String(reqOrgId) !== String(userOrgId)) {
-        return errorResponse(res, "Forbidden: You do not have access to this organization's data", 403);
-    }
+  if (reqOrgId && String(reqOrgId) !== String(userOrgId)) {
+    return errorResponse(res, "Forbidden: You do not have access to this organization's data", 403);
+  }
 
-    // Attach the manager's org ID so controllers can scope queries without re-reading the JWT.
-    req.managedOrgId = userOrgId;
+  // Attach the manager's org ID so controllers can scope queries without re-reading the JWT.
+  req.managedOrgId = userOrgId;
 
-    next();
+  next();
 };
 
 export default authorizeManager;

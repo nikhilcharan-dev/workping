@@ -1,9 +1,9 @@
 import express from "express";
 import {
-    getAttendanceSummary,
-    getAttendanceByOrganizationId,
-    getAttendanceByTeamId,
-    getManagerAttendanceSummary,
+  getAttendanceSummary,
+  getAttendanceByOrganizationId,
+  getAttendanceByTeamId,
+  getManagerAttendanceSummary,
 } from "#webController/admin/attendance/controller.js";
 import authorizeManager from "#middleware/authorizeManager.js";
 

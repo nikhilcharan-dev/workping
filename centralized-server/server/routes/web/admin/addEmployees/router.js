@@ -7,8 +7,8 @@ import uploadExcel from "#middleware/uploadExcel.js";
 const router = Router();
 
 const faceUpload = multer({
-    storage: multer.memoryStorage(),
-    limits: { fileSize: 5 * 1024 * 1024 },
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
 });
 
 router.post("/by-form", faceUpload.single("face_photo"), insertByForm);

@@ -1,13 +1,13 @@
 import { Router } from "express";
 import {
-    send_simple_mail,
-    send_html_mail,
-    send_greeting,
-    send_alert_info,
-    send_alert_warning,
-    send_alert_danger,
-    send_alert_success,
-    send_general_notification,
+  send_simple_mail,
+  send_html_mail,
+  send_greeting,
+  send_alert_info,
+  send_alert_warning,
+  send_alert_danger,
+  send_alert_success,
+  send_general_notification,
 } from "#webController/admin/mail/controller.js";
 
 const router = Router();

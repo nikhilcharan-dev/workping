@@ -26,4 +26,3 @@ const HoverMenuToggle = () => {
 }
 
 export default HoverMenuToggle
-

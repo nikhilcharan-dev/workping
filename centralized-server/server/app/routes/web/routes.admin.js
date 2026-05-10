@@ -32,54 +32,54 @@ const adminOnly = [validateCookie, requireRole("admin")];
 const adminOrManager = [validateCookie, requireRole("admin", "manager"), authorizeManager];
 
 export default function adminRoutes(app) {
-    app.use("/api/admin/auth", authLimiter, authRoutes);
-    app.use("/api/admin/organization", ...adminOnly, organizationRouter);
-    app.use("/api/admin/subscriptions", ...adminOnly, subscriptionRouter);
-    // OTP
-    app.use("/api/admin/otp", authLimiter, otpRoutes);
-    app.use("/api/admin/forgot-password", authLimiter, forgotPasswordRouter);
-    app.use("/api/admin/mail", ...adminOnly, mailRouter);
+  app.use("/api/admin/auth", authLimiter, authRoutes);
+  app.use("/api/admin/organization", ...adminOnly, organizationRouter);
+  app.use("/api/admin/subscriptions", ...adminOnly, subscriptionRouter);
+  // OTP
+  app.use("/api/admin/otp", authLimiter, otpRoutes);
+  app.use("/api/admin/forgot-password", authLimiter, forgotPasswordRouter);
+  app.use("/api/admin/mail", ...adminOnly, mailRouter);
 
-    // Forgot Password
+  // Forgot Password
 
-    //create-team
-    app.use("/api/admin/employee", ...adminOrManager, getEmployee);
-    app.use("/api/admin/get-all-employees", ...adminOrManager, getAllEmployeesRouter);
-    app.use("/api/admin/employees", ...adminOnly, deleteEmployeesById);
-    app.use("/api/admin/team", ...adminOrManager, teamRoutes);
-    app.use("/api/admin/add-employees", ...adminOnly, addEmployeesRouter);
+  //create-team
+  app.use("/api/admin/employee", ...adminOrManager, getEmployee);
+  app.use("/api/admin/get-all-employees", ...adminOrManager, getAllEmployeesRouter);
+  app.use("/api/admin/employees", ...adminOnly, deleteEmployeesById);
+  app.use("/api/admin/team", ...adminOrManager, teamRoutes);
+  app.use("/api/admin/add-employees", ...adminOnly, addEmployeesRouter);
 
-    // Project — managers can manage projects and assignments
-    app.use("/api/admin/project", ...adminOrManager, projectRoutes);
+  // Project — managers can manage projects and assignments
+  app.use("/api/admin/project", ...adminOrManager, projectRoutes);
 
-    // Payments & Orders (read)
-    app.use("/api/admin/payments", ...adminOnly, paymentsRouter);
-    app.use("/api/admin/orders", ...adminOnly, ordersRouter);
+  // Payments & Orders (read)
+  app.use("/api/admin/payments", ...adminOnly, paymentsRouter);
+  app.use("/api/admin/orders", ...adminOnly, ordersRouter);
 
-    // Face enrollment
-    app.use("/api/admin/employees", ...adminOnly, faceEnrollRouter);
+  // Face enrollment
+  app.use("/api/admin/employees", ...adminOnly, faceEnrollRouter);
 
-    // Plans
-    app.use("/api/admin/plans", ...adminOnly, plansRouter);
+  // Plans
+  app.use("/api/admin/plans", ...adminOnly, plansRouter);
 
-    // PhonePe — initiate payment (admin only)
-    app.use("/api/admin/phonepe", ...adminOnly, phonepeGatewayRouter);
+  // PhonePe — initiate payment (admin only)
+  app.use("/api/admin/phonepe", ...adminOnly, phonepeGatewayRouter);
 
-    // Admin Profile
-    app.use("/api/admin/profile", ...adminOrManager, profileRoutes);
+  // Admin Profile
+  app.use("/api/admin/profile", ...adminOrManager, profileRoutes);
 
-    // Holiday
-    app.use("/api/admin/holiday", ...adminOrManager, holidayRouter);
+  // Holiday
+  app.use("/api/admin/holiday", ...adminOrManager, holidayRouter);
 
-    // Attendance — managers can view team attendance
-    app.use("/api/admin/attendance", ...adminOrManager, attendanceRouter);
+  // Attendance — managers can view team attendance
+  app.use("/api/admin/attendance", ...adminOrManager, attendanceRouter);
 
-    // Leaves — managers can view and action team leaves
-    app.use("/api/admin/leaves", ...adminOrManager, leavesRouter);
+  // Leaves — managers can view and action team leaves
+  app.use("/api/admin/leaves", ...adminOrManager, leavesRouter);
 
-    // Shifts
-    app.use("/api/admin/shifts", ...adminOrManager, shiftRouter);
+  // Shifts
+  app.use("/api/admin/shifts", ...adminOrManager, shiftRouter);
 
-    // Lock screen password verification (requires valid session cookie)
-    app.post("/api/admin/auth/verify-password", ...adminOnly, verifyPassword);
+  // Lock screen password verification (requires valid session cookie)
+  app.post("/api/admin/auth/verify-password", ...adminOnly, verifyPassword);
 }

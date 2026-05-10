@@ -96,9 +96,7 @@ export const authRoutes = [
   { path: '/coming-soon', name: 'Coming Soon', element: <ComingSoon /> },
 ]
 
-const dashboardRoutes = [
-  { path: '/dashboard/analytics', name: 'Analytics', element: <Analytics /> },
-]
+const dashboardRoutes = [{ path: '/dashboard/analytics', name: 'Analytics', element: <Analytics /> }]
 
 const pagesRoutes = [
   { path: '/pages/welcome', name: 'Welcome', element: <Welcome /> },

@@ -5,12 +5,12 @@ import axios from "axios";
  * All requests include x-internal-secret for authentication.
  */
 const originClient = axios.create({
-    baseURL: process.env.ORIGIN,
-    headers: {
-        "Content-Type": "application/json",
-        "x-internal-secret": process.env.INTERNAL_SECRET,
-    },
-    timeout: 8000,
+  baseURL: process.env.ORIGIN,
+  headers: {
+    "Content-Type": "application/json",
+    "x-internal-secret": process.env.INTERNAL_SECRET,
+  },
+  timeout: 8000,
 });
 
 export default originClient;

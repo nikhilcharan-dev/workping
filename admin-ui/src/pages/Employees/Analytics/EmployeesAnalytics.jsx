@@ -214,7 +214,7 @@ const EmployeesAnalytics = () => {
                           display: 'inline-block',
                         }}
                       />
-                      {typeof t === 'string' ? t : (t.teamName ?? t.name ?? `Team ${i + 1}`)}
+                      {typeof t === 'string' ? t : t.teamName ?? t.name ?? `Team ${i + 1}`}
                     </li>
                   ))}
                 </ul>

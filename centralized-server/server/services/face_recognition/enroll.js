@@ -11,20 +11,20 @@ const FACE_API_URI = process.env.IMAGE_CLASSIFICATION_URI;
  * @param {object} user  Needs: _id, organizationId
  */
 export const enrollFace = async (imageBuffer, user) => {
-    const image_base64 = imageBuffer.toString("base64");
+  const image_base64 = imageBuffer.toString("base64");
 
-    // Embeddings are keyed by MongoDB _id (consistent with detect calls)
-    const { data } = await axios.post(`${FACE_API_URI}/api/v1/enroll`, {
-        image_base64,
-        employee_id: user._id.toString(),
-        organization_id: user.organizationId.toString(),
-    });
+  // Embeddings are keyed by MongoDB _id (consistent with detect calls)
+  const { data } = await axios.post(`${FACE_API_URI}/api/v1/enroll`, {
+    image_base64,
+    employee_id: user._id.toString(),
+    organization_id: user.organizationId.toString(),
+  });
 
-    if (!data.success) {
-        throw new Error("Face API failed to enroll face");
-    }
+  if (!data.success) {
+    throw new Error("Face API failed to enroll face");
+  }
 
-    return data;
+  return data;
 };
 
 /**
@@ -32,14 +32,14 @@ export const enrollFace = async (imageBuffer, user) => {
  * Hits the per-user lookup endpoint — does not download the full org list.
  */
 export const checkFaceStatus = async (userId) => {
-    try {
-        const { data } = await axios.get(`${FACE_API_URI}/api/v1/embeddings/${encodeURIComponent(userId.toString())}`, {
-            timeout: 5000,
-        });
-        return data.registered === true;
-    } catch {
-        return false;
-    }
+  try {
+    const { data } = await axios.get(`${FACE_API_URI}/api/v1/embeddings/${encodeURIComponent(userId.toString())}`, {
+      timeout: 5000,
+    });
+    return data.registered === true;
+  } catch {
+    return false;
+  }
 };
 
 /**
@@ -47,9 +47,9 @@ export const checkFaceStatus = async (userId) => {
  * Fire-and-forget safe — does not throw.
  */
 export const deleteFace = async (userId) => {
-    try {
-        await axios.delete(`${FACE_API_URI}/api/v1/embeddings/${encodeURIComponent(userId)}`);
-    } catch (err) {
-        console.error(`[FaceAPI] Failed to delete face for userId "${userId}":`, err?.response?.data || err.message);
-    }
+  try {
+    await axios.delete(`${FACE_API_URI}/api/v1/embeddings/${encodeURIComponent(userId)}`);
+  } catch (err) {
+    console.error(`[FaceAPI] Failed to delete face for userId "${userId}":`, err?.response?.data || err.message);
+  }
 };

@@ -1,18 +1,18 @@
 import {
-    createProject,
-    getProjects,
-    getProject,
-    updateProject,
-    deleteProject,
-    getManagerProjects,
+  createProject,
+  getProjects,
+  getProject,
+  updateProject,
+  deleteProject,
+  getManagerProjects,
 } from "#webController/admin/project/project.controller.js";
 import {
-    addProjectMember,
-    getProjectMembers,
-    getProjectMember,
-    updateProjectMember,
-    removeProjectMembers,
-    getEligibleEmployeesForProject,
+  addProjectMember,
+  getProjectMembers,
+  getProjectMember,
+  updateProjectMember,
+  removeProjectMembers,
+  getEligibleEmployeesForProject,
 } from "#webController/admin/project/teams.controller.js";
 import { Router } from "express";
 import requireRole from "#middleware/requireRole.js";

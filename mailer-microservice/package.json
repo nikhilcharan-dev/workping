@@ -4,8 +4,12 @@
   "description": "",
   "main": "server.js",
   "scripts": {
-    "test": "npx nodemon",
-    "start": "node server.js"
+    "start": "node server.js",
+    "dev": "npx nodemon server.js",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "repository": {
     "type": "git",
@@ -19,6 +23,12 @@
     "url": "https://github.com/nikhilcharan-dev/mailer-microservice/issues"
   },
   "homepage": "https://github.com/nikhilcharan-dev/mailer-microservice#readme",
+  "devDependencies": {
+    "@eslint/js": "^9.0.0",
+    "eslint": "^9.0.0",
+    "globals": "^15.0.0",
+    "prettier": "^3.0.0"
+  },
   "dependencies": {
     "dotenv": "^17.2.3",
     "express": "^5.2.1",

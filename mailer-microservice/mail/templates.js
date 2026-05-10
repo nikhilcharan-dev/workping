@@ -5,19 +5,19 @@ import handlebars from "handlebars";
    ───────────────────────────────────────────── */
 
 const BRAND = {
-    color: "#2563eb",
-    colorDark: "#1e40af",
-    colorLight: "#dbeafe",
-    bg: "#f8fafc",
-    cardBg: "#ffffff",
-    text: "#1e293b",
-    textMuted: "#64748b",
-    border: "#e2e8f0",
-    success: "#16a34a",
-    warning: "#d97706",
-    danger: "#dc2626",
-    radius: "12px",
-    font: "'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
+  color: "#2563eb",
+  colorDark: "#1e40af",
+  colorLight: "#dbeafe",
+  bg: "#f8fafc",
+  cardBg: "#ffffff",
+  text: "#1e293b",
+  textMuted: "#64748b",
+  border: "#e2e8f0",
+  success: "#16a34a",
+  warning: "#d97706",
+  danger: "#dc2626",
+  radius: "12px",
+  font: "'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
 };
 
 /* ─── BASE LAYOUT ─── */
@@ -184,7 +184,7 @@ const baseLayout = (bodyContent, { accent = BRAND.color } = {}) => `
    ─────────────────────────────────────── */
 
 const otpTemplate = handlebars.compile(
-    baseLayout(`
+  baseLayout(`
   <div class="body">
     <h1>Verify Your Email</h1>
     <p>Hi <strong style="color:#1e293b">{{name}}</strong>, use the code below to verify your email address.</p>
@@ -204,8 +204,8 @@ const otpTemplate = handlebars.compile(
    ─────────────────────────────────────── */
 
 const resetPasswordOtpTemplate = handlebars.compile(
-    baseLayout(
-        `
+  baseLayout(
+    `
   <div class="body">
     <h1>Reset Your Password</h1>
     <p>Hi <strong style="color:#1e293b">{{name}}</strong>, we received a request to reset your password. Use the OTP below to proceed.</p>
@@ -218,13 +218,13 @@ const resetPasswordOtpTemplate = handlebars.compile(
     <p style="font-size:13px;">Need help? Contact our support team.</p>
   </div>
 `,
-        { accent: BRAND.warning }
-    )
+    { accent: BRAND.warning }
+  )
 );
 
 const verifyPasswordTemplate = handlebars.compile(
-    baseLayout(
-        `
+  baseLayout(
+    `
   <div class="body">
     <h1>Password Verified ✓</h1>
     <p>Hi <strong style="color:#1e293b">{{name}}</strong>, your password has been successfully verified.</p>
@@ -234,13 +234,13 @@ const verifyPasswordTemplate = handlebars.compile(
     <p style="font-size:13px;">If this wasn't you, please reset your password immediately.</p>
   </div>
 `,
-        { accent: BRAND.success }
-    )
+    { accent: BRAND.success }
+  )
 );
 
 const forgotPasswordTemplate = handlebars.compile(
-    baseLayout(
-        `
+  baseLayout(
+    `
   <div class="body">
     <h1>Forgot Your Password?</h1>
     <p>Hi <strong style="color:#1e293b">{{name}}</strong>, no worries — it happens! Click the button below to set a new password.</p>
@@ -255,12 +255,12 @@ const forgotPasswordTemplate = handlebars.compile(
     </p>
   </div>
 `,
-        { accent: BRAND.warning }
-    )
+    { accent: BRAND.warning }
+  )
 );
 
 const greetingTemplate = handlebars.compile(
-    baseLayout(`
+  baseLayout(`
   <div class="body">
     <h1>Welcome Aboard! 🎉</h1>
     <p>Hi <strong style="color:#1e293b">{{name}}</strong>, welcome to <strong>{{org}}</strong>!</p>
@@ -272,7 +272,7 @@ const greetingTemplate = handlebars.compile(
 );
 
 const alertInfoTemplate = handlebars.compile(
-    baseLayout(`
+  baseLayout(`
   <div class="body">
     <h1>📢 {{title}}</h1>
     <p>Hi <strong style="color:#1e293b">{{name}}</strong>,</p>
@@ -285,8 +285,8 @@ const alertInfoTemplate = handlebars.compile(
 );
 
 const alertWarningTemplate = handlebars.compile(
-    baseLayout(
-        `
+  baseLayout(
+    `
   <div class="body">
     <h1>⚠️ {{title}}</h1>
     <p>Hi <strong style="color:#1e293b">{{name}}</strong>,</p>
@@ -301,13 +301,13 @@ const alertWarningTemplate = handlebars.compile(
     {{/if}}
   </div>
 `,
-        { accent: BRAND.warning }
-    )
+    { accent: BRAND.warning }
+  )
 );
 
 const alertDangerTemplate = handlebars.compile(
-    baseLayout(
-        `
+  baseLayout(
+    `
   <div class="body">
     <h1>🚨 {{title}}</h1>
     <p>Hi <strong style="color:#1e293b">{{name}}</strong>,</p>
@@ -322,13 +322,13 @@ const alertDangerTemplate = handlebars.compile(
     {{/if}}
   </div>
 `,
-        { accent: BRAND.danger }
-    )
+    { accent: BRAND.danger }
+  )
 );
 
 const alertSuccessTemplate = handlebars.compile(
-    baseLayout(
-        `
+  baseLayout(
+    `
   <div class="body">
     <h1>✅ {{title}}</h1>
     <p>Hi <strong style="color:#1e293b">{{name}}</strong>,</p>
@@ -338,12 +338,12 @@ const alertSuccessTemplate = handlebars.compile(
     </div>
   </div>
 `,
-        { accent: BRAND.success }
-    )
+    { accent: BRAND.success }
+  )
 );
 
 const notificationTemplate = handlebars.compile(
-    baseLayout(`
+  baseLayout(`
   <div class="body">
     <h1>{{title}}</h1>
     <p>Hi <strong style="color:#1e293b">{{name}}</strong>,</p>
@@ -361,62 +361,62 @@ const notificationTemplate = handlebars.compile(
 const currentYear = new Date().getFullYear();
 
 const getOtp = (email, otp, appName = "WorkPing", expiry = "30 minutes") => {
-    const name = email.split("@")[0].toUpperCase();
-    return otpTemplate({ name, otp, appName, expiry, year: currentYear });
+  const name = email.split("@")[0].toUpperCase();
+  return otpTemplate({ name, otp, appName, expiry, year: currentYear });
 };
 
 const getResetPasswordOtp = (email, otp, appName = "WorkPing", expiry = "10 minutes") => {
-    const name = email.split("@")[0].toUpperCase();
-    return resetPasswordOtpTemplate({ name, otp, appName, expiry, year: currentYear });
+  const name = email.split("@")[0].toUpperCase();
+  return resetPasswordOtpTemplate({ name, otp, appName, expiry, year: currentYear });
 };
 
 const getVerifyPassword = (email, appName = "WorkPing") => {
-    const name = email.split("@")[0].toUpperCase();
-    return verifyPasswordTemplate({ name, appName, year: currentYear });
+  const name = email.split("@")[0].toUpperCase();
+  return verifyPasswordTemplate({ name, appName, year: currentYear });
 };
 
 const getForgotPassword = (email, resetLink, appName = "WorkPing", expiry = "1 hour") => {
-    const name = email.split("@")[0].toUpperCase();
-    return forgotPasswordTemplate({ name, resetLink, appName, expiry, year: currentYear });
+  const name = email.split("@")[0].toUpperCase();
+  return forgotPasswordTemplate({ name, resetLink, appName, expiry, year: currentYear });
 };
 
 const getGreeting = (name, org, role, appName = "WorkPing") =>
-    greetingTemplate({ name, org, role, appName, year: currentYear });
+  greetingTemplate({ name, org, role, appName, year: currentYear });
 
 const getAlertInfo = (email, title, message, appName = "WorkPing") => {
-    const name = email.split("@")[0].toUpperCase();
-    return alertInfoTemplate({ name, title, message, appName, year: currentYear });
+  const name = email.split("@")[0].toUpperCase();
+  return alertInfoTemplate({ name, title, message, appName, year: currentYear });
 };
 
 const getAlertWarning = (email, title, message, actionLink = null, appName = "WorkPing") => {
-    const name = email.split("@")[0].toUpperCase();
-    return alertWarningTemplate({ name, title, message, actionLink, appName, year: currentYear });
+  const name = email.split("@")[0].toUpperCase();
+  return alertWarningTemplate({ name, title, message, actionLink, appName, year: currentYear });
 };
 
 const getAlertDanger = (email, title, message, actionLink = null, appName = "WorkPing") => {
-    const name = email.split("@")[0].toUpperCase();
-    return alertDangerTemplate({ name, title, message, actionLink, appName, year: currentYear });
+  const name = email.split("@")[0].toUpperCase();
+  return alertDangerTemplate({ name, title, message, actionLink, appName, year: currentYear });
 };
 
 const getAlertSuccess = (email, title, message, appName = "WorkPing") => {
-    const name = email.split("@")[0].toUpperCase();
-    return alertSuccessTemplate({ name, title, message, appName, year: currentYear });
+  const name = email.split("@")[0].toUpperCase();
+  return alertSuccessTemplate({ name, title, message, appName, year: currentYear });
 };
 
 const getNotification = (email, title = "Notification", message = "", appName = "WorkPing") => {
-    const name = email.split("@")[0].toUpperCase();
-    return notificationTemplate({ name, title, message, appName, year: currentYear });
+  const name = email.split("@")[0].toUpperCase();
+  return notificationTemplate({ name, title, message, appName, year: currentYear });
 };
 
 export default {
-    getOtp,
-    getResetPasswordOtp,
-    getVerifyPassword,
-    getForgotPassword,
-    getGreeting,
-    getAlertInfo,
-    getAlertWarning,
-    getAlertDanger,
-    getAlertSuccess,
-    getNotification,
+  getOtp,
+  getResetPasswordOtp,
+  getVerifyPassword,
+  getForgotPassword,
+  getGreeting,
+  getAlertInfo,
+  getAlertWarning,
+  getAlertDanger,
+  getAlertSuccess,
+  getNotification,
 };

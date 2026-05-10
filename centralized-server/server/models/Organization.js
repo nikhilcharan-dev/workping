@@ -1,33 +1,33 @@
 import mongoose from "mongoose";
 
 const organizationSchema = new mongoose.Schema(
-    {
-        name: { type: String, required: true, unique: true, index: true },
+  {
+    name: { type: String, required: true, unique: true, index: true },
 
-        type: { type: String, trim: true },
+    type: { type: String, trim: true },
 
-        clDays: { type: Number, default: 12 },
+    clDays: { type: Number, default: 12 },
 
-        description: { type: String },
+    description: { type: String },
 
-        IPWhitelist: [{ type: String }],
+    IPWhitelist: [{ type: String }],
 
-        foundedAt: { type: Date },
+    foundedAt: { type: Date },
 
-        coordinates: [{ type: Number }],
+    coordinates: [{ type: Number }],
 
-        areaPins: [
-            {
-                lat: { type: Number, required: true },
-                lng: { type: Number, required: true },
-            },
-        ],
+    areaPins: [
+      {
+        lat: { type: Number, required: true },
+        lng: { type: Number, required: true },
+      },
+    ],
 
-        msl: { type: String },
+    msl: { type: String },
 
-        logo: { type: String },
-    },
-    { timestamps: true }
+    logo: { type: String },
+  },
+  { timestamps: true }
 );
 
 export default mongoose.model("Organization", organizationSchema);

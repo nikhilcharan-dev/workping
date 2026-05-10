@@ -1,9 +1,9 @@
 import { Router } from "express";
 import * as Auth from "#webController/admin/auth/controller.js";
 import {
-    send_otp,
-    verify_otp,
-    verify_otp_and_change_password,
+  send_otp,
+  verify_otp,
+  verify_otp_and_change_password,
 } from "#webController/admin/forgotPassword/controller.js";
 import validateCookie from "#middleware/jwtBearer.js";
 

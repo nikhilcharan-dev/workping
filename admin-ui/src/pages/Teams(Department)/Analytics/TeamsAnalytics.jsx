@@ -73,10 +73,12 @@ const TeamsAnalytics = () => {
     const name = t.teamName ?? t.name ?? `Team ${i + 1}`
     return name.length > 20 ? name.slice(0, 18) + '…' : name
   })
-  const barSeries = [{
-    name: 'Members',
-    data: orgTeams.map((t) => t.memberCount ?? t.members?.length ?? t.totalMembers ?? 1),
-  }]
+  const barSeries = [
+    {
+      name: 'Members',
+      data: orgTeams.map((t) => t.memberCount ?? t.members?.length ?? t.totalMembers ?? 1),
+    },
+  ]
   const barOptions = {
     chart: { type: 'bar', toolbar: { show: false } },
     plotOptions: { bar: { borderRadius: 6, horizontal: true, distributed: true } },
