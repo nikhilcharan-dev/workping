@@ -1,0 +1,8 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: 'workping-core-api'
+    static_configs:
+      # Use host.docker.internal to scrape from the host machine running Node.js
+      - targets: ['host.docker.internal:5000']

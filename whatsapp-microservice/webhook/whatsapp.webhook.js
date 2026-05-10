@@ -1,6 +1,26 @@
 import { Router } from "express";
+import crypto from "crypto";
 import messagePipeline from "../pipeline/message.pipeline.js";
 import { normalizeWhatsAppPayload } from "./whatsapp.normalizer.js";
+
+const WHATSAPP_APP_SECRET = process.env.WHATSAPP_APP_SECRET;
+
+function verifyMetaSignature(req) {
+    if (!WHATSAPP_APP_SECRET) return true; // skip if not configured (dev only)
+    const sigHeader = req.headers["x-hub-signature-256"];
+    if (!sigHeader) return false;
+    const [, receivedHex] = sigHeader.split("=");
+    if (!receivedHex) return false;
+    const expected = crypto
+        .createHmac("sha256", WHATSAPP_APP_SECRET)
+        .update(JSON.stringify(req.body))
+        .digest("hex");
+    try {
+        return crypto.timingSafeEqual(Buffer.from(receivedHex), Buffer.from(expected));
+    } catch {
+        return false;
+    }
+}
 
 const router = Router();
 
@@ -23,9 +43,12 @@ function isDuplicate(messageId) {
     return false;
 }
 
-// Next Version needs
-// - status updates if user doesn't reply to a specific message prompt again.
 router.post("/webhook", async (req, res) => {
+    if (!verifyMetaSignature(req)) {
+        console.warn("[Webhook] X-Hub-Signature-256 verification failed");
+        return res.sendStatus(401);
+    }
+
     try {
         const entry = req.body?.entry?.[0];
         const change = entry?.changes?.[0];

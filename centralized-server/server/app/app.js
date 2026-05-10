@@ -9,6 +9,7 @@ import adminWebRoutes from "./routes/web/routes.admin.js";
 import userWebRoutes from "./routes/web/routes.user.js";
 import internalRouter from "../routes/internal/router.js";
 
+import register from "../utils/metrics.js";
 import errorHandler from "../middleware/errorHandler.js";
 
 const app = express();
@@ -17,6 +18,16 @@ const app = express();
 // Intentionally placed BEFORE middlewares so it bypasses rate-limiting and auth.
 app.get("/health", (req, res) => {
     res.status(200).json({ status: "UP", timestamp: new Date().toISOString() });
+});
+
+// Prometheus metrics endpoint
+app.get("/metrics", async (req, res) => {
+    try {
+        res.set("Content-Type", register.contentType);
+        res.end(await register.metrics());
+    } catch (ex) {
+        res.status(500).end(ex.message);
+    }
 });
 
 app.get("/", (req, res) => {

@@ -26,6 +26,8 @@ const adminSchema = new mongoose.Schema(
         },
 
         profileImage: { type: String },
+
+        deletedAt: { type: Date, default: null, index: true },
     },
     { timestamps: true }
 );

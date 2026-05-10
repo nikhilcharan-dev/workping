@@ -5,7 +5,8 @@ import mongoose from "mongoose";
 import { formatUserDates } from "#helpers/data.reducer.js";
 import { successResponse, errorResponse } from "#utils/response.helper.js";
 import { setAuthCookie, clearAuthCookie } from "#utils/cookie.helper.js";
-import { generateTokenPair, revokeAllTokens } from "#utils/token.helper.js";
+import { generateTokenPair, revokeAllTokens, blacklistToken } from "#utils/token.helper.js";
+import { recordFailedAttempt, clearFailedAttempts } from "#middleware/bruteForce.js";
 import {
     validateEmail,
     validatePassword,
@@ -134,10 +135,18 @@ export const login = asyncHandler(async (req, res) => {
     if (!emailValidation.valid) return errorResponse(res, emailValidation.error);
 
     const account = await Account.findOne({ email: emailValidation.normalized });
-    if (!account || account.role === "admin") return errorResponse(res, "User does not exist", 401);
+    if (!account || account.role === "admin") {
+        await recordFailedAttempt(emailValidation.normalized);
+        return errorResponse(res, "User does not exist", 401);
+    }
 
     const isMatch = await bcrypt.compare(password, account.password);
-    if (!isMatch) return errorResponse(res, "Invalid credentials", 401);
+    if (!isMatch) {
+        await recordFailedAttempt(emailValidation.normalized);
+        return errorResponse(res, "Invalid credentials", 401);
+    }
+
+    await clearFailedAttempts(emailValidation.normalized);
 
     const userMetaDetails = await User.findOne({ email: emailValidation.normalized });
     if (!userMetaDetails) return errorResponse(res, "User profile does not exist", 401);
@@ -159,6 +168,9 @@ export const login = asyncHandler(async (req, res) => {
 export const logout = asyncHandler(async (req, res) => {
     if (req.user?.userId) {
         await revokeAllTokens(req.user.userId);
+    }
+    if (req.accessToken) {
+        await blacklistToken(req.accessToken);
     }
     clearAuthCookie(res, req);
     return successResponse(res, "Logout successful");

@@ -17,6 +17,10 @@ const authorizeManager = (req, res, next) => {
     // Managers (and others like teamleads) are restricted to their own organization
     const userOrgId = req.user.organizationId;
 
+    if (!userOrgId) {
+        return errorResponse(res, "Forbidden: manager account has no organization assigned", 403);
+    }
+
     // Check for organizationId in body, query, or params
     const reqOrgId = req.body?.organizationId || req.query?.organizationId || req.params?.organizationId;
 
@@ -24,8 +28,8 @@ const authorizeManager = (req, res, next) => {
         return errorResponse(res, "Forbidden: You do not have access to this organization's data", 403);
     }
 
-    // If no org ID is provided in the request, we assume the controller will handle resource-specific checks
-    // or it's a generic request. For the routes we are hardening, orgId is usually present.
+    // Attach the manager's org ID so controllers can scope queries without re-reading the JWT.
+    req.managedOrgId = userOrgId;
 
     next();
 };

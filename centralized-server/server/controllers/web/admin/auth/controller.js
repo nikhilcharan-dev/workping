@@ -5,7 +5,8 @@ import Account from "#models/Account.js";
 import { sendEmailOTP, verifyEmailOTP } from "#services/mailer/mail.service.js";
 import { successResponse, errorResponse } from "#utils/response.helper.js";
 import { setAuthCookie, clearAuthCookie } from "#utils/cookie.helper.js";
-import { generateTokenPair, revokeAllTokens } from "#utils/token.helper.js";
+import { generateTokenPair, revokeAllTokens, blacklistToken } from "#utils/token.helper.js";
+import { recordFailedAttempt, clearFailedAttempts } from "#middleware/bruteForce.js";
 import {
     validateEmail,
     validatePhone,
@@ -82,7 +83,7 @@ export const register = asyncHandler(async (req, res) => {
 
     const { accessToken, refreshToken } = await generateTokenPair({ userId: user._id, role: "admin" }, req);
 
-    setAuthCookie(res, req, accessToken, { httpOnly: false });
+    setAuthCookie(res, req, accessToken);
 
     return successResponse(
         res,
@@ -109,10 +110,22 @@ export const login = asyncHandler(async (req, res) => {
     if (!emailValidation.valid) return errorResponse(res, emailValidation.error);
 
     const account = await Account.findOne({ email: emailValidation.normalized });
-    if (!account || account.role !== "admin") return errorResponse(res, "Admin does not exist", 401);
+    if (!account || account.role !== "admin") {
+        await recordFailedAttempt(emailValidation.normalized);
+        return errorResponse(res, "Admin does not exist", 401);
+    }
+
+    if (account.isActive === false) {
+        return errorResponse(res, "Account has been deactivated. Please contact support.", 403);
+    }
 
     const isMatch = await bcrypt.compare(password, account.password);
-    if (!isMatch) return errorResponse(res, "Invalid credentials", 401);
+    if (!isMatch) {
+        await recordFailedAttempt(emailValidation.normalized);
+        return errorResponse(res, "Invalid credentials", 401);
+    }
+
+    await clearFailedAttempts(emailValidation.normalized);
 
     const admin = await Admin.findOne({ email: emailValidation.normalized });
     if (!admin) return errorResponse(res, "Admin profile not found", 401);
@@ -132,9 +145,11 @@ export const login = asyncHandler(async (req, res) => {
 }, "LOGIN_ADMIN_ERROR");
 
 export const logout = asyncHandler(async (req, res) => {
-    // Revoke all refresh tokens for this admin
     if (req.user?.userId) {
         await revokeAllTokens(req.user.userId);
+    }
+    if (req.accessToken) {
+        await blacklistToken(req.accessToken);
     }
     clearAuthCookie(res, req);
     return successResponse(res, "Logout successful");
@@ -320,6 +335,12 @@ export const changePassword = asyncHandler(async (req, res) => {
     account.password = await bcrypt.hash(newPassword, 10);
     await account.save();
 
+    // Invalidate all sessions so other devices must re-authenticate
+    await revokeAllTokens(userId);
+    if (req.accessToken) {
+        await blacklistToken(req.accessToken);
+    }
+
     return successResponse(res, "Password changed successfully");
 }, "ADMIN_CHANGE_PASSWORD_ERROR");
 
@@ -338,9 +359,14 @@ export const deactivateAccount = asyncHandler(async (req, res) => {
     const isMatch = await bcrypt.compare(password, account.password);
     if (!isMatch) return errorResponse(res, "Invalid password", 401);
 
-    // Deactivate admin profile? Or just account?
-    // Admin model doesn't have isActive? (Checked Admin.js, it doesn't)
-    // Let's just clear cookie and respond
+    // Deactivate the account — mark as inactive so login is blocked
+    account.isActive = false;
+    account.deactivatedAt = new Date();
+    await account.save();
+
+    // Revoke all refresh tokens so existing sessions are invalidated
+    await revokeAllTokens(userId);
+
     clearAuthCookie(res, req);
 
     return successResponse(res, "Account deactivated successfully");

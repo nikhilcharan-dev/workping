@@ -8,6 +8,14 @@ const REDIRECT_URI = PHONEPE_CONFIG.redirectUri;
 const PAY_PATH = "/checkout/v2/pay";
 const STATUS_PATH = "/checkout/v2/order";
 
+// Allowlist of valid plan amounts in paise. Prevents amount tampering.
+const VALID_AMOUNTS = new Set(
+    (process.env.VALID_PLAN_AMOUNTS_PAISE || "")
+        .split(",")
+        .map((s) => parseInt(s.trim(), 10))
+        .filter((n) => !isNaN(n) && n > 0)
+);
+
 const router = Router();
 
 // Initiate a payment
@@ -26,10 +34,17 @@ router.post("/initiate-payment", async (req, res) => {
             return res.status(400).json({ error: "Missing userId" });
         }
 
+        // Validate amount matches a known plan price (in paise)
+        const amountPaise = Math.round(amount * 100);
+        if (VALID_AMOUNTS.size > 0 && !VALID_AMOUNTS.has(amountPaise)) {
+            console.warn(`[Payment] Rejected unknown amount ${amountPaise} paise for order ${orderId}`);
+            return res.status(400).json({ error: "Amount does not match any active plan price" });
+        }
+
         // Default Payload for PhonePe payment initialization
         const requestPayload = {
             merchantOrderId: orderId,
-            amount: Math.round(amount * 100), // Ensure it's an integer
+            amount: amountPaise,
             expiresAfter: 10 * 60,
             metaInfo: {
                 udf1: userId,

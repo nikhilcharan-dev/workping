@@ -48,7 +48,7 @@ from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-from embedding import get_face_embedding_from_bytes, load_face_app, is_gpu_available
+from embedding import get_face_embedding_from_bytes, load_face_app, is_gpu_available, _active_provider
 from db import get_embeddings_collection
 from cache import embedding_key, cache_get, cache_set, cache_del, CACHE_TTL, _get_redis
 
@@ -57,6 +57,14 @@ DIM = 512          # ArcFace R100 produces 512-dim embeddings
 THRESHOLD = 0.6    # Cosine similarity cutoff; tune per deployment (higher = stricter)
 START_TIME = time.time()
 HISTORY_LIMIT = 50
+
+# 5 MB decoded → ~6.9 MB base64 chars; cap the string length conservatively
+MAX_IMAGE_B64_LEN = int(os.environ.get("MAX_IMAGE_B64_BYTES", str(7 * 1024 * 1024)))
+MAX_IMAGE_BYTES = 5 * 1024 * 1024   # 5 MB after decoding
+
+# Per-user inference rate limit: max N requests per window
+RATE_LIMIT_REQUESTS = int(os.environ.get("RATE_LIMIT_REQUESTS", "30"))
+RATE_LIMIT_WINDOW_SECONDS = int(os.environ.get("RATE_LIMIT_WINDOW_SECONDS", "60"))
 
 # ---------------- MODELS ----------------
 class EnrollRequest(BaseModel):
@@ -130,7 +138,17 @@ app = FastAPI(title="Face Recognition API - v3")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://localhost:5174",
+        "https://workping.live",
+        "https://www.workping.live",
+        "https://admin.workping.live",
+        "https://api.workping.live",
+        "https://employee.workping.live",
+        "https://whatsapp.workping.live",
+        "https://phonepe.workping.live"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -140,7 +158,12 @@ print("Preloading InsightFace antelopev2 model...")
 load_face_app()
 print("InsightFace model ready")
 
-executor = ThreadPoolExecutor(max_workers=os.cpu_count() or 4)
+# 0 → use all CPU cores (keeps every GPU CUDA stream fed)
+_cfg_workers = int(os.environ.get("INFERENCE_WORKERS", "0"))
+INFERENCE_WORKERS = _cfg_workers if _cfg_workers > 0 else (os.cpu_count() or 8)
+print(f"Inference workers: {INFERENCE_WORKERS}")
+
+executor = ThreadPoolExecutor(max_workers=INFERENCE_WORKERS)
 
 def do_inference(image_bytes, db_emb, threshold, req_user_id):
     start_emb = time.time()
@@ -182,12 +205,24 @@ async def inference_worker():
             
             start_total = time.time()
             
-            user_doc = await col.find_one({"organization_id": org_id, "employee_id": user_id}, {"_id": 0, "embedding": 1})
-            if not user_doc:
+            user_emb_key = f"face:user_emb:{user_id}"
+            cached_emb = await redis.get(user_emb_key)
+            if cached_emb:
+                db_emb = np.frombuffer(base64.b64decode(cached_emb), dtype=np.float32)
+                user_found = True
+            else:
+                user_doc = await col.find_one({"organization_id": org_id, "employee_id": user_id}, {"_id": 0, "embedding": 1})
+                if user_doc:
+                    db_emb = np.array(user_doc["embedding"], dtype=np.float32)
+                    await redis.setex(user_emb_key, 300, base64.b64encode(db_emb.tobytes()).decode())
+                    user_found = True
+                else:
+                    user_found = False
+
+            if not user_found:
                 result = {"success": False, "error": "User not found"}
             else:
                 image_bytes = base64.b64decode(payload["image_base64"])
-                db_emb = np.array(user_doc["embedding"], dtype=np.float32)
                 
                 loop = asyncio.get_running_loop()
                 inf_res = await loop.run_in_executor(executor, do_inference, image_bytes, db_emb, THRESHOLD, user_id)
@@ -227,7 +262,42 @@ async def inference_worker():
 
 @app.on_event("startup")
 async def startup_event():
-    asyncio.create_task(inference_worker())
+    for _ in range(INFERENCE_WORKERS):
+        asyncio.create_task(inference_worker())
+
+# ---------------- SECURITY HELPERS ----------------
+
+def validate_image_b64(image_b64: str) -> bytes:
+    """Validate base64 string size then decode. Raises HTTPException on violation."""
+    if len(image_b64) > MAX_IMAGE_B64_LEN:
+        raise HTTPException(status_code=413, detail="Image exceeds maximum allowed size of 5 MB")
+    try:
+        image_bytes = base64.b64decode(image_b64)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid base64 image data")
+    if len(image_bytes) > MAX_IMAGE_BYTES:
+        raise HTTPException(status_code=413, detail="Decoded image exceeds maximum allowed size of 5 MB")
+    return image_bytes
+
+
+async def check_rate_limit(user_id: str):
+    """Redis sliding-window rate limit per user_id. Raises 429 when exceeded."""
+    redis = _get_redis()
+    key = f"rl:detect:{user_id}"
+    try:
+        count = await redis.incr(key)
+        if count == 1:
+            await redis.expire(key, RATE_LIMIT_WINDOW_SECONDS)
+        if count > RATE_LIMIT_REQUESTS:
+            raise HTTPException(
+                status_code=429,
+                detail=f"Rate limit exceeded: max {RATE_LIMIT_REQUESTS} requests per {RATE_LIMIT_WINDOW_SECONDS}s",
+            )
+    except HTTPException:
+        raise
+    except Exception:
+        pass  # Redis down — fail open
+
 
 # ---------------- HELPERS ----------------
 async def load_embeddings(organization_id: str) -> list:
@@ -248,8 +318,10 @@ async def load_embeddings(organization_id: str) -> list:
     return records
 
 
-async def bust_cache(organization_id: str):
+async def bust_cache(organization_id: str, employee_id: str | None = None):
     await cache_del(embedding_key(organization_id))
+    if employee_id:
+        await cache_del(f"face:user_emb:{employee_id}")
 
 
 # ---------------- ROUTES ----------------
@@ -264,6 +336,7 @@ async def health():
     return {
         "status": "ok",
         "gpu_available": is_gpu_available(),
+        "inference_provider": _active_provider,
         "uptime_seconds": int(time.time() - START_TIME),
         "avg_latency_ms": stats.get_analytics()["avg_latency"],
     }
@@ -275,10 +348,7 @@ async def enroll(req: EnrollRequest):
     Extract a 512-D embedding from the image and upsert it into MongoDB.
     Invalidates the org's Redis cache so the next detect picks up the change.
     """
-    try:
-        image_bytes = base64.b64decode(req.image_base64)
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid base64 image data")
+    image_bytes = validate_image_b64(req.image_base64)
 
     try:
         emb = get_face_embedding_from_bytes(image_bytes)
@@ -295,7 +365,7 @@ async def enroll(req: EnrollRequest):
         }},
         upsert=True,
     )
-    await bust_cache(req.organization_id)
+    await bust_cache(req.organization_id, req.employee_id)
 
     return {"success": True, "employee_id": req.employee_id}
 
@@ -305,6 +375,9 @@ async def detect(req: DetectRequest):
     """
     Submits a face verification task to the Redis queue.
     """
+    validate_image_b64(req.image_base64)  # size check before queuing
+    await check_rate_limit(req.user_id)
+
     ticket_id = str(uuid.uuid4())
     redis = _get_redis()
     
@@ -348,26 +421,26 @@ async def delete_embedding(employee_id: str):
     col = get_embeddings_collection()
     doc = await col.find_one_and_delete({"employee_id": employee_id})
     if doc:
-        await bust_cache(doc["organization_id"])
+        await bust_cache(doc["organization_id"], employee_id)
     return {"success": True, "deleted_employee_id": employee_id}
 
 
 @app.get("/api/v1/embeddings")
-async def list_embeddings(organization_id: Optional[str] = None):
+async def list_embeddings(organization_id: Optional[str] = None, skip: int = 0, limit: int = 50):
     """List enrolled employee IDs, optionally filtered by org."""
     col = get_embeddings_collection()
     query = {"organization_id": organization_id} if organization_id else {}
-    docs = await col.find(query, {"_id": 0, "employee_id": 1, "organization_id": 1}).to_list(length=None)
-    return {"total": len(docs), "employees": docs}
+    
+    total = await col.count_documents(query)
+    docs = await col.find(query, {"_id": 0, "employee_id": 1, "organization_id": 1}).skip(skip).limit(limit).to_list(length=limit)
+    
+    return {"total": total, "skip": skip, "limit": limit, "employees": docs}
 
 
 @app.post("/api/v1/extract-embedding")
 async def extract_embedding(req: ExtractEmbeddingRequest):
     """Extract a 512-D embedding and return it without persisting. Useful for testing."""
-    try:
-        image_bytes = base64.b64decode(req.image_base64)
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid base64 image data")
+    image_bytes = validate_image_b64(req.image_base64)
 
     try:
         emb = get_face_embedding_from_bytes(image_bytes)

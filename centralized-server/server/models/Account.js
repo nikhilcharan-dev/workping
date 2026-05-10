@@ -44,6 +44,17 @@ const accountSchema = new mongoose.Schema(
             type: String,
             default: "",
         },
+
+        isActive: {
+            type: Boolean,
+            default: true,
+            index: true,
+        },
+
+        deactivatedAt: {
+            type: Date,
+            default: null,
+        },
     },
     { timestamps: true }
 );

@@ -25,7 +25,8 @@ export const getMenuItemFromURL = (items, url) => {
     if (items.url == url) return items
     if (items.children != null) {
       for (const item of items.children) {
-        if (item.url == url) return item
+        const found = getMenuItemFromURL(item, url)
+        if (found) return found
       }
     }
   }

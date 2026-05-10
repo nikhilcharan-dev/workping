@@ -2,17 +2,7 @@ import { Server } from "socket.io";
 import { createAdapter } from "@socket.io/redis-adapter";
 import { createClient } from "redis";
 
-const allowedOrigins = [
-    "http://10.144.15.154:5173",
-    "http://localhost:5173",
-    "https://work-ping-liart.vercel.app",
-    "http://127.0.0.1:5501",
-    "https://workping.live",
-    "https://www.workping.live",
-    "https://phonepe.workping.live",
-    "https://whatsapp.workping.live",
-    process.env.CLIENT_URL,
-];
+import { allowedOrigins } from "#config/cors.js";
 
 function makeRedisClient() {
     return createClient({

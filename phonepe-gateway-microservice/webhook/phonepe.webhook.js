@@ -1,40 +1,88 @@
 import axios from "axios";
 import crypto from "node:crypto";
+import redis from "../config/redis.js";
 
 const USERNAME = process.env.WEBHOOK_USERNAME;
 const PASSWORD = process.env.WEBHOOK_PASSWORD;
-
 const ORIGIN_WEBHOOK_URL = process.env.ORIGIN_WEBHOOK_URL;
 
-export function verifyPhonePeWebhook(authHeader) {
+// PhonePe HMAC secret for X-Verify header (set in PhonePe merchant dashboard)
+const PHONEPE_WEBHOOK_SECRET = process.env.PHONEPE_WEBHOOK_SECRET;
+
+// Idempotency window: ignore duplicate webhook deliveries within 10 minutes
+const IDEMPOTENCY_TTL = 10 * 60;
+
+// Valid order state transitions — prevents replaying old states
+const VALID_TRANSITIONS = {
+    PENDING: new Set(["COMPLETED", "FAILED", "CANCELLED"]),
+    COMPLETED: new Set([]),
+    FAILED: new Set([]),
+    CANCELLED: new Set([]),
+};
+
+function verifyBasicAuth(authHeader) {
     if (!authHeader) return false;
-
     const expected = crypto.createHash("sha256").update(`${USERNAME}:${PASSWORD}`).digest("hex");
-
     try {
         return crypto.timingSafeEqual(Buffer.from(authHeader.trim()), Buffer.from(expected));
     } catch {
-        // timingSafeEqual throws if buffers differ in byte length
+        return false;
+    }
+}
+
+function verifyXVerify(rawBody, xVerifyHeader) {
+    if (!PHONEPE_WEBHOOK_SECRET || !xVerifyHeader) return !PHONEPE_WEBHOOK_SECRET; // skip if not configured
+    const [signature] = xVerifyHeader.split("###");
+    const expected = crypto.createHmac("sha256", PHONEPE_WEBHOOK_SECRET).update(rawBody).digest("hex");
+    try {
+        return crypto.timingSafeEqual(Buffer.from(signature.trim()), Buffer.from(expected));
+    } catch {
         return false;
     }
 }
 
 const phonepeWebhook = async (req, res) => {
     try {
-        const authHeader = req.headers["authorization"];
-        if (!verifyPhonePeWebhook(authHeader)) {
-            console.warn("Unauthorized webhook attempt");
+        // 1. Basic auth verification
+        if (!verifyBasicAuth(req.headers["authorization"])) {
+            console.warn("[Webhook] Unauthorized: basic auth failed");
+            return res.status(401).send("Unauthorized");
+        }
+
+        // 2. PhonePe HMAC signature verification (X-Verify header)
+        const rawBody = JSON.stringify(req.body);
+        if (!verifyXVerify(rawBody, req.headers["x-verify"])) {
+            console.warn("[Webhook] Unauthorized: X-Verify signature mismatch");
             return res.status(401).send("Unauthorized");
         }
 
         const { event, payload } = req.body;
 
         if (!payload || !payload.merchantOrderId) {
-            console.error("Invalid webhook payload received");
+            console.error("[Webhook] Invalid payload received");
             return res.status(400).json({ error: "Invalid payload" });
         }
 
         const { merchantOrderId, state, amount, metaInfo, paymentDetails } = payload;
+
+        // 3. Idempotency check — deduplicate retried webhook deliveries
+        const idempotencyKey = `webhook:seen:${merchantOrderId}:${state}`;
+        const alreadyProcessed = await redis.set(idempotencyKey, "1", { NX: true, EX: IDEMPOTENCY_TTL });
+        if (!alreadyProcessed) {
+            console.log(`[Webhook] Duplicate delivery skipped for order ${merchantOrderId} state=${state}`);
+            return res.status(200).json({ success: true, note: "duplicate" });
+        }
+
+        // 4. State machine — reject invalid transitions
+        const stateKey = `order:state:${merchantOrderId}`;
+        const currentState = (await redis.get(stateKey)) || "PENDING";
+        const allowed = VALID_TRANSITIONS[currentState];
+        if (allowed !== undefined && !allowed.has(state)) {
+            console.warn(`[Webhook] Invalid transition ${currentState} → ${state} for order ${merchantOrderId}`);
+            return res.status(409).json({ error: `Invalid state transition: ${currentState} → ${state}` });
+        }
+        // Persist new state (keep 30 days for auditing)
+        await redis.set(stateKey, state, { EX: 30 * 24 * 60 * 60 });
 
         const filtered = {
             merchantOrderId,
@@ -45,9 +93,8 @@ const phonepeWebhook = async (req, res) => {
             event,
         };
 
-        console.log(`Forwarding webhook for order ${merchantOrderId} to backend...`);
+        console.log(`[Webhook] Forwarding order ${merchantOrderId} (${state}) to backend`);
 
-        // Forward to backend
         const response = await axios.post(ORIGIN_WEBHOOK_URL, filtered, {
             headers: {
                 "X-Webhook-Secret": process.env.ORIGIN_WEBHOOK_SECRET,
@@ -55,17 +102,13 @@ const phonepeWebhook = async (req, res) => {
             },
         });
 
-        console.log(`Backend responded with status ${response.status} for order ${merchantOrderId}`);
-
-        return res.status(200).json({
-            success: true,
-        });
+        console.log(`[Webhook] Backend responded ${response.status} for order ${merchantOrderId}`);
+        return res.status(200).json({ success: true });
     } catch (err) {
-        console.error("Webhook Processing Error:", err?.response?.data || err.message);
-        return res.status(500).json({
-            error: "Failed to process webhook",
-        });
+        console.error("[Webhook] Error:", err?.response?.data || err.message);
+        return res.status(500).json({ error: "Failed to process webhook" });
     }
 };
 
+export { verifyBasicAuth };
 export default phonepeWebhook;

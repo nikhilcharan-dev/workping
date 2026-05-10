@@ -69,20 +69,26 @@ const TeamsAnalytics = () => {
   const selectedOrgName = organizations.find((o) => o.organizationId === orgId)?.name ?? ''
   const orgShare = totalTeams > 0 ? Math.round((orgTotal / totalTeams) * 100) : 0
 
-  const barSeries = [{ name: 'Team', data: orgTeams.map((_, i) => i + 1) }]
+  const barCategories = orgTeams.map((t, i) => {
+    const name = t.teamName ?? t.name ?? `Team ${i + 1}`
+    return name.length > 20 ? name.slice(0, 18) + '…' : name
+  })
+  const barSeries = [{
+    name: 'Members',
+    data: orgTeams.map((t) => t.memberCount ?? t.members?.length ?? t.totalMembers ?? 1),
+  }]
   const barOptions = {
     chart: { type: 'bar', toolbar: { show: false } },
     plotOptions: { bar: { borderRadius: 6, horizontal: true, distributed: true } },
-    dataLabels: { enabled: false },
-    xaxis: { labels: { show: false } },
+    dataLabels: { enabled: true, style: { fontSize: '12px' } },
+    xaxis: {
+      categories: barCategories,
+      title: { text: 'Members' },
+    },
     yaxis: {
       labels: {
-        formatter: (_, i) => {
-          const t = orgTeams[i]
-          if (!t) return ''
-          const name = t.teamName ?? t.name ?? `Team ${i + 1}`
-          return name.length > 20 ? name.slice(0, 18) + '…' : name
-        },
+        maxWidth: 160,
+        style: { fontSize: '12px' },
       },
     },
     colors: ['#0ea5e9', '#6366f1', '#14b8a6', '#f97316', '#8b5cf6', '#ec4899'],
@@ -91,10 +97,7 @@ const TeamsAnalytics = () => {
     noData: { text: 'No teams found' },
     tooltip: {
       y: {
-        formatter: (_, { dataPointIndex }) => {
-          const t = orgTeams[dataPointIndex]
-          return t ? (t.teamName ?? t.name ?? 'Team') : ''
-        },
+        formatter: (val) => `${val} member${val !== 1 ? 's' : ''}`,
       },
     },
   }

@@ -1,0 +1,103 @@
+version: 2
+updates:
+  # GitHub Actions
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    labels: [dependencies, ci]
+
+  # Core API
+  - package-ecosystem: npm
+    directory: /centralized-server/server
+    schedule:
+      interval: weekly
+      day: monday
+    labels: [dependencies, centralized-server]
+    groups:
+      mongoose:
+        patterns: [mongoose, mongodb*]
+      socket-io:
+        patterns: [socket.io*, "@socket.io/*"]
+      security:
+        patterns: [helmet, bcrypt*, jsonwebtoken, express-rate-limit]
+
+  # Admin UI
+  - package-ecosystem: npm
+    directory: /admin-ui
+    schedule:
+      interval: weekly
+      day: monday
+    labels: [dependencies, admin-ui]
+    groups:
+      react:
+        patterns: [react, react-dom, react-*]
+      vite:
+        patterns: [vite, "@vitejs/*"]
+
+  # Employee UI
+  - package-ecosystem: npm
+    directory: /employees-ui
+    schedule:
+      interval: weekly
+      day: monday
+    labels: [dependencies, employees-ui]
+    groups:
+      react:
+        patterns: [react, react-dom, react-*]
+      vite:
+        patterns: [vite, "@vitejs/*"]
+
+  # Mobile App
+  - package-ecosystem: npm
+    directory: /mobile-app
+    schedule:
+      interval: weekly
+      day: monday
+    labels: [dependencies, mobile-app]
+    groups:
+      expo:
+        patterns: [expo, expo-*, "@expo/*"]
+      react-native:
+        patterns: [react-native, react-native-*]
+
+  # WhatsApp Microservice
+  - package-ecosystem: npm
+    directory: /whatsapp-microservice
+    schedule:
+      interval: weekly
+      day: monday
+    labels: [dependencies, whatsapp-microservice]
+
+  # Mailer Microservice
+  - package-ecosystem: npm
+    directory: /mailer-microservice
+    schedule:
+      interval: weekly
+      day: monday
+    labels: [dependencies, mailer-microservice]
+
+  # PhonePe Gateway Microservice
+  - package-ecosystem: npm
+    directory: /phonepe-gateway-microservice
+    schedule:
+      interval: weekly
+      day: monday
+    labels: [dependencies, phonepe-gateway-microservice]
+
+  # Oracle Cloud Object Storage Microservice
+  - package-ecosystem: npm
+    directory: /oracle-cloud-object-microservice
+    schedule:
+      interval: weekly
+      day: monday
+    labels: [dependencies, oracle-cloud-object-microservice]
+
+  # Face API Microservice (Python)
+  - package-ecosystem: pip
+    directory: /face-api-microservice
+    schedule:
+      interval: weekly
+      day: monday
+    labels: [dependencies, face-api-microservice]

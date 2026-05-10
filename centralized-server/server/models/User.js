@@ -59,6 +59,12 @@ const userSchema = new mongoose.Schema(
             enum: ["remote", "onsite", "hybrid"],
             required: true,
         },
+
+        deletedAt: {
+            type: Date,
+            default: null,
+            index: true,
+        },
     },
     { timestamps: true }
 );

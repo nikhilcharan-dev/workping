@@ -35,6 +35,7 @@ Acts as the orchestration layer, handling requests for:
 3. **Control**: Admin uses `/faiss/add` or `/faiss/delete` to refine the identity database in real-time.
 
 ## Performance Analytics
-- **GPU**: 5-10x throughput increase over CPU.
+- **GPU throughput**: ~6.4 req/s sustained (~384/min, ~23k/hour, ~550k/day) — measured at c=10, 20, 50 on DGX B200.
+- **CPU fallback**: ~1–2 req/s (suitable for dev/staging only).
 - **Index Search**: Sub-1ms for up to 10k identities (flat index).
 - **Cold Boot**: Optimized via Docker volume mounting for models, bypassing redundant downloads.

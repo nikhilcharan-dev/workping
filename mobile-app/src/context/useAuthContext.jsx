@@ -1,7 +1,12 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as SecureStore from "expo-secure-store";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { DeviceEventEmitter } from "react-native";
 import { AUTH_STORAGE_KEY } from "./constants";
+
+// expo-secure-store only accepts string values and keys ≤ 255 chars
+const secureGet = (key) => SecureStore.getItemAsync(key);
+const secureSet = (key, value) => SecureStore.setItemAsync(key, value);
+const secureDel = (key) => SecureStore.deleteItemAsync(key);
 
 const AuthContext = createContext(undefined);
 
@@ -21,13 +26,13 @@ export function AuthProvider({ children }) {
         let active = true;
         (async () => {
             try {
-                const stored = await AsyncStorage.getItem(AUTH_STORAGE_KEY);
+                const stored = await secureGet(AUTH_STORAGE_KEY);
                 if (active && stored) {
                     setUser(JSON.parse(stored));
                 }
             } catch (e) {
                 // Corrupted session data — clear it
-                await AsyncStorage.removeItem(AUTH_STORAGE_KEY).catch(() => {});
+                await secureDel(AUTH_STORAGE_KEY).catch(() => {});
             } finally {
                 if (active) setIsLoading(false);
             }
@@ -35,7 +40,7 @@ export function AuthProvider({ children }) {
 
         const subscription = DeviceEventEmitter.addListener("session_expired", () => {
             setUser(null);
-            AsyncStorage.removeItem(AUTH_STORAGE_KEY).catch(() => {});
+            secureDel(AUTH_STORAGE_KEY).catch(() => {});
         });
 
         return () => {
@@ -48,17 +53,16 @@ export function AuthProvider({ children }) {
         if (!userData) return;
         setUser(userData);
         try {
-            await AsyncStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(userData));
+            await secureSet(AUTH_STORAGE_KEY, JSON.stringify(userData));
         } catch (e) {
             // Persist failed — session won't survive app restart
         }
     }, []);
 
     const removeSession = useCallback(async () => {
-        // Always clear in-memory state, even if AsyncStorage removal fails
         setUser(null);
         try {
-            await AsyncStorage.removeItem(AUTH_STORAGE_KEY);
+            await secureDel(AUTH_STORAGE_KEY);
         } catch (e) {
             // Remove failed — in-memory state already cleared
         }

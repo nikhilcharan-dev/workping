@@ -1,10 +1,45 @@
 import jwt from "jsonwebtoken";
+import crypto from "node:crypto";
 import RefreshToken from "#models/RefreshToken.js";
 
 const ACCESS_TOKEN_EXPIRY_WEB = process.env.JWT_EXPIRES_IN || "1h";
 const ACCESS_TOKEN_EXPIRY_MOBILE = "7d";
 const REFRESH_TOKEN_EXPIRY_WEB = 7 * 24 * 60 * 60 * 1000; // 7 days
 const REFRESH_TOKEN_EXPIRY_MOBILE = 30 * 24 * 60 * 60 * 1000; // 30 days
+
+const BLACKLIST_PREFIX = "bl:";
+
+function tokenHash(token) {
+    return crypto.createHash("sha256").update(token).digest("hex");
+}
+
+/**
+ * Add an access token to the Redis blacklist.
+ * TTL is set to the remaining lifetime of the token so the key auto-expires.
+ */
+export async function blacklistToken(token) {
+    try {
+        const decoded = jwt.decode(token);
+        if (!decoded?.exp) return;
+        const ttlSeconds = decoded.exp - Math.floor(Date.now() / 1000);
+        if (ttlSeconds <= 0) return; // already expired — no need to blacklist
+        await redis.set(BLACKLIST_PREFIX + tokenHash(token), "1", { EX: ttlSeconds });
+    } catch {
+        // Non-fatal — token already invalid or redis down
+    }
+}
+
+/**
+ * Check whether an access token has been blacklisted.
+ */
+export async function isTokenBlacklisted(token) {
+    try {
+        const val = await redis.get(BLACKLIST_PREFIX + tokenHash(token));
+        return val === "1";
+    } catch {
+        return false; // fail open to avoid blocking all requests on Redis outage
+    }
+}
 
 /**
  * Detect whether the request originates from the mobile app.

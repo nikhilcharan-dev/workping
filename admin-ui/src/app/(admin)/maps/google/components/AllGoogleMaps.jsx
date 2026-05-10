@@ -784,5 +784,5 @@ const AllGoogleMaps = ({ google }) => {
   )
 }
 export default GoogleApiWrapper({
-  apiKey: 'AIzaSyDsucrEdmswqYrw0f6ej3bf4M4suDeRgNA',
+  apiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
 })(AllGoogleMaps)

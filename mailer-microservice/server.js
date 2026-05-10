@@ -1,4 +1,5 @@
 import express from "express";
+import crypto from "crypto";
 import "dotenv/config";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -339,7 +340,17 @@ server.get("/templates", (req, res) => {
 /* ─── Auth Middleware (protects API routes) ─── */
 server.use((req, res, next) => {
     const token = req.headers.authorization;
-    if (!token || token !== SECRET) {
+    if (!token || typeof token !== "string") {
+        return res.status(403).json({
+            status: "error",
+            error: "Unauthorized: Invalid or missing secret token",
+        });
+    }
+
+    // Timing-safe comparison to prevent timing attacks on API key
+    const tokenBuf = Buffer.from(token);
+    const secretBuf = Buffer.from(SECRET);
+    if (tokenBuf.length !== secretBuf.length || !crypto.timingSafeEqual(tokenBuf, secretBuf)) {
         return res.status(403).json({
             status: "error",
             error: "Unauthorized: Invalid or missing secret token",

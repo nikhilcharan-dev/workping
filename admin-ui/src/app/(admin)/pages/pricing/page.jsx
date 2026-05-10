@@ -2,18 +2,7 @@ import { useEffect, useState } from 'react'
 import { Button, Modal, Spinner, Badge } from 'react-bootstrap'
 import PageMetaData from '@/components/PageTitle'
 import IconifyIcon from '@/components/wrappers/IconifyIcon'
-import { useLayoutContext } from '@/context/useLayoutContext'
 import axiosClient from '@/helpers/httpClient'
-
-// ── collapse sidebar on this page ─────────────────────────────────────────────
-function useSidebarCollapsed() {
-  const { menu, changeMenu } = useLayoutContext()
-  useEffect(() => {
-    const prev = menu.size
-    changeMenu.size('condensed')
-    return () => changeMenu.size(prev)
-  }, [])
-}
 
 const POPULAR = 'Pro'
 const PLAN_ICONS = {
@@ -94,6 +83,7 @@ const ConfirmModal = ({ plan, show, onHide, onConfirm, loading, error }) => (
 // ── Plan Card ──────────────────────────────────────────────────────────────────
 const PlanCard = ({ plan, isCurrent, isPopular, onSelect }) => (
   <div
+    className="pricing-plan-card"
     style={{
       position: 'relative',
       borderRadius: 16,
@@ -273,9 +263,9 @@ const CustomPlanBuilder = ({ catalogue, onBuild }) => {
         maxWidth: 900,
         margin: '0 auto',
       }}>
-      <div style={{ borderRadius: 18, background: 'var(--bs-body-bg)', padding: '32px 28px' }}>
+      <div className="pricing-builder-inner" style={{ borderRadius: 18, background: 'var(--bs-body-bg)', padding: '32px 28px' }}>
         {/* Header */}
-        <div className="d-flex align-items-center gap-3 mb-4">
+        <div className="d-flex flex-wrap align-items-center gap-3 mb-4">
           <div
             style={{
               width: 44,
@@ -285,24 +275,25 @@ const CustomPlanBuilder = ({ catalogue, onBuild }) => {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
+              flexShrink: 0,
             }}>
             <IconifyIcon icon="bx:slider-alt" style={{ fontSize: 22, color: '#fd7e14' }} />
           </div>
-          <div>
-            <h5 className="mb-0 fw-bold">Build Your Own Plan</h5>
+          <div style={{ minWidth: 0, flex: '1 1 180px' }}>
+            <h5 className="mb-0 fw-bold" style={{ fontSize: 'clamp(16px,4vw,20px)' }}>Build Your Own Plan</h5>
             <span className="text-muted" style={{ fontSize: 13 }}>
               Pick only what you need — we calculate the bill
             </span>
           </div>
-          <div className="ms-auto text-end">
-            <div style={{ fontSize: 28, fontWeight: 800, lineHeight: 1 }}>₹{total.toLocaleString()}</div>
+          <div className="text-end" style={{ flex: '0 0 auto' }}>
+            <div style={{ fontSize: 'clamp(22px,5vw,28px)', fontWeight: 800, lineHeight: 1 }}>₹{total.toLocaleString()}</div>
             <span className="text-muted" style={{ fontSize: 12 }}>
               / month
             </span>
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 28 }}>
+        <div className="pricing-builder-grid" style={{ display: 'grid', gap: 28 }}>
           {/* Left — employee tier */}
           <div>
             <p className="fw-semibold mb-3" style={{ fontSize: 13, textTransform: 'uppercase', letterSpacing: 0.8, opacity: 0.6 }}>
@@ -416,8 +407,6 @@ const CustomPlanBuilder = ({ catalogue, onBuild }) => {
 
 // ── Page ───────────────────────────────────────────────────────────────────────
 const Pricing = () => {
-  useSidebarCollapsed()
-
   const [plans, setPlans] = useState([])
   const [catalogue, setCatalogue] = useState(null)
   const [activeSubscription, setSub] = useState(null)
@@ -444,7 +433,7 @@ const Pricing = () => {
   return (
     <>
       <PageMetaData title="Pricing" />
-      <div style={{ minHeight: '100vh', padding: '48px 24px 80px' }}>
+      <div className="pricing-page-wrapper" style={{ minHeight: '100vh' }}>
         {/* Header */}
         <div className="text-center mb-5">
           <span
@@ -469,6 +458,8 @@ const Pricing = () => {
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
+                  flexWrap: 'wrap',
+                  justifyContent: 'center',
                   gap: 8,
                   padding: '6px 16px',
                   borderRadius: 24,
@@ -495,6 +486,7 @@ const Pricing = () => {
           <>
             {/* Standard plans */}
             <div
+              className="pricing-plans-grid"
               style={{
                 display: 'flex',
                 flexWrap: 'wrap',
@@ -537,6 +529,47 @@ const Pricing = () => {
           All prices in INR · Billed monthly · Payments via PhonePe
         </p>
       </div>
+
+      {/* Responsive styles */}
+      <style>{`
+        .pricing-page-wrapper {
+          padding: 48px 24px 80px;
+        }
+        .pricing-builder-grid {
+          grid-template-columns: 1fr 1fr;
+        }
+        .pricing-builder-inner {
+          padding: 32px 28px;
+        }
+        @media (max-width: 767.98px) {
+          .pricing-page-wrapper {
+            padding: 24px 12px 48px;
+          }
+          .pricing-plan-card {
+            flex: 1 1 100% !important;
+            max-width: 100% !important;
+            min-width: 0 !important;
+          }
+          .pricing-plans-grid {
+            gap: 20px !important;
+            margin-bottom: 40px !important;
+          }
+          .pricing-builder-grid {
+            grid-template-columns: 1fr !important;
+          }
+          .pricing-builder-inner {
+            padding: 20px 16px !important;
+          }
+        }
+        @media (max-width: 575.98px) {
+          .pricing-page-wrapper {
+            padding: 16px 8px 40px;
+          }
+          .pricing-plan-card {
+            margin-top: 8px;
+          }
+        }
+      `}</style>
 
       <ConfirmModal
         plan={selectedPlan}

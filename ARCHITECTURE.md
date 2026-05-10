@@ -72,6 +72,7 @@ WorkPing is a **multi-tenant employee management platform** with biometric atten
 | Cache | Redis: embedding cache (TTL configurable) + inference ticket cache (TTL 300s) |
 | DB | MongoDB (Motor async driver) — stores enrolled embeddings |
 | GPU | CUDA auto-detection; falls back to CPU ONNX Runtime |
+| GPU throughput | ~6.4 req/s (~384/min, ~23k/hr, ~550k/day) — measured at c=10,20,50 on DGX B200 |
 
 ### 3. Mailer Service — `mailer-microservice`
 | Attribute | Value |

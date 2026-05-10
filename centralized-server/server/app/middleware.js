@@ -3,20 +3,11 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import helmet from "helmet";
 import { rateLimit } from "express-rate-limit";
+import sanitizeMongo from "#middleware/sanitizeMongo.js";
 
 const MODE = process.env.MODE;
 
-const allowedOrigins = [
-    "http://localhost:5173",
-    "http://localhost:5174",
-    "http://127.0.0.1:5173",
-    "http://127.0.0.1:5174",
-    "https://workping.live",
-    "https://www.workping.live",
-    "https://phonepe.workping.live",
-    "https://whatsapp.workping.live",
-    process.env.CLIENT_URL,
-].filter(Boolean);
+import { allowedOrigins } from "#config/cors.js";
 
 const corsOptions = {
     origin: (origin, cb) =>
@@ -54,6 +45,8 @@ export default function middlewares(app) {
 
     app.use(express.json({ limit: "10kb" }));
     app.use(express.urlencoded({ extended: true, limit: "10kb" }));
+
+    app.use(sanitizeMongo);
 
     app.use(cookieParser());
 
