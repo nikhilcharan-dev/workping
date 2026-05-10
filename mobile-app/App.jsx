@@ -19,7 +19,10 @@ import { PushNotificationProvider } from '@/context/usePushNotificationContext';
 import { ChatProvider } from '@/context/useChatContext';
 import { EmailProvider } from '@/context/useEmailContext';
 import RootNavigator from '@/navigation';
-const ApiLogViewer = __DEV__ ? require('@/components/ApiLogViewer').default : null;
+let ApiLogViewer = null;
+if (__DEV__) {
+  ApiLogViewer = require('@/components/ApiLogViewer').default;
+}
 
 const AppContent = () => {
   const { themeMode } = useLayoutContext();
