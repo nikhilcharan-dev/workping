@@ -24,7 +24,7 @@
     "express": "^5.2.1",
     "handlebars": "^4.7.8",
     "node-cron": "^4.2.1",
-    "nodemailer": "^7.0.12",
+    "nodemailer": "^8.0.7",
     "redis": "^5.10.0"
   }
 }
