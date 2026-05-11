@@ -80,9 +80,7 @@ oracle-cloud-express/
 ├── .oci/                      # OCI SDK credentials (git-ignored)
 ├── .env                       # Runtime config (git-ignored)
 ├── .env.example               # Documented env var template
-├── Architecture.md            # Detailed architecture walkthrough
-├── ENDPOINTS.md               # Full API reference
-└── DEPLOYMENT.md              # Deployment & production guide
+└── Architecture_Scalability_Deployment.md  # Architecture, scalability notes, and deployment guide
 ```
 
 ## Environment Variables

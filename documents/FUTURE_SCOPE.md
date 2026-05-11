@@ -6,12 +6,12 @@ This document captures planned improvements for the next development cycle. Item
 
 ## 1. Observability & Logging
 
-### Structured Logging (Winston / Pino)
-**Current state:** `console.log` / `console.error` across all services.  
-**Problem:** No log levels, no structured JSON output, no centralised log aggregation.
+### Structured Logging (centralised, all services)
+**Current state:** The core API uses Winston (`utils/logger.js`) with structured JSON output. The remaining microservices (mailer, chatbot, payments, storage) still use `console.*` calls.  
+**Problem:** No centralised log aggregation; microservice logs are scattered across individual PM2 / Docker outputs.
 
 **Planned:**
-- Replace `console.*` calls with a shared `logger.js` using **Pino** (fastest JSON logger for Node.js).
+- Replace `console.*` calls in microservices with a shared logger using **Pino** (already used by the storage service; adopt across mailer, chatbot, payments).
 - Log levels: `trace`, `debug`, `info`, `warn`, `error`, `fatal`.
 - Each log line includes: `timestamp`, `level`, `service`, `requestId`, `userId`, `message`.
 - Production transport: ship logs to **Elasticsearch** (via Logstash or Fluent Bit) or **Grafana Loki**.

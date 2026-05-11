@@ -19,7 +19,7 @@ Acts as the orchestration layer, handling requests for:
 ### 2. Inference Engine (InsightFace)
 - **Model**: `AntelopeV2` (SCRFD for detection, ArcFace for embeddings).
 - **Optimization**: Singleton pattern deployment with ONNX Runtime. Automatic CUDA detection for GPU offloading.
-- **Latency**: Targeted sub-200ms end-to-end processing for 1080p frames.
+- **Latency**: ~150–450ms end-to-end with GPU enabled. On CPU (current OCI VM deployment) total latency is ~2,500–4,000ms; see `INFERENCE.md` for full benchmarks.
 
 ### 3. Vector Database (FAISS)
 - **Strategy**: `IndexFlatIP` (Inner Product) for high-precision similarity search with normalized embeddings.
@@ -34,8 +34,8 @@ Acts as the orchestration layer, handling requests for:
 2. **Real-time Recognition**: Mobile client sends base64 image. API detects, searches FAISS, records match metrics, and broadcasts to the Dashboard.
 3. **Control**: Admin uses `/faiss/add` or `/faiss/delete` to refine the identity database in real-time.
 
-## Performance Analytics
-- **GPU throughput**: ~6.4 req/s sustained (~384/min, ~23k/hour, ~550k/day) — measured at c=10, 20, 50 on DGX B200.
-- **CPU fallback**: ~1–2 req/s (suitable for dev/staging only).
-- **Index Search**: Sub-1ms for up to 10k identities (flat index).
+## Performance
+- **Current deployment (CPU)**: ~1–2 req/s on the 4 vCPU OCI VMs; adequate for low-concurrency SMB check-ins.
+- **GPU (when enabled)**: ~6.4 req/s — see `INFERENCE.md` for measured load-test results.
+- **Index Search**: Sub-1ms for up to 10k identities (flat FAISS index).
 - **Cold Boot**: Optimized via Docker volume mounting for models, bypassing redundant downloads.

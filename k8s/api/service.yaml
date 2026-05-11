@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: workping-api
+  namespace: workping
+  labels:
+    app: workping-api
+spec:
+  selector:
+    app: workping-api
+  ports:
+    - protocol: TCP
+      port: 5000
+      targetPort: 5000
+  type: ClusterIP

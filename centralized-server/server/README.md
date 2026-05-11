@@ -8,11 +8,14 @@ The central Express.js API server for WorkPing. Handles authentication, employee
 - **Framework**: Express 5
 - **Database**: MongoDB Atlas (Mongoose)
 - **Cache**: Redis
-- **Auth**: JWT + Google OAuth2 + Microsoft OAuth2 + TOTP 2FA
-- **Real-time**: Socket.io (with Redis adapter for cluster mode)
-- **Process model**: Node.js `cluster` (one worker per CPU core)
+- **Auth**: JWT (jsonwebtoken) + refresh token rotation · bcrypt (password hashing) · speakeasy (TOTP 2FA) · Google OAuth2 · Microsoft OAuth2
+- **Real-time**: Socket.io + @socket.io/redis-adapter (cluster-safe room broadcasts)
+- **Process model**: Node.js `cluster` (one worker per CPU core) · PM2 in production
 - **Task scheduling**: node-cron (subscription renewals, shift reminders)
-- **File uploads**: Multer (profile images, bulk employee Excel)
+- **File uploads**: Multer (profile images, bulk employee Excel import via XLSX)
+- **Security**: helmet · express-rate-limit (200 req/15 min global, 10 req/15 min auth/OTP)
+- **Observability**: prom-client (Prometheus metrics) · Winston (structured logging)
+- **Testing**: Jest · Supertest (integration tests in `__tests__/`)
 
 ## Getting Started
 

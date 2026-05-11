@@ -1,10 +1,10 @@
-# 🏗️ Architecture – Mailer Microservice
+# Architecture — Mailer Microservice
 
-> A stateless, plug-and-play email & OTP microservice built for **WorkPing** and adaptable to any internal product.
+A stateless email and OTP microservice built for WorkPing. Any instance can verify any OTP because Redis is the shared source of truth.
 
 ---
 
-## 📐 High-Level Overview
+## High-Level Overview
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
@@ -27,8 +27,7 @@
 │                   ▼                           ▼              │
 │  ┌────────────────────────┐  ┌──────────────────────────┐   │
 │  │   Template Engine       │  │    Nodemailer Transport   │   │
-│  │  (Handlebars + Design   │  │   (Gmail SMTP / Custom)   │   │
-│  │   System)               │  │                           │   │
+│  │  (Handlebars)           │  │   (Gmail SMTP / Custom)   │   │
 │  └────────────────────────┘  └──────────────────────────┘   │
 │                                                              │
 │  ┌──────────────────────────────────────────────────────┐   │
@@ -41,81 +40,73 @@
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 mailer-microservice/
-├── server.js                  # Entry point – Express app, middleware, routes
-├── package.json               # Dependencies & scripts
+├── server.js                  # Entry point — Express app, middleware, routes
+├── package.json
 ├── architecture.md            # This file
 ├── README.md                  # Usage documentation
 │
 ├── config/
 │   ├── mailTransporter.js     # Nodemailer SMTP transport configuration
-│   └── redisConfig.js         # Redis client setup & connection
+│   └── redisConfig.js         # Redis client setup
 │
 ├── mail/
 │   ├── mailer.js              # Send functions (one per template type)
 │   └── templates.js           # Handlebars-compiled HTML email templates
 │
 ├── routes/
-│   ├── router.mail.js         # Mail endpoints (alerts, greeting, forgot-password, etc.)
+│   ├── router.mail.js         # Mail endpoints
 │   └── router.otp.js          # OTP endpoints (send, verify for email & reset)
 │
-├── utils/
-│   └── services.mail.js       # SMTP service presets (Gmail, Outlook)
-│
-└── public/
-    └── templates.html         # Visual template gallery (browser preview)
+└── utils/
+    └── services.mail.js       # SMTP service presets
 ```
 
 ---
 
-## 🔑 Core Components
+## Core Components
 
-### 1. Express Server (`server.js`)
+### Express Server (`server.js`)
 
 | Concern | Detail |
 |---------|--------|
-| **Port** | `process.env.PORT` (default `3000`) |
-| **Middleware** | JSON body parser, URL-encoded parser |
-| **Auth** | Header-based: `Authorization: <SECRET>` — applied to all `/api/*` routes |
-| **Public routes** | `GET /` (health), `GET /templates` (template gallery) |
-| **Protected routes** | `POST /api/v1/mail/*`, `POST /api/v1/otp/*` |
+| Port | `process.env.PORT` (default `3000`) |
+| Auth | Header-based: `Authorization: <SECRET>` — applied to all `/api/*` routes |
+| Public routes | `GET /` (health), `GET /templates` (template gallery) |
+| Protected routes | `POST /api/v1/mail/*`, `POST /api/v1/otp/*` |
 
-### 2. Mail Transport (`config/mailTransporter.js`)
+### Mail Transport (`config/mailTransporter.js`)
 
-- Uses **Nodemailer** with Gmail SMTP (Google App Passwords)
+- Uses Nodemailer with Gmail SMTP (Google App Passwords)
 - Auto-verifies connection on startup
-- Easily swappable to any SMTP provider
+- Swap to any SMTP provider by updating the transporter config
 
-### 3. Redis Store (`config/redisConfig.js`)
+### Redis Store (`config/redisConfig.js`)
 
-- **Purpose**: OTP storage with automatic TTL expiry
-- **Keys**:
-  - `otp:email:<email>` → Email verification OTP (TTL: 30 min)
-  - `otp:reset:<email>` → Password reset OTP (TTL: 10 min)
-- **Guarantees**: One-time use, deleted on verification
+- **Keys:**
+  - `otp:email:<email>` — email verification OTP (TTL: 30 min)
+  - `otp:reset:<email>` — password reset OTP (TTL: 10 min)
+- **Guarantees:** one-time use, deleted on verification
 
-### 4. Template Engine (`mail/templates.js`)
+### Template Engine (`mail/templates.js`)
 
-- **Design System**: Centralized brand constants (colors, fonts, radius)
-- **Base Layout**: Shared HTML shell with header bar, logo, footer
-- **Templates** (10 total):
-  1. **OTP Verification** – email verification code
-  2. **Reset Password OTP** – password reset code (warning accent)
-  3. **Verify Password** – confirmation after password verified (success accent)
-  4. **Forgot Password** – link-based password reset with CTA button
-  5. **Welcome / Greeting** – onboarding email with org & role
-  6. **Alert: Info** – informational notice
-  7. **Alert: Warning** – warning with optional action link
-  8. **Alert: Danger** – critical alert with optional action link
-  9. **Alert: Success** – positive confirmation
-  10. **Notification** – generic notification
+10 templates total:
 
-### 5. Mailer Service (`mail/mailer.js`)
+1. OTP Verification
+2. Reset Password OTP
+3. Verify Password (confirmation)
+4. Forgot Password (link-based)
+5. Welcome / Greeting
+6. Alert: Info
+7. Alert: Warning
+8. Alert: Danger
+9. Alert: Success
+10. Notification
 
-One exported `async` function per template type:
+### Mailer Service (`mail/mailer.js`)
 
 | Function | Parameters |
 |----------|-----------|
@@ -134,7 +125,7 @@ One exported `async` function per template type:
 
 ---
 
-## 🌐 API Routes
+## API Routes
 
 ### OTP Routes (`/api/v1/otp`)
 
@@ -144,8 +135,6 @@ One exported `async` function per template type:
 | `POST` | `/send-reset-password-otp` | Send password reset OTP | `{ email }` |
 | `POST` | `/verify-email-otp` | Verify email OTP | `{ email, otp }` |
 | `POST` | `/verify-reset-password-otp` | Verify reset password OTP | `{ email, otp }` |
-| `POST` | `/send-phone-otp` | _(placeholder)_ | `{ phone }` |
-| `POST` | `/verify-phone-otp` | _(placeholder)_ | `{ phone, otp }` |
 
 ### Mail Routes (`/api/v1/mail`)
 
@@ -153,7 +142,7 @@ One exported `async` function per template type:
 |--------|----------|-------------|------|
 | `POST` | `/send-mail` | Send templated email | `{ email, subject, content }` |
 | `POST` | `/send-html` | Send raw HTML email | `{ email, subject, html }` |
-| `POST` | `/forgot-password` | Forgot password (link) | `{ email, resetLink }` |
+| `POST` | `/forgot-password` | Forgot password link | `{ email, resetLink }` |
 | `POST` | `/verify-password` | Password verified confirmation | `{ email }` |
 | `POST` | `/greeting` | Welcome / onboarding email | `{ email, name, org, role }` |
 | `POST` | `/alert/info` | Info alert | `{ email, title, message }` |
@@ -166,12 +155,12 @@ One exported `async` function per template type:
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/` | Health check / landing page |
+| `GET` | `/` | Health check |
 | `GET` | `/templates` | Visual template gallery |
 
 ---
 
-## 🔒 Security Model
+## Security Model
 
 ```
 Client Request
@@ -184,35 +173,30 @@ Client Request
            │ Valid
            ▼
 ┌─────────────────────────┐
-│   Body Validation        │──── Missing email ────→ 403 Bad Request
-│   { email } required     │
+│   Body Validation        │──── Missing email ────→ 400 Bad Request
 └──────────┬──────────────┘
            │ Valid
            ▼
        Route Handler
 ```
 
-- **API Key Auth**: Shared secret via `Authorization` header
-- **No session state**: Completely stateless API layer
-- **OTP Security**: Redis TTL auto-expiry, single-use (deleted after verification)
-- **No PII stored**: Only OTP codes in Redis, auto-deleted
+- API key auth via shared `Authorization` header
+- Stateless API layer — no session state
+- OTP security: Redis TTL auto-expiry, single-use (deleted after verification)
 
 ---
 
-## 🔄 OTP Flow
+## OTP Flow
 
 ### Email Verification
 
 ```
 Client ──POST /send-email-otp──→ Server
-                                   │
                                    ├─ Generate 6-digit OTP
                                    ├─ Store in Redis (TTL: 30m)
-                                   ├─ Render OTP template
-                                   └─ Send via SMTP ──→ User Inbox
+                                   └─ Send via SMTP → User Inbox
 
 Client ──POST /verify-email-otp──→ Server
-                                     │
                                      ├─ Fetch OTP from Redis
                                      ├─ Compare with submitted OTP
                                      ├─ Delete from Redis on match
@@ -223,14 +207,11 @@ Client ──POST /verify-email-otp──→ Server
 
 ```
 Client ──POST /send-reset-password-otp──→ Server
-                                            │
                                             ├─ Generate 6-digit OTP
                                             ├─ Store in Redis (TTL: 10m)
-                                            ├─ Render reset password template
-                                            └─ Send via SMTP ──→ User Inbox
+                                            └─ Send via SMTP → User Inbox
 
 Client ──POST /verify-reset-password-otp──→ Server
-                                              │
                                               ├─ Fetch OTP from Redis
                                               ├─ Validate & delete
                                               └─ Return { verified: true }
@@ -238,52 +219,24 @@ Client ──POST /verify-reset-password-otp──→ Server
 
 ---
 
-## 🎨 Email Design System
-
-All templates share a unified design language:
+## Email Design Tokens
 
 | Token | Value | Usage |
 |-------|-------|-------|
 | `brand` | `#2563eb` | Primary accent, links, buttons |
-| `success` | `#16a34a` | Success alerts, verify password |
+| `success` | `#16a34a` | Success alerts |
 | `warning` | `#d97706` | Warning alerts, reset password |
 | `danger` | `#dc2626` | Critical alerts |
 | `bg` | `#f8fafc` | Email background |
 | `card` | `#ffffff` | Card background |
 | `text` | `#1e293b` | Heading text |
 | `muted` | `#64748b` | Body text |
-| `border` | `#e2e8f0` | Borders, dividers |
+| `border` | `#e2e8f0` | Borders |
 | `radius` | `12px` | Border radius |
-| `font` | Segoe UI / Roboto | Font stack |
-
-### Template Anatomy
-
-```
-┌─────────────────────────────┐
-│ ████████████████████████████ │  ← Accent color bar (4px)
-│                             │
-│        WorkPing             │  ← Logo text (brand color)
-│                             │
-│  ┌───────────────────────┐  │
-│  │  Title                 │  │  ← h1 heading
-│  │  Hi NAME, message...   │  │  ← Personalized body
-│  │                        │  │
-│  │  ┌──── ── ── ── ──┐   │  │  ← OTP box / CTA button
-│  │  │   4 8 2 9 3 7   │   │  │
-│  │  └──── ── ── ── ──┘   │  │
-│  │                        │  │
-│  │  ▌ Info box message    │  │  ← Contextual info box
-│  │                        │  │
-│  └───────────────────────┘  │
-│                             │
-│  © 2026 WorkPing            │  ← Footer
-│  Auto-generated message     │
-└─────────────────────────────┘
-```
 
 ---
 
-## 🧱 Tech Stack
+## Tech Stack
 
 | Component | Technology |
 |-----------|-----------|
@@ -293,16 +246,3 @@ All templates share a unified design language:
 | Template Engine | Handlebars |
 | OTP Storage | Redis (with TTL) |
 | Containerization | Docker & Docker Compose |
-
----
-
-## 🛣️ Roadmap
-
-- [ ] 📱 Phone OTP support (SMS provider integration)
-- [ ] 🔄 Rate limiting per email/IP
-- [ ] 📊 Health check & metrics endpoint
-- [ ] 🔐 mTLS / JWT-based service-to-service auth
-- [ ] 📎 Attachment support for email routes
-- [ ] 🎨 Custom branding per tenant (multi-tenant support)
-- [ ] 🧪 Unit & integration tests
-

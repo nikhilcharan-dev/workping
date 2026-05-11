@@ -137,7 +137,7 @@ Why one uvicorn process instead of `--workers 4`:
 
 ## Performance — measured load test results
 
-Test setup: image 125 KB JPEG, user `imran.khan@workping.live`, DGX B200 via proxy, 30 requests per concurrency level.
+Test setup: image 125 KB JPEG, user `imran.khan@workping.live`, GPU instance (MIG slice), 30 requests per concurrency level.
 
 **Current deployment (CPU — `gpu_available: false`)**
 
@@ -150,7 +150,9 @@ Test setup: image 125 KB JPEG, user `imran.khan@workping.live`, DGX B200 via pro
 
 \* Redis cache warmed mid-run at c=10 — subsequent requests skipped MongoDB fetch, making poll resolution faster.
 
-**Measured GPU results (`onnxruntime-gpu` + CUDA, DGX B200)**
+**Measured GPU results (`onnxruntime-gpu` + CUDA, `cudnn_conv_algo_search: DEFAULT`)**
+
+> **Cold-start fix:** Setting `cudnn_conv_algo_search: DEFAULT` eliminates the p99=48s spike on the first batch after startup. `EXHAUSTIVE` mode benchmarks every cuDNN convolution algorithm against your specific input shape on first use — that overhead takes 30–45s. `DEFAULT` skips the benchmark and picks a known-good heuristic immediately. Subsequent requests are unaffected either way (cuDNN caches the winning algorithm), so this only matters for the first request after startup.
 
 | Concurrency | Throughput | Notes |
 |---|---|---|
@@ -167,7 +169,9 @@ Test setup: image 125 KB JPEG, user `imran.khan@workping.live`, DGX B200 via pro
 | Per hour | ~23,000 req/hour |
 | Per day | ~550,000 req/day |
 
-Throughput is stable across concurrency levels, indicating the GPU pipeline is the steady-state bottleneck and the queue absorbs burst traffic cleanly.
+Throughput is stable across concurrency levels. The real ceiling is GPU compute: each request requires ~35–41ms of embedding time as 5 SCRFD + ArcFace ONNX models serialize through the CUDA stream. 4 `INFERENCE_WORKERS` keeps the GPU fed without over-saturating the MIG slice.
+
+**Scaling headroom:** A second MIG slice (GI 9) is idle on the same physical GPU. Running a second service instance on port 5001 behind a load balancer would yield ~12 req/s / ~720 req/min from the same hardware.
 
 Confidence was stable at **0.814** across all runs and all concurrency levels, confirming the similarity score is deterministic (same image → same embedding every time).
 
@@ -205,8 +209,8 @@ GET /api/v1/health
 
 | | GPU (B200) | CPU (general VM) |
 |---|---|---|
-| Embedding time | ~150 ms | ~2 500–4 000 ms |
-| Throughput | ~40–60 req/s | ~1–2 req/s |
+| Embedding time | ~35–41 ms | ~2 500–4 000 ms |
+| Throughput | ~6.4 req/s | ~1–2 req/s |
 | Accuracy | Identical | Identical |
 
 The accuracy is identical because the same ONNX weights are used — only the execution hardware changes. CPU-only is suitable for low-traffic development or staging environments; production attendance workloads need a GPU node.

@@ -26,7 +26,16 @@
         "centralized-server/server/middleware/requireRole.js",
         "centralized-server/server/middleware/authorizeManager.js"
       ],
-      "biometric_face_recognition_service_fastapi": [
+      "biometric_face_recognition_faiss_insightface": [
+        "face-api-microservice/app.py"
+      ],
+      "biometric_faiss_bulk_search_1_to_N": [
+        "face-api-microservice/app.py"
+      ],
+      "biometric_liveness_detection_optical_flow_pad": [
+        "face-api-microservice/app.py"
+      ],
+      "biometric_ai_productivity_insights": [
         "face-api-microservice/app.py"
       ],
       "biometric_face_checkin_mobile_screen": [
@@ -37,6 +46,9 @@
         "mobile-app/src/utils/locationLock.js",
         "mobile-app/src/hooks/useLocationLock.js",
         "centralized-server/server/utils/location.js"
+      ],
+      "offline_attendance_sync_sqlite_netinfo": [
+        "mobile-app/index.js"
       ],
       "realtime_socketio_redis_adapter": [
         "centralized-server/server/app/socket.io.js"
@@ -53,6 +65,15 @@
       "whatsapp_chatbot_llm_intent_pipeline": [
         "whatsapp-microservice/pipeline/message.pipeline.js",
         "whatsapp-microservice/utils/llm.provider.js"
+      ],
+      "voice_chatbot_aws_transcribe_polly_foundation": [
+        "whatsapp-microservice/package.json"
+      ],
+      "kubernetes_oci_oke_migration_foundation": [
+        "k8s/api/deployment.yaml",
+        "k8s/whatsapp/deployment.yaml",
+        "centralized-server/server/package.json",
+        "whatsapp-microservice/package.json"
       ],
       "observability_prometheus_metrics": [
         "centralized-server/server/utils/metrics.js"
@@ -79,6 +100,7 @@
     "include": [
       "docker-compose.yml",
       "nginx/nginx.conf",
+      "face-api-microservice/app.py",
       "centralized-server/server/app/socket.io.js",
       "centralized-server/server/utils/token.helper.js",
       "centralized-server/server/middleware/jwtBearer.js",
@@ -96,9 +118,12 @@
       "mobile-app/src/hooks/useLocationLock.js",
       "mobile-app/src/hooks/useFaceCapture.js",
       "mobile-app/src/screens/FaceCaptureScreen.jsx",
+      "mobile-app/index.js",
       "whatsapp-microservice/pipeline/message.pipeline.js",
       "whatsapp-microservice/utils/llm.provider.js",
       "oracle-cloud-object-microservice/app.js",
+      "k8s/api/deployment.yaml",
+      "k8s/whatsapp/deployment.yaml",
       "centralized-server/server/__tests__/auth.test.js",
       "centralized-server/server/__tests__/otp.test.js",
       "centralized-server/server/__tests__/health.test.js",

@@ -1,0 +1,88 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: workping-api
+  namespace: workping
+  labels:
+    app: workping-api
+    tier: backend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: workping-api
+  template:
+    metadata:
+      labels:
+        app: workping-api
+        tier: backend
+    spec:
+      containers:
+        - name: workping-api
+          image: workping/api:latest
+          ports:
+            - containerPort: 5000
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: PORT
+              value: "5000"
+            - name: MONGODB_URI
+              valueFrom:
+                secretKeyRef:
+                  name: workping-secrets
+                  key: mongodb-uri
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: workping-secrets
+                  key: jwt-secret
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: workping-secrets
+                  key: redis-url
+            - name: INTERNAL_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: workping-secrets
+                  key: internal-secret
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1Gi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: workping-api-hpa
+  namespace: workping
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: workping-api
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70

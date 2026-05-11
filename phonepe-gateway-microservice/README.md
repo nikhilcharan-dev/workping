@@ -6,7 +6,10 @@ Microservice wrapper around the PhonePe UPI payment API. Handles payment initiat
 
 - **Runtime**: Node.js (ES modules)
 - **Framework**: Express 5
-- **Payment Provider**: PhonePe (UPI)
+- **Payment Provider**: PhonePe UPI (sandbox + production)
+- **HTTP Client**: Axios
+- **Cache**: Redis (payment state bridging)
+- **Security**: helmet · express-rate-limit · HMAC-SHA256 webhook verification (`crypto.timingSafeEqual`)
 - **Scheduling**: node-cron (retry failed payments)
 
 ## Getting Started

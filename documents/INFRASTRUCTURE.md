@@ -10,13 +10,13 @@ Internet
 │  Nginx  (Reverse Proxy + API Gateway)                                    │
 │                                                                          │
 │  Routing rules:                                                          │
-│   workping.live            → :5000  (Core API)                          │
-│   workping.live/admin      → dist/  (Admin UI static build)             │
-│   workping.live/portal     → dist/  (Employee UI static build)          │
+│   api.workping.live        → :5000  (Core API)                          │
+│   admin.workping.live      → dist/  (Admin UI static build)             │
+│   employee.workping.live   → dist/  (Employee UI static build)          │
 │   phonepe.workping.live    → :3001  (Payments microservice)             │
 │   whatsapp.workping.live   → :3002  (Chatbot microservice)              │
-│   storage.workping.live    → :8000  (Storage microservice)              │
-│   biometric.workping.live  → :8001  (Biometric microservice)            │
+│   s3.workping.live         → :8000  (Storage microservice)              │
+│   face.workping.live       → :8001  (Biometric microservice)            │
 │                                                                          │
 │  Also handles: SSL termination · WebSocket upgrade (Socket.io) ·        │
 │                Gzip compression · Static file cache headers             │

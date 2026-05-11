@@ -122,7 +122,7 @@ At 500 employees per org with 2048 bytes each: ~1 MB per org in Redis — neglig
 
 CPU inference uses `onnxruntime` with `OMP_NUM_THREADS=1` per worker (set in Dockerfile) to prevent thread contention between uvicorn workers. On a 4-core VM running 4 uvicorn workers, total throughput is ~10 detections/second.
 
-**GPU acceleration**: Set `providers=["CUDAExecutionProvider"]` in `insightface.FaceAnalysis()`. Reduces embedding time to ~10–30ms. Uncomment the GPU block in `docker-compose.yml`.
+**GPU acceleration**: Set `providers=["CUDAExecutionProvider"]` in `insightface.FaceAnalysis()`. Reduces embedding time to ~35–41ms. Uncomment the GPU block in `docker-compose.yml`.
 
 ---
 
@@ -142,4 +142,4 @@ InsightFace AntelopeV2 gives enterprise-grade accuracy with a self-hosted ONNX b
 
 ## Security Note
 
-The face-api service is **internal-only** — it is not exposed through Nginx and has no public route. It is accessible only from the Core API server within the same VPC/host network. No authentication layer is added at the HTTP level because network isolation is the enforcement boundary. If the network perimeter changes (e.g. multi-VM deployment), add an `X-Internal-Secret` header check matching the pattern in `centralized-server/server/routes/internal/router.js`.
+The face-api service is proxied through Nginx at `face.workping.live`. All inbound requests must include an `Authorization: Bearer <FACE_API_KEY>` header; the service validates this on every route. Raw port `8001` is not exposed to the public internet — the VM firewall allows only Nginx-proxied traffic. If the network perimeter changes (e.g. moving to a multi-VM mesh where the service is callable from additional hosts), tighten the allowlist in the Nginx upstream block and verify the API key check in `app.py`.

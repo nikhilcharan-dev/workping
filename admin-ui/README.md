@@ -8,8 +8,11 @@ The administrative web interface for WorkPing — a workforce management platfor
 - **Routing**: React Router v6
 - **Forms**: React Hook Form + Yup
 - **Charts**: ApexCharts, FullCalendar
-- **Face Detection**: TensorFlow.js + MediaPipe (for enrollment UI)
-- **Maps**: Leaflet (geofencing zones)
+- **Face Enrollment**: react-webcam — captures a JPEG frame from the admin's webcam, base64-encodes it, and POSTs to `POST /api/v1/enroll` on the biometric service; all face detection and embedding extraction are server-side (InsightFace AntelopeV2)
+- **Real-time**: socket.io-client — live attendance board updates via Socket.io rooms
+- **Maps**: Leaflet + react-leaflet (geofence zone configuration)
+- **Data Tables**: @tanstack/react-table, Syncfusion grids
+- **Excel Export**: xlsx
 - **Styling**: Bootstrap 5 + SASS
 - **HTTP**: Axios
 

@@ -6,7 +6,9 @@ React Native mobile app for WorkPing. Allows employees to check in/out using fac
 
 - **Framework**: React Native 0.83 via Expo 55
 - **Navigation**: React Navigation (stack + bottom tabs)
-- **Camera / Face**: react-native-vision-camera + InsightFace plugin
+- **Camera / Face**: react-native-vision-camera + react-native-vision-camera-face-detector (on-device face bounding-box detection); captured frame is sent to the biometric service for embedding extraction
+- **Offline Sync**: @react-native-community/netinfo (connectivity detection) + expo-sqlite (local queue); check-ins captured offline are flushed to the API on reconnect via the NetInfo listener in index.js
+- **Audio**: expo-audio + expo-speech (voice feedback for check-in confirmation; foundation for voice chatbot interaction)
 - **Forms**: React Hook Form + Yup
 - **Location**: Expo Location (GPS-based geofence validation)
 - **Push Notifications**: Expo Notifications

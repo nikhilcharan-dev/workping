@@ -6,3 +6,5 @@ insightface
 onnxruntime-gpu
 motor
 redis[hiredis]
+faiss-cpu
+scipy

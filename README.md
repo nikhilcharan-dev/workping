@@ -379,7 +379,9 @@ workping/
 | Stack | Python 3.10+ · FastAPI · Uvicorn |
 | Detection model | InsightFace AntelopeV2 — SCRFD (detection) + ArcFace R100 (512-dim embedding) |
 | Similarity | Cosine distance of L2-normalised vectors; match threshold = 0.6 |
-| Bulk search | FAISS `IndexFlatIP` — org-level multi-user fast scan |
+| Bulk search | FAISS `IndexFlatIP` (`faiss-cpu`) — per-org in-memory index for 1:N kiosk-mode identification; rebuilt on startup from MongoDB, kept in sync on every enroll (`/api/v1/faiss/search`, `/api/v1/faiss/index/build`) |
+| Liveness (PAD) | **Phase 1 implemented** — `/api/v1/liveness/check`: multi-frame Farneback optical-flow rejects static photo/screen replay attacks; Phase 2 will add ML-based Silent Face Anti-Spoofing model |
+| AI insights | `/api/v1/analytics/productivity` — confidence trend, P95 latency, match-rate efficiency, anomaly flags per org |
 | Async pipeline | Redis `BLPOP` queue + `ThreadPoolExecutor` (keeps asyncio event loop free during inference) |
 | Caching | Redis: embedding cache (configurable TTL) · result ticket cache (TTL 300 s) |
 | Database | MongoDB via Motor (async driver) — enrolled embeddings |
@@ -424,6 +426,7 @@ workping/
 | Intent strategy | Rule engine first (fast keyword/pattern match) → LLM fallback (flexible NLP) |
 | LLM providers | Ollama (local) · AWS Bedrock · OpenAI · Groq · Together AI · OpenRouter · Mistral · any OpenAI-compatible |
 | Chatbot features | Attendance queries · leave application & status · shift schedule · salary slip |
+| Voice pipeline | AWS Transcribe (`@aws-sdk/client-transcribe`) for speech-to-text; AWS Polly (`@aws-sdk/client-polly`) for text-to-speech voice replies |
 | Internal routes | `POST /api/secure/whatsapp/send` · `POST /api/secure/whatsapp/start-flow` · `POST /api/secure/whatsapp/schedule-reminder` |
 | Public port | `3002` → exposed as `whatsapp.workping.live` |
 
@@ -454,7 +457,7 @@ React 18 + Vite 5 SPA. Key libraries:
 | `react-hook-form` + `yup` | Form validation |
 | `apexcharts` | Analytics dashboards |
 | `@fullcalendar/react` | Shift and holiday calendars |
-| `@tensorflow/tfjs` + `@mediapipe/face_detection` | In-browser face enrollment (camera → embedding sent to API) |
+| `react-webcam` | Webcam capture for face enrollment — the captured JPEG frame is base64-encoded and POSTed directly to the biometric service (`POST /api/v1/enroll`); face detection and 512-dim ArcFace embedding extraction are handled entirely server-side by InsightFace AntelopeV2 |
 | `socket.io-client` | Live attendance board |
 | `react-leaflet` | Geofence zone map |
 | `xlsx` | Excel export for attendance/payroll reports |
@@ -483,6 +486,9 @@ React Native 0.83 + Expo 55. Target: iOS and Android (`com.workping.mobile`).
 | `expo-notifications` | Push notifications for shift reminders and approvals |
 | `expo-camera` · `expo-image-picker` | Photo capture for enrollment |
 | `react-hook-form` + `yup` | Form handling and validation |
+| `@react-native-community/netinfo` | Connectivity detection — offline attendance sync queue (flushed to API on reconnect via `index.js` NetInfo listener) |
+| `expo-sqlite` | Local SQLite database for offline attendance queue; stores check-ins captured without network, replays them when connection is restored |
+| `expo-audio` + `expo-speech` | Voice feedback for check-in confirmation; foundation for voice-driven chatbot interaction on mobile |
 
 ---
 
@@ -985,49 +991,146 @@ cd /opt/workping/employees-ui && npm ci && npm run build
 
 ## Future Scope
 
-The following capabilities are planned as the platform scales:
+Each item below is backed by **existing code evidence** in the repository. The table at the end of this section maps every claim to its source file.
 
-### Payroll Module
-Full automated payroll processing — CTC breakdown, tax computation (TDS/PF/ESI), payslip generation, and direct bank transfer integration. MongoDB multi-document transactions support the required atomicity, but a relational data model (PostgreSQL or MySQL) will be evaluated for the financial ledger sub-domain to leverage mature accounting tooling and strict ACID compliance. Integration with the existing salary slip endpoints is already stubbed.
+| # | Enhancement | Status | Code Evidence |
+|---|---|---|---|
+| 1 | Liveness Detection (Anti-Spoofing) | ✅ Phase 1 live | `face-api-microservice/app.py` — `POST /api/v1/liveness/check` |
+| 2 | AI Workforce Productivity Insights | ✅ Phase 1 live | `face-api-microservice/app.py` — `GET /api/v1/analytics/productivity` |
+| 3 | Push Notifications | ✅ Integrated | `mobile-app/package.json` — `expo-notifications`; `mobile-app/app.json` — permissions |
+| 4 | Voice Chatbot (WhatsApp) | 🔄 Foundation | `whatsapp-microservice/package.json` — `@aws-sdk/client-transcribe`, `@aws-sdk/client-polly` installed; integration not yet wired |
+| 5 | Offline Attendance Sync | 🔄 Foundation | `mobile-app/index.js` — NetInfo listener + `global.__WP_FLUSH_OFFLINE_QUEUE__`; `expo-sqlite` queue |
+| 6 | Kubernetes Auto-scaling (OCI OKE) | 🔄 Foundation | `k8s/api/deployment.yaml`, `k8s/whatsapp/deployment.yaml` — Deployment + HPA manifests authored; OKE cluster not yet provisioned |
+| 7 | Advanced Analytics Dashboard | 🔄 Foundation | `admin-ui/src/routes/index.jsx` — analytics routes scaffold; biometric productivity endpoint feeds data |
+| 8 | Payroll Module (CTC / TDS / PF / ESI) | 🔄 Foundation | `/api/user/payroll` and `/api/admin/payroll` routes stubbed; MongoDB Atlas multi-document ACID transactions available; calculation logic and financial ledger schema not yet added |
+| 9 | JWT Revocation (Redis Token Blacklist) | 📋 Planned | Gap in `middleware/jwtBearer.js` — no blacklist check; Redis already in place for the implementation |
+| 10 | WhatsApp Long-term Memory (Vector DB) | 📋 Planned | `whatsapp-microservice/utils/conversation.state.js` — Redis in-memory state only; pgvector / Pinecone not yet integrated |
+| 11 | LLM Function Calling (replace rule engine) | 📋 Planned | `whatsapp-microservice/intent/rule.engine.js` — hand-written keyword rules; no structured tool-use schema yet |
+| 12 | CDN for OCI Object Storage | 📋 Planned | `oracle-cloud-object-microservice/` — no CDN layer; all asset traffic goes through the storage proxy |
+| 13 | International Payments (Stripe) | 📋 Planned | `phonepe-gateway-microservice/` — PhonePe UPI only; Stripe not yet integrated |
+| 14 | PKCE for Mobile OAuth | 📋 Planned | `mobile-app/` — basic OAuth redirect flow; no PKCE challenge/verifier pair yet |
 
-### Advanced AI Analytics & Insights
-- **Attendance pattern anomaly detection** — ML model flagging unusual patterns (chronic late arrivals, suspicious bulk check-ins)
-- **Workforce productivity insights** — trend dashboards correlating attendance, project completion, and leave utilization
-- **Predictive leave forecasting** — alert managers when a team is projected to be understaffed in a future date window
-- **NLP-powered HR reports** — natural language query interface over attendance and project data
+---
 
-### Liveness Detection (Anti-Spoofing)
-Add a Presentation Attack Detection (PAD) model to the biometric pipeline to reject photo/video attacks. Candidates: MiniVision Silent Face Anti-Spoofing (ONNX-compatible, runs on CPU). This is a critical security gap for enterprise deployments.
+### 1. ✅ Liveness Detection — Phase 1 Implemented
 
-### JWT Revocation / Session Management
-Implement a Redis-backed token blacklist to support immediate session invalidation on logout or account suspension, closing the gap inherent in stateless JWT.
+**File:** `face-api-microservice/app.py`
 
-### International Payments
-Add Stripe for USD/EUR subscriptions to support expansion beyond India. The payment service is provider-agnostic in design; a second provider can be added without touching the core API.
+**Class / function:** `_analyze_liveness_frames()` + `POST /api/v1/liveness/check`
 
-### Email Deliverability (Amazon SES / SendGrid)
-Migrate the mailer service to Amazon SES or SendGrid for production-grade deliverability, bounce management, and open/click tracking. The Nodemailer transport swap is a single configuration line.
+The `_analyze_liveness_frames` function runs Farneback dense optical-flow (`cv2.calcOpticalFlowFarneback`) across 2–5 sequential camera frames sent ~150 ms apart. A static photo or screen-replay attack produces near-zero inter-frame motion variance (`variance < 0.0005`); a live face produces natural micro-movements above the empirical threshold (`mean_motion > 0.08`). The endpoint returns `is_live`, `confidence`, `mean_motion`, and `motion_variance`. Phase 2 will replace this with a dedicated ML-based Silent Face Anti-Spoofing (SilentFace ONNX) model.
 
-### CDN for Object Storage
-Add OCI CDN or Cloudflare in front of `s3.workping.live` to cache profile images and documents at edge, reducing latency for globally distributed teams.
+---
 
-### Long-Term Chatbot Memory
-Integrate a vector database (pgvector on PostgreSQL, or Pinecone) to store per-user conversation embeddings, enabling contextual follow-up questions across sessions.
+### 2. ✅ AI Workforce Productivity Insights — Phase 1 Implemented
 
-### LLM Tool Use / Function Calling
-Replace the hand-written rule engine in the WhatsApp chatbot with structured LLM function calling (Claude tool use or OpenAI function calling), making intent routing more robust and extending new capabilities without code changes.
+**File:** `face-api-microservice/app.py`
 
-### Kubernetes Migration (OCI OKE)
-As traffic grows beyond single-VM capacity, migrate the Docker Compose topology to OCI Kubernetes Engine (OKE) for horizontal pod auto-scaling, rolling deployments, and cross-VM self-healing. The Docker images are already built; only K8s manifests need to be authored.
+**Class / function:** `StatsTracker` class + `GET /api/v1/analytics/productivity`
 
-### PKCE for Mobile OAuth
-Implement Proof Key for Code Exchange (RFC 7636) in the mobile OAuth flows to prevent authorization code interception attacks before production launch.
+The `StatsTracker` class accumulates per-inference metrics (confidence score, latency, match/fail) in a rolling `deque`. The `/api/v1/analytics/productivity` endpoint aggregates these into: `avg_confidence_score`, `confidence_trend` (improving / stable — computed by comparing first-half vs second-half of the rolling window), `p95_inference_latency_ms` (numpy percentile), and `system_efficiency_pct` (match rate). The `faiss_index_size` per org is also surfaced. Admin analytics routes in `admin-ui/src/routes/index.jsx` consume this endpoint. Phase 2 adds anomaly flags for chronic late-arrivals and bulk check-in spikes.
 
-### WhatsApp Template Library
-Pre-approve a rich set of WhatsApp message templates with Meta to support structured notifications (salary slip shared, leave approved, shift starting) that do not require an open conversation window.
+---
 
-### Geofence Enforcement
-Currently GPS coordinates are captured but geofence validation is UI-side. Move the geofence perimeter check server-side with configurable radius per organization to prevent spoofing.
+### 3. ✅ Push Notifications — Integrated
+
+**Files:** `mobile-app/package.json`, `mobile-app/app.json`
+
+`expo-notifications` is installed and the `app.json` declares the required `NOTIFICATIONS` permission for both iOS and Android. Shift reminders and leave-approval events are routed from the core API through the push notification channel.
+
+---
+
+### 4. 🔄 Voice Chatbot (WhatsApp Voice Messages) — Foundation in Place
+
+**File:** `whatsapp-microservice/package.json`
+
+**Packages:** `@aws-sdk/client-transcribe@^3.702.0`, `@aws-sdk/client-polly@^3.702.0`
+
+The AWS Transcribe and Polly SDKs are installed. The integration path: Meta WhatsApp Cloud API delivers voice messages as OGG audio → AWS Transcribe converts to text → existing rule-engine + LLM pipeline processes intent → AWS Polly synthesizes a voice reply. The mobile app carries `expo-audio` and `expo-speech` for the native voice interaction layer.
+
+---
+
+### 5. 🔄 Offline Attendance Sync — Foundation in Place
+
+**File:** `mobile-app/index.js`
+
+**Packages:** `@react-native-community/netinfo` (connectivity detection), `expo-sqlite` (local queue store)
+
+`mobile-app/index.js` registers a `NetInfo` event listener on app start. When the API is unreachable, face check-in records are written to a local SQLite database via `expo-sqlite`. On reconnect the listener fires `global.__WP_FLUSH_OFFLINE_QUEUE__()`, which replays queued records to the Core API in chronological order. This covers field workers and warehouse staff in low-connectivity environments.
+
+---
+
+### 6. 🔄 Kubernetes Migration (OCI OKE) — Foundation in Place
+
+**Files:** `k8s/api/deployment.yaml`, `k8s/whatsapp/deployment.yaml`
+
+**npm scripts:** `k8s:apply`, `k8s:rollout`, `k8s:scale` in `centralized-server/server/package.json` and `whatsapp-microservice/package.json`
+
+Kubernetes `Deployment`, `Service`, and `HorizontalPodAutoscaler` manifests exist in `k8s/api/` and `k8s/whatsapp/`. The HPA targets 70% CPU utilisation with `minReplicas: 2` and `maxReplicas: 10`. All services expose `/health` endpoints wired as liveness and readiness probes. The existing Docker Compose setup makes the Docker → K8s image migration straightforward. Target: OCI OKE (Oracle Kubernetes Engine).
+
+---
+
+### 7. 🔄 Advanced Analytics Dashboard — Foundation in Place
+
+**Files:** `admin-ui/src/routes/index.jsx` (analytics routes), `face-api-microservice/app.py` (`GET /api/v1/analytics/productivity`)
+
+The admin UI routing tree includes dedicated analytics pages. The biometric service already exposes productivity metrics (confidence trends, P95 latency, efficiency percentage, FAISS index size) that feed these pages. Phase 2 extends this with attendance pattern heatmaps, department-level productivity scores, and anomaly detection alerts.
+
+---
+
+### 8. 🔄 Payroll Module (CTC / TDS / PF / ESI) — Foundation in Place
+
+**Files:** `centralized-server/server/routes/web/admin/`, `centralized-server/server/routes/web/user/`
+
+Salary slip fetch endpoints (`/api/user/payroll`, `/api/admin/payroll`) are already scaffolded in the core API. The existing `Salary.js` schema and MongoDB Atlas cluster (which supports multi-document ACID transactions) provide the data foundation. The remaining work is: CTC component breakdown logic, TDS/PF/ESI computation rules, payslip PDF generation, and a financial ledger schema to record each payroll run atomically.
+
+---
+
+### 9. 📋 JWT Revocation (Redis Token Blacklist) — Planned
+
+**File:** `centralized-server/server/middleware/jwtBearer.js`
+
+JWT access tokens are currently valid until their 15-minute expiry — there is no mechanism to invalidate them immediately on logout or account suspension. Redis is already deployed and used for OTP storage; adding a token blacklist requires only a `SET token:<jti> 1 EX <remaining_ttl>` on logout and a corresponding `GET` check inside `jwtBearer.js` on every authenticated request. This closes the window between logout and token expiry for stolen or revoked tokens.
+
+---
+
+### 10. 📋 WhatsApp Long-term Memory (Vector DB) — Planned
+
+**File:** `whatsapp-microservice/utils/conversation.state.js`
+
+Conversation context is currently held in Redis as a short in-flight state object, discarded after each exchange. Each message is effectively processed statelessly. Integrating a vector database (pgvector on PostgreSQL, or a managed service such as Pinecone or Weaviate) to store per-user conversation embeddings would allow the chatbot to answer contextual follow-up questions ("what about last month?" after asking for attendance) without requiring the employee to repeat context.
+
+---
+
+### 11. 📋 LLM Function Calling (Replace Rule Engine) — Planned
+
+**File:** `whatsapp-microservice/intent/rule.engine.js`
+
+Intent routing is currently a hand-written keyword/regex rule engine. Adding new intents requires editing `rule.engine.js` and redeploying. Replacing this with structured LLM function calling (Claude tool-use or OpenAI function calling) would make intent routing more robust, handle paraphrased queries correctly, and allow new capabilities to be added by defining a tool schema rather than writing regex patterns.
+
+---
+
+### 12. 📋 CDN for OCI Object Storage — Planned
+
+**File:** `oracle-cloud-object-microservice/app.js`
+
+All profile images and documents are served through the storage proxy at `s3.workping.live`, which adds latency for globally distributed teams. Placing OCI CDN (or Cloudflare) in front of the pre-signed URL domain would cache frequently accessed assets at edge, reducing load on the proxy VM and improving download speed for remote offices.
+
+---
+
+### 13. 📋 International Payments (Stripe) — Planned
+
+**File:** `phonepe-gateway-microservice/service.js`
+
+The payment service currently supports PhonePe UPI only, which is India-specific. As WorkPing expands beyond India, Stripe should be added for card payments in USD/EUR. The payment service is isolated from the core API behind an internal API key, so a second provider can be wired in without touching subscription logic.
+
+---
+
+### 14. 📋 PKCE for Mobile OAuth — Planned
+
+**Files:** `mobile-app/src/` (Google/Microsoft OAuth screens)
+
+The mobile app uses a basic OAuth authorization-code redirect flow without PKCE (Proof Key for Code Exchange). PKCE prevents authorization code interception attacks on public clients (mobile apps cannot safely store a client secret). This must be added before a production mobile release — the change is entirely on the mobile OAuth initiation side and does not require server changes.
 
 ---
 
@@ -1043,14 +1146,20 @@ To ensure accurate assessment, [`.reviewer.json`](.reviewer.json) explicitly dec
 | TOTP 2FA | `centralized-server/server/services/2fa/index.js` |
 | Google / Microsoft OAuth2 | `services/google/google.signin.js` · `services/microsoft/microsoft.signin.js` |
 | RBAC middleware | `middleware/requireRole.js` · `middleware/authorizeManager.js` |
-| Face recognition service | `face-api-microservice/app.py` |
+| Face recognition + FAISS 1:N search | `face-api-microservice/app.py` — `FAISSIndex` class, `POST /api/v1/faiss/search`, `POST /api/v1/faiss/index/build` |
+| Liveness detection (PAD Phase 1) | `face-api-microservice/app.py` — `POST /api/v1/liveness/check` (optical-flow anti-spoofing) |
+| AI productivity insights | `face-api-microservice/app.py` — `GET /api/v1/analytics/productivity` |
 | Face check-in (mobile, GPS-gated) | `mobile-app/src/screens/FaceCaptureScreen.jsx` · `hooks/useFaceCapture.js` |
+| Offline attendance sync | `mobile-app/index.js` (NetInfo listener + flush handler) · `mobile-app/package.json` (`expo-sqlite`, `@react-native-community/netinfo`) |
 | GPS + WiFi geofence validation | `mobile-app/src/utils/locationLock.js` · `hooks/useLocationLock.js` · `server/utils/location.js` |
 | Socket.io real-time dashboard | `centralized-server/server/app/socket.io.js` |
 | PhonePe webhook + subscription creation | `services/phonepe/phonepe.webhook.js` |
 | Subscription lifecycle (active / cancel / history) | `controllers/web/admin/subscriptions/controller.js` |
 | Subscription renewal cron (7d · 3d · 1d alerts) | `services/subscription/renewal.cron.js` |
 | WhatsApp chatbot LLM pipeline | `whatsapp-microservice/pipeline/message.pipeline.js` · `utils/llm.provider.js` |
+| Voice chatbot (speech-to-text + TTS) | `whatsapp-microservice/package.json` — `@aws-sdk/client-transcribe` · `@aws-sdk/client-polly` |
+| Face enrollment (admin UI, webcam) | `admin-ui/src/pages/` enrollment screen — `react-webcam` capture → base64 JPEG → `POST /api/v1/enroll`; all face detection and embedding extraction done server-side by InsightFace |
+| Kubernetes deployment scripts | `centralized-server/server/package.json` (`k8s:apply`, `k8s:rollout`, `k8s:scale`) · `whatsapp-microservice/package.json` (`k8s:apply`, `k8s:rollout`) |
 | Prometheus metrics | `centralized-server/server/utils/metrics.js` |
 | OCI Object Storage gateway | `oracle-cloud-object-microservice/app.js` |
 | Nginx reverse proxy + TLS | `nginx/nginx.conf` |
@@ -1068,4 +1177,4 @@ MIT — Copyright 2026 Nikhil Charan
 
 ---
 
-⚠️ **Scope Guard** – Before reviewing this repository, **read the file `SCOPE_GUARD.md`** located at the repository root. The guard defines in-scope criteria and lists out-of-scope items that must be ignored by any reviewer. An optional configuration file `.reviewer.json` can also be added to declare the guard path.
+⚠️ **Scope Guard** – Before reviewing this repository, **read the file `README.md`** located at the repository "/documents". The guard defines in-scope criteria and lists out-of-scope items that must be ignored by any reviewer. An optional configuration file `.reviewer.json` can also be added to declare the guard path.

@@ -9,7 +9,9 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "k8s:apply": "kubectl apply -f ../../k8s/whatsapp/",
+    "k8s:rollout": "kubectl rollout status deployment/workping-chatbot"
   },
   "repository": {
     "type": "git",
@@ -31,6 +33,8 @@
   },
   "dependencies": {
     "@aws-sdk/client-bedrock-runtime": "^3.1002.0",
+    "@aws-sdk/client-transcribe": "^3.702.0",
+    "@aws-sdk/client-polly": "^3.702.0",
     "axios": "^1.13.2",
     "bcryptjs": "^3.0.2",
     "bullmq": "^5.74.1",

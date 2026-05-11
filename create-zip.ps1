@@ -10,7 +10,7 @@ $dest   = [System.IO.Path]::GetFullPath($Out)
 $excludeDirNames = @(
     'node_modules', '.git', '.gradle', '.idea', '.expo',
     '.cxx', '.kotlin', 'web-build', 'logs', '.claude', '.oci',
-    'dist', '.vscode'
+    'dist', '.vscode', 'bin'
 )
 
 $excludePathPrefixes = @(

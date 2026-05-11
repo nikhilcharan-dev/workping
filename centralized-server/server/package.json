@@ -12,7 +12,10 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "k8s:apply": "kubectl apply -f ../../k8s/api/",
+    "k8s:rollout": "kubectl rollout status deployment/workping-api",
+    "k8s:scale": "kubectl scale deployment/workping-api --replicas=3"
   },
   "author": "",
   "license": "ISC",

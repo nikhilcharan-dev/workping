@@ -2,8 +2,8 @@
 
 ## Mobile Face Capture Screen — Attendance System
 
-> Complete implementation guide for building the real-time face capture and recognition screen
-> that communicates with the Jetson Nano / GPU VM backend (FastAPI + AntelopeV2 + FAISS).
+> Implementation guide for the real-time face capture and recognition screen
+> that communicates with the face-api backend (FastAPI + AntelopeV2 + FAISS).
 
 ---
 
@@ -54,7 +54,7 @@
           │  HTTPS / VPN
           ▼
 ┌─────────────────────────────────────────────────────────┐
-│              JETSON NANO / GPU VM                        │
+│              FACE API SERVER (GPU VM or CPU VM)          │
 │                                                         │
 │  Nginx ──▶ FastAPI ──▶ AntelopeV2 ──▶ FAISS ──▶ Result  │
 │                                                         │
@@ -69,11 +69,11 @@
 | 2 | Mobile | Face detection via on-device ML | 5–10ms |
 | 3 | Mobile | Bounding box crop + JPEG compress | ~2ms |
 | 4 | Network | POST cropped face to `/api/v1/detect` | ~5ms |
-| 5 | Server | AntelopeV2 generates 512-dim embedding | 10–15ms |
+| 5 | Server | AntelopeV2 generates 512-dim embedding | ~10–15ms (GPU) / 2,500–4,000ms (CPU) |
 | 6 | Server | FAISS nearest neighbor search | 1–2ms |
 | 7 | Mobile | Display identity result + confidence | ~1ms |
 
-**Total round-trip: ~25ms** (on local network)
+**Total round-trip: ~25ms with GPU; ~3,000–4,500ms on CPU-only deployment.** The current OCI VMs run CPU inference. See `INFERENCE.md` for full benchmarks.
 
 ---
 
@@ -2325,5 +2325,5 @@ async def health():
 
 ---
 
-*Built for the Mobile-to-Jetson Face Recognition Architecture.*
-*Compatible with Jetson Nano (edge) and GPU VM (cloud) deployments.*
+*Built for the Mobile-to-Server Face Recognition Architecture.*
+*Compatible with CPU-only VMs and GPU-enabled deployments.*

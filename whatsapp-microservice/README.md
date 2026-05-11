@@ -121,6 +121,22 @@ See [DEPLOYMENT.md](DEPLOYMENT.md) for provider-specific variables.
 
 Providers can be switched at runtime via the dashboard or API without restart.
 
+## Voice Pipeline (Foundation — Phase 2)
+
+AWS SDKs for speech-to-text and text-to-speech are installed (`@aws-sdk/client-transcribe`, `@aws-sdk/client-polly`). The planned integration path:
+
+1. Meta WhatsApp Cloud API delivers voice messages as OGG audio attachments
+2. `@aws-sdk/client-transcribe` converts the audio to text (AWS Transcribe streaming)
+3. The transcribed text enters the existing rule-engine → LLM pipeline unchanged
+4. `@aws-sdk/client-polly` synthesizes the text response back to speech
+5. The audio reply is sent via the WhatsApp Cloud API `/messages` endpoint
+
+This makes the existing text-based chatbot voice-capable with no changes to the core intent/response logic.
+
+## Message Queue
+
+BullMQ (`bullmq` package, Redis-backed) decouples Meta webhook receipt from LLM processing. Each inbound message is enqueued immediately so the webhook returns 200 within Meta's timeout window, then a BullMQ worker processes the job asynchronously.
+
 ## Supported Intents
 
 | Intent | Detection | Response |
@@ -140,5 +156,6 @@ Providers can be switched at runtime via the dashboard or API without restart.
 
 ## Documentation
 
-- [ENDPOINTS.md](ENDPOINTS.md) - Complete API reference
-- [DEPLOYMENT.md](DEPLOYMENT.md) - Docker, VM, and provider setup guides
+- [DEPLOYMENT.md](DEPLOYMENT.md) — Docker, VM, and provider setup guides
+- [SERVER.md](SERVER.md) — Backend API contract the bot expects from the core server
+- [CustomLLM.md](CustomLLM.md) — How to connect a custom or self-hosted LLM
