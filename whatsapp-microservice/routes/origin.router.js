@@ -1,4 +1,5 @@
 import { Router } from "express";
+import crypto from "crypto";
 import { sendWhatsAppMessage } from "../whatsapp/sender.js";
 import { startFlow } from "../utils/conversation.state.js";
 import { scheduleShiftReminder, cancelShiftReminder } from "../scheduler/shift.reminder.js";
@@ -10,7 +11,16 @@ if (!API_SECRET) throw new Error("[CONFIG] WHATSAPP_VERIFY_TOKEN env var is requ
 
 function authGuard(req, res, next) {
   const token = req.headers["authorization"];
-  if (token !== API_SECRET) {
+  if (!token) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  try {
+    const tokenBuf = Buffer.from(token);
+    const secretBuf = Buffer.from(API_SECRET);
+    if (tokenBuf.length !== secretBuf.length || !crypto.timingSafeEqual(tokenBuf, secretBuf)) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+  } catch {
     return res.status(401).json({ error: "Unauthorized" });
   }
   next();
@@ -59,13 +69,16 @@ originRouter.post("/send", authGuard, async (req, res) => {
   if (!/^\d{10,15}$/.test(String(to).trim())) {
     return res.status(400).json({ error: "'to' must be a phone number with country code (10-15 digits, no +)" });
   }
+  if (typeof text !== "string" || text.length > 4096) {
+    return res.status(400).json({ error: "'text' must be a string (max 4096 chars)" });
+  }
   try {
     await sendWhatsAppMessage({ to, text });
     console.log("Message sent to:", to);
     res.json({ sent: true, to });
   } catch (err) {
     console.error("Send message failed:", err.message);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: "Failed to send message" });
   }
 });
 

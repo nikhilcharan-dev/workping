@@ -14,7 +14,12 @@ const authorizeManager = (req, res, next) => {
     return next();
   }
 
-  // Managers (and others like teamleads) are restricted to their own organization
+  // Only admin and manager roles are allowed; teamlead, employee, and others are forbidden
+  if (!["admin", "manager"].includes(req.user.role)) {
+    return errorResponse(res, "Forbidden: insufficient role privileges", 403);
+  }
+
+  // Managers are restricted to their own organization
   const userOrgId = req.user.organizationId;
 
   if (!userOrgId) {

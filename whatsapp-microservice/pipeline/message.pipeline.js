@@ -200,6 +200,22 @@ async function process(internalMessage) {
   } catch (error) {
     trackError();
     console.error("[PIPELINE] Failure:", error.message);
+    try {
+      const queue = require("bull");
+      const failedMessagesQueue = new queue("failed-messages", process.env.REDIS_URL || "redis://localhost:6379");
+      await failedMessagesQueue.add(
+        {
+          internalMessage,
+          error: error.message,
+          timestamp: new Date().toISOString(),
+          retryCount: 0,
+        },
+        { attempts: 3, backoff: { type: "exponential", delay: 2000 } }
+      );
+      console.error("[PIPELINE] Message pushed to DLQ for retry:", internalMessage.from);
+    } catch (dlqError) {
+      console.error("[PIPELINE] Failed to push to DLQ:", dlqError.message);
+    }
   }
 }
 

@@ -68,6 +68,7 @@ router.put("/config/:provider", (req, res) => {
 
 // POST /api/dashboard/sync  { "provider": "ollama" | "bedrock" }
 // Writes current runtime config to .env file on disk
+// SECURITY: Only whitelisted configuration keys are allowed (see env.sync.js)
 router.post("/sync", (req, res) => {
   try {
     const provider = req.body.provider || getProvider();
@@ -78,8 +79,9 @@ router.post("/sync", (req, res) => {
     console.log("Config synced to .env for:", provider);
     res.json({ synced: true, provider, keys: Object.keys(envUpdates) });
   } catch (err) {
-    console.error("Sync to disk failed:", err);
-    res.status(500).json({ error: err.message });
+    console.error("Sync to disk failed:", err.message);
+    // Don't expose detailed error messages that might reveal security restrictions
+    res.status(400).json({ error: "Configuration sync failed. Check that all required values are set." });
   }
 });
 

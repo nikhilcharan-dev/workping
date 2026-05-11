@@ -99,8 +99,8 @@ const ORIGIN = process.env.ORIGIN;
 
 const server = express();
 server.use(cors({ origin: ORIGIN, credentials: true }));
-server.use(express.urlencoded({ extended: false }));
-server.use(express.json());
+server.use(express.json({ limit: "10kb" }));
+server.use(express.urlencoded({ extended: false, limit: "10kb" }));
 
 // Request logging
 server.use((req, res, next) => {

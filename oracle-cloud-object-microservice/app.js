@@ -79,7 +79,7 @@ const __dirname = path.dirname(__filename);
 // --- Validate required env vars at startup ---
 // Skipped under NODE_ENV=test because integration tests set these on-the-fly.
 if (process.env.NODE_ENV !== "test") {
-  const REQUIRED_ENV = ["COMPARTMENT_ID", "REGION"];
+  const REQUIRED_ENV = ["COMPARTMENT_ID", "REGION", "API_KEY"];
   for (const key of REQUIRED_ENV) {
     if (!process.env[key]) {
       logger.fatal(`Missing required environment variable: ${key}`);

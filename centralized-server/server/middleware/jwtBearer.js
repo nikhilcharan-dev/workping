@@ -17,7 +17,10 @@ const validateCookie = async (req, res, next) => {
 
     let decoded;
     try {
-      decoded = jwt.verify(token, process.env.SECRET_KEY);
+      // Prevent algorithm confusion attacks by explicitly specifying allowed algorithms
+      decoded = jwt.verify(token, process.env.SECRET_KEY, {
+        algorithms: ['HS256']
+      });
     } catch (err) {
       if (err.name === "TokenExpiredError") {
         return res.status(401).json({ type: "error", message: "Token expired", code: "TOKEN_EXPIRED" });

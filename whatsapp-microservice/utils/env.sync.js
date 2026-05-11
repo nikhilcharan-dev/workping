@@ -18,11 +18,55 @@ function readEnvFile() {
 }
 
 /**
+ * Whitelist of allowed environment variables for .env sync.
+ * Only these keys can be updated via the dashboard.
+ * DO NOT include sensitive keys like credentials, tokens, or secrets.
+ */
+const ALLOWED_ENV_KEYS = new Set([
+  "LLM_PROVIDER",
+  "OLLAMA_BASE_URL",
+  "OLLAMA_MODEL",
+  "BEDROCK_MODEL_ID",
+  "BEDROCK_MODEL_NAME",
+  "AWS_REGION",
+]);
+
+/**
+ * Validate environment variable keys and values.
+ * Prevents injection of sensitive credentials.
+ * @param {Record<string, string>} updates - Key-value pairs to validate
+ * @throws {Error} If validation fails
+ */
+function validateEnvUpdates(updates) {
+  for (const [key, value] of Object.entries(updates)) {
+    // Only allow whitelisted keys
+    if (!ALLOWED_ENV_KEYS.has(key)) {
+      throw new Error(`Environment variable '${key}' is not allowed to be modified via dashboard`);
+    }
+
+    // Validate value is a non-empty string
+    if (typeof value !== "string" || value.trim().length === 0) {
+      throw new Error(`Environment variable '${key}' must be a non-empty string`);
+    }
+
+    // Prevent shell injection by disallowing certain characters
+    if (/[;|&$`\n\r]/.test(value)) {
+      throw new Error(`Environment variable '${key}' contains invalid characters`);
+    }
+  }
+}
+
+/**
  * Update or add key=value pairs in .env file.
  * Preserves comments, ordering, and unrelated lines.
+ * Only allows whitelisted keys for security.
  * @param {Record<string, string>} updates - Key-value pairs to write
+ * @throws {Error} If validation fails
  */
 export function syncToEnv(updates) {
+  // Validate all updates before modifying the file
+  validateEnvUpdates(updates);
+
   const content = readEnvFile();
   const lines = content.split("\n");
   const keysToUpdate = new Set(Object.keys(updates));
@@ -53,6 +97,8 @@ export function syncToEnv(updates) {
   }
 
   writeFileSync(ENV_PATH, newLines.join("\n"), "utf-8");
+  // Log all .env modifications for audit purposes
+  console.log(`[ENV-SYNC-AUDIT] Updated keys: ${Array.from(keysToUpdate).join(", ")}`);
 }
 
 /**

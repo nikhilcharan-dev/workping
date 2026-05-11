@@ -74,7 +74,9 @@ router.post("/verify-reset-password-otp", validateEmail, async (req, res) => {
   try {
     const OTP = await redis.get(`otp:reset:${email}`);
     if (!OTP) return res.status(400).json({ status: "error", error: "OTP expired or not found" });
-    if (OTP !== otp) return res.status(400).json({ status: "error", error: "Invalid OTP" });
+    if (!crypto.timingSafeEqual(Buffer.from(OTP), Buffer.from(String(otp)))) {
+      return res.status(400).json({ status: "error", error: "Invalid OTP" });
+    }
 
     await redis.del(`otp:reset:${email}`);
     return res.status(200).json({
@@ -120,7 +122,7 @@ router.post("/verify-email-otp", validateEmail, async (req, res) => {
         error: "OTP expired or not found",
       });
 
-    if (OTP !== otp)
+    if (!crypto.timingSafeEqual(Buffer.from(OTP), Buffer.from(String(otp))))
       return res.status(400).json({
         status: "error",
         error: "Invalid OTP",

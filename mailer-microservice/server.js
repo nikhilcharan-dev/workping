@@ -81,8 +81,8 @@ const PORT = process.env.PORT || 3000;
 const SECRET = process.env.SECRET;
 const server = express();
 
-server.use(express.json());
-server.use(express.urlencoded({ extended: true }));
+server.use(express.json({ limit: "10kb" }));
+server.use(express.urlencoded({ extended: true, limit: "10kb" }));
 
 /* ─── Liveness probe — bypasses auth, used by load balancers and Docker HEALTHCHECK ─── */
 server.get("/health", (_req, res) => {

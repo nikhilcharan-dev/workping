@@ -4,6 +4,7 @@ import cookieParser from "cookie-parser";
 import helmet from "helmet";
 import { rateLimit } from "express-rate-limit";
 import sanitizeMongo from "#middleware/sanitizeMongo.js";
+import csrf from "csurf";
 
 const MODE = process.env.MODE;
 
@@ -26,10 +27,32 @@ const generalLimiter = rateLimit({
 // Strict limiter — auth, OTP, password reset (brute-force targets)
 export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 10,
+  max: 5,  // Reduced from 10 to 5 per 15 min (one attempt per 3 minutes)
   standardHeaders: "draft-7",
   legacyHeaders: false,
   message: { type: "error", message: "Too many attempts, please try again in 15 minutes." },
+  keyGenerator: (req) => req.body?.email || req.ip,  // Rate limit by email if provided
+});
+
+// OTP rate limiter — strict per email
+export const otpLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  max: 3,  // 3 OTP attempts per 5 minutes
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: { type: "error", message: "Too many OTP attempts, please try again later." },
+  keyGenerator: (req) => req.body?.email || req.ip,
+  skip: (req) => req.path !== '/otp/verify',  // Only limit verification, not sending
+});
+
+// Sensitive operations rate limiter
+export const sensitiveOpLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,  // 10 per minute per user
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: { type: "error", message: "Rate limit exceeded for sensitive operation." },
+  keyGenerator: (req) => req.user?.userId || req.ip,
 });
 
 export default function middlewares(app) {
@@ -42,6 +65,11 @@ export default function middlewares(app) {
         directives: {
           defaultSrc: ["'none'"],
           frameAncestors: ["'none'"],
+          scriptSrc: ["'none'"],
+          styleSrc: ["'none'"],
+          imgSrc: ["'none'"],
+          fontSrc: ["'none'"],
+          connectSrc: ["'self'"],
         },
       },
       crossOriginEmbedderPolicy: false,
@@ -51,6 +79,16 @@ export default function middlewares(app) {
         maxAge: 31536000,
         includeSubDomains: true,
         preload: true,
+      },
+      frameguard: { action: 'deny' },  // Prevent clickjacking
+      noSniff: true,  // Prevent MIME type sniffing
+      xssFilter: true,  // Enable XSS filter
+      permissionsPolicy: {  // Control browser capabilities
+        camera: [],
+        microphone: [],
+        geolocation: [],
+        magnetometer: [],
+        gyroscope: [],
       },
     })
   );
@@ -74,11 +112,26 @@ export default function middlewares(app) {
 
   app.use(cookieParser());
 
+  // CSRF protection for state-changing operations (POST, PUT, DELETE, PATCH)
+  // Use session-based tokens (stored in cookie)
+  const csrfProtection = csrf({ cookie: false });
+
+  // Apply CSRF to state-changing routes only
+  app.post('*', csrfProtection);
+  app.put('*', csrfProtection);
+  app.delete('*', csrfProtection);
+  app.patch('*', csrfProtection);
+
+  // Request logging — reduced to warn/error level only
   app.use((req, res, next) => {
-    console.log(`[Request] [${req.ip}] ${req.method} ${req.url}`);
+    // Log only sensitive operations and errors
+    if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(req.method)) {
+      console.log(`[${req.method}] ${req.path} [${req.ip}]`);
+    }
     if (req.headers["user-agent"]?.includes("PostmanRuntime") && MODE === "production") {
       return res.status(403).json({
-        message: "Axios/Postman is fast, but not fast enough to be a browser.",
+        type: "error",
+        message: "API testing tools not allowed in production",
       });
     }
     next();

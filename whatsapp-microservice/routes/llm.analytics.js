@@ -66,7 +66,8 @@ router.get("/llm/metrics", (req, res) => {
  *   - success: "true" | "false" | null (show failures or successes)
  */
 router.get("/llm/history", (req, res) => {
-  const limit = Math.min(parseInt(req.query.limit) || 100, 500);
+  const parsedLimit = parseInt(req.query.limit, 10);
+  const limit = Math.min(Math.max(1, isNaN(parsedLimit) ? 100 : parsedLimit), 500);
   const { operation, intent, success } = req.query;
 
   const successFilter =

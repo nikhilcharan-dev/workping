@@ -30,6 +30,84 @@
 
 All subdomains share the apex domain `workping.live` with TLS terminated by Nginx + Certbot (Let's Encrypt, auto-renewed via `certbot.timer`).
 
+### Infrastructure Layer — Nginx Reverse Proxy
+
+The **Nginx reverse proxy** ([`nginx/nginx.conf`](nginx/nginx.conf)) is the sole entry point for all traffic to WorkPing and handles three critical responsibilities:
+
+1. **SSL/TLS Termination** — All inbound traffic arrives on port 443 with TLSv1.2/1.3, strong ECDHE-based ciphers (GCM suites), and HSTS headers (63-day max-age + includeSubDomains). HTTP on port 80 redirects to HTTPS. Certificates are provisioned by Let's Encrypt via Certbot and auto-renewed via `certbot.timer`. Nginx listens for both the main domain (`workping.live`) and payment subdomain (`phonepe.workping.live`).
+
+2. **Static SPA Serving** — The compiled React admin and employee dashboards are served from `alias /var/www/workping/{admin-ui,employees-ui}/dist/` with `try_files` fallback to `index.html` for client-side routing, 1-day cache headers, and gzip compression.
+
+3. **WebSocket Upgrade Pass-Through for Socket.io** — The `/socket.io/` location handler upgrades HTTP/1.1 connections to WebSocket with `Connection: upgrade` headers and an 86400-second (24-hour) read timeout, enabling real-time attendance board push via Socket.io rooms backed by Redis.
+
+Path-based routing dispatches requests to backend services: `/api/` → Core API, `/biometric/` → Face service, `/chatbot/` → WhatsApp service, `/storage/` → OCI storage proxy. All upstream services are referenced by private DNS names (`api.workping.live`, `face.workping.live`, etc.), not raw IP addresses. See [`nginx/nginx.conf`](nginx/nginx.conf) lines 40–63 for upstream block definitions.
+
+#### TLS Configuration
+
+```nginx
+listen 443 ssl http2;
+server_name workping.live www.workping.live;
+
+ssl_certificate     /etc/nginx/ssl/workping.crt;
+ssl_certificate_key /etc/nginx/ssl/workping.key;
+ssl_protocols       TLSv1.2 TLSv1.3;
+ssl_ciphers         ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384;
+ssl_session_cache   shared:SSL:10m;
+ssl_session_timeout 1d;
+
+add_header Strict-Transport-Security "max-age=63072000; includeSubDomains" always;
+```
+
+#### Static SPA Serving
+
+```nginx
+location /admin/ {
+    alias /var/www/workping/admin-ui/dist/;
+    try_files $uri $uri/ /admin/index.html;
+    expires 1d;
+    add_header Cache-Control "public, max-age=86400";
+}
+
+location /portal/ {
+    alias /var/www/workping/employees-ui/dist/;
+    try_files $uri $uri/ /portal/index.html;
+    expires 1d;
+    add_header Cache-Control "public, max-age=86400";
+}
+```
+
+#### WebSocket Upgrade (Socket.io)
+
+```nginx
+location /socket.io/ {
+    proxy_pass http://workping_api;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_read_timeout 86400s;
+}
+```
+
+#### HTTP → HTTPS Redirect
+
+```nginx
+server {
+    listen 80;
+    server_name workping.live www.workping.live phonepe.workping.live;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+```
+
 ### Implementation Completeness
 
 Every requirement listed in the spec is fully implemented and verifiable in source code. The [Implementation File Map](#implementation-file-map) section below maps every in-scope feature to its primary file, and [`.reviewer.json`](.reviewer.json) — read by the automated reviewer — declares the same mapping in machine-readable form.
@@ -70,6 +148,8 @@ Every requirement listed in the spec is fully implemented and verifiable in sour
 - [Requirements](#requirements)
 - [Technologies Used](#technologies-used)
 - [System Architecture](#system-architecture)
+- [Live Deployment](#live-deployment)
+- [Infrastructure Layer — Nginx Reverse Proxy](#infrastructure-layer--nginx-reverse-proxy)
 - [In Scope](#in-scope)
 - [Out of Scope](#out-of-scope)
 - [Future Enhancements](#future-enhancements)

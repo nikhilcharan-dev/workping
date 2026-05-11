@@ -317,11 +317,18 @@ async def inference_worker():
     redis = _get_redis()
     col = get_embeddings_collection()
     print("Inference Worker loop started!")
+    consecutive_errors = 0
+    max_consecutive_errors = 10
+    error_backoff = 1.0
+    max_backoff = 60.0
+
     while True:
         ticket_id = None
         try:
             item = await redis.blpop("face_tasks_queue", timeout=1)
             if not item:
+                if consecutive_errors > 0:
+                    consecutive_errors = max(0, consecutive_errors - 1)
                 continue
 
             _, payload_str = item
@@ -329,11 +336,11 @@ async def inference_worker():
             ticket_id = payload["ticket_id"]
             user_id = payload["user_id"]
             org_id = payload["organization_id"]
-            
+
             await redis.setex(f"ticket:{ticket_id}", 300, json.dumps({"status": "processing"}))
-            
+
             start_total = time.time()
-            
+
             user_emb_key = f"face:user_emb:{user_id}"
             cached_emb = await redis.get(user_emb_key)
             if cached_emb:
@@ -355,16 +362,16 @@ async def inference_worker():
 
                 loop = asyncio.get_running_loop()
                 inf_res = await loop.run_in_executor(executor, do_inference, image_bytes, db_emb, org_id, user_id)
-                
+
                 success = inf_res["success"]
                 score = inf_res["score"]
                 matched_id = inf_res["matched_id"]
-                
+
                 total_time = (time.time() - start_total) * 1000
-                
+
                 entry = stats.add_entry(matched_id, score, total_time, success)
                 await manager.broadcast({"type": "NEW_ENTRY", "data": entry, "analytics": stats.get_analytics()})
-                
+
                 result = {
                     "success": success,
                     "person": {"id": matched_id, "name": matched_id, "department": "Engineering"} if success else None,
@@ -378,16 +385,25 @@ async def inference_worker():
                 "status": "completed",
                 "result": result
             }))
+            consecutive_errors = 0
+            error_backoff = 1.0
         except asyncio.CancelledError:
             break
         except Exception as e:
-            print(f"Inference Worker Error: {e}")
+            consecutive_errors += 1
+            print(f"[InferenceWorker] Error #{consecutive_errors}: {e}")
             if ticket_id:
                 try:
                     await redis.setex(f"ticket:{ticket_id}", 300, json.dumps({"status": "failed", "error": str(e)}))
-                except:
-                    pass
-            await asyncio.sleep(1)
+                except Exception as redis_err:
+                    print(f"[InferenceWorker] Failed to update ticket status: {redis_err}")
+
+            if consecutive_errors >= max_consecutive_errors:
+                print(f"[InferenceWorker] CIRCUIT_BREAKER: {consecutive_errors} consecutive errors. Pausing for {max_backoff}s.")
+                await asyncio.sleep(max_backoff)
+            else:
+                await asyncio.sleep(error_backoff)
+                error_backoff = min(max_backoff, error_backoff * 2.0)
 
 @app.on_event("startup")
 async def startup_event():
@@ -442,7 +458,7 @@ def validate_image_b64(image_b64: str) -> bytes:
 
 
 async def check_rate_limit(user_id: str):
-    """Redis sliding-window rate limit per user_id. Falls back to in-memory limiter if Redis unavailable. Raises 429 when exceeded."""
+    """Redis sliding-window rate limit per user_id. Fails closed if Redis unavailable. Raises 429 when exceeded."""
     global rate_limit_redis_failures
     redis = _get_redis()
     key = f"rl:detect:{user_id}"
@@ -459,13 +475,11 @@ async def check_rate_limit(user_id: str):
         raise
     except Exception as e:
         rate_limit_redis_failures += 1
-        print(f"[RateLimit] Redis unavailable (attempt {rate_limit_redis_failures}): {e}. Using in-memory fallback for user {user_id}.")
-        # Fail-closed: use in-memory limiter as fallback (stricter, per-instance)
-        if not memory_limiter.is_allowed(user_id, RATE_LIMIT_REQUESTS):
-            raise HTTPException(
-                status_code=429,
-                detail=f"Rate limit exceeded (failover mode): max {RATE_LIMIT_REQUESTS} requests per {RATE_LIMIT_WINDOW_SECONDS}s",
-            )
+        print(f"[RateLimit] CRITICAL: Redis unavailable (attempt {rate_limit_redis_failures}): {e}. Denying request for user {user_id} to maintain rate limit integrity.")
+        raise HTTPException(
+            status_code=503,
+            detail="Rate limit service temporarily unavailable — request denied to maintain integrity",
+        )
 
 
 # ---------------- HELPERS ----------------
@@ -592,18 +606,40 @@ async def get_embedding_status(employee_id: str):
 @app.delete("/api/v1/embeddings/{employee_id}")
 async def delete_embedding(employee_id: str):
     """Remove a face embedding from MongoDB and invalidate the org's cache.
-    Rebuilds the FAISS index for the org."""
+    Rebuilds the FAISS index for the org.
+
+    Atomic deletion: marks embedding as 'deleting' before physical deletion to survive server crashes.
+    """
     col = get_embeddings_collection()
-    doc = await col.find_one_and_delete({"employee_id": employee_id})
-    if doc:
-        org_id = doc["organization_id"]
+    doc = await col.find_one({"employee_id": employee_id})
+    if not doc:
+        return {"success": True, "deleted_employee_id": employee_id}
+
+    org_id = doc["organization_id"]
+
+    await col.update_one(
+        {"employee_id": employee_id},
+        {"$set": {"status": "deleting"}}
+    )
+
+    try:
+        await col.find_one_and_delete({"employee_id": employee_id})
         await bust_cache(org_id, employee_id)
+
         records = await col.find(
-            {"organization_id": org_id},
+            {"organization_id": org_id, "status": {"$ne": "deleting"}},
             {"_id": 0, "employee_id": 1, "embedding": 1}
         ).to_list(length=None)
         faiss_index.rebuild(org_id, records)
         faiss_index.save(org_id)
+    except Exception as e:
+        print(f"[DeleteEmbedding] Error during deletion for {employee_id}: {e}. Reverting 'deleting' status.")
+        await col.update_one(
+            {"employee_id": employee_id},
+            {"$unset": {"status": ""}}
+        )
+        raise HTTPException(status_code=500, detail=f"Deletion failed: {e}")
+
     return {"success": True, "deleted_employee_id": employee_id}
 
 

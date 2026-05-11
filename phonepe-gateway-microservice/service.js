@@ -86,8 +86,14 @@ const allowedOrigins = [
 
 app.use(
   cors({
-    origin: (origin, cb) =>
-      !origin || allowedOrigins.includes(origin) ? cb(null, true) : cb(new Error("CORS blocked")),
+    origin: (origin, cb) => {
+      // Require origin to be present and in the allowlist (no null origin allowed)
+      if (origin && allowedOrigins.includes(origin)) {
+        cb(null, true);
+      } else {
+        cb(new Error("CORS not allowed"));
+      }
+    },
     credentials: true,
   })
 );
@@ -113,8 +119,8 @@ const paymentLimiter = rateLimit({
 app.use(generalLimiter);
 
 // --- Body parsing ---
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
+app.use(express.json({ limit: "10kb" }));
+app.use(express.urlencoded({ extended: false, limit: "10kb" }));
 
 // --- Health check (before auth) ---
 app.get("/health", (req, res) => {
@@ -130,7 +136,7 @@ app.post("/api/payments/phonepe/callback", phonepeCallback);
 // --- Global Error Handler ---
 app.use((err, req, res, next) => {
   const status = err.statusCode || 500;
-  const message = status === 500 ? "Internal Server Error" : err.message;
+  const clientMessage = status === 500 ? "Internal Server Error" : err.message;
 
   console.error({
     level: "error",
@@ -143,7 +149,7 @@ app.use((err, req, res, next) => {
 
   res.status(status).json({
     success: false,
-    error: message,
+    error: clientMessage,
   });
 });
 

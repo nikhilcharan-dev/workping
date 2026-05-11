@@ -27,8 +27,6 @@ export const createController = (config) => {
 
         await saveSecret(userId, secret.base32);
 
-        console.log(secret.base32);
-
         res.json({
           message: "2FA setup initiated",
           secret: secret.base32, // Optional: for manual entry
@@ -50,7 +48,6 @@ export const createController = (config) => {
         }
 
         const secret = await getSecret(id);
-        console.log(`DEBUG: Verifying user ${id}, secret found: ${!!secret}, token: ${token}`);
 
         // GENERIC ERROR: Don't reveal if user exists or has 2FA specific error
         // Unless we really want to, but security audit said no.

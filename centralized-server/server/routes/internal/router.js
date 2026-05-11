@@ -1,4 +1,5 @@
 import { Router } from "express";
+import crypto from "crypto";
 import {
   getEmployeeByPhone,
   getAttendanceToday,
@@ -19,7 +20,16 @@ const router = Router();
 // Shared-secret guard — all internal routes require x-internal-secret
 router.use((req, res, next) => {
   const secret = req.headers["x-internal-secret"];
-  if (!secret || secret !== process.env.INTERNAL_SECRET) {
+  if (!secret) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  try {
+    const secretBuf = Buffer.from(secret);
+    const expectedBuf = Buffer.from(process.env.INTERNAL_SECRET || "");
+    if (secretBuf.length !== expectedBuf.length || !crypto.timingSafeEqual(secretBuf, expectedBuf)) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+  } catch {
     return res.status(401).json({ error: "Unauthorized" });
   }
   next();
