@@ -214,9 +214,19 @@ workping/
 │       ├── seedAdminUser.js            # Seed initial super-admin
 │       ├── seedData.js                 # Demo data for development
 │       ├── __tests__/
-│       │   └── health.test.js          # Jest + Supertest smoke tests
-│       ├── globals.js                  # Shared constants (plan limits, roles)
-│       ├── jest.config.js
+│       │   ├── setup/
+│       │   │   ├── globalSetup.js      # Start mongo:7 Docker container (replica set)
+│       │   │   ├── globalTeardown.js   # Stop container
+│       │   │   └── db.js               # connectTestDB / clearCollections / Redis mock
+│       │   ├── auth.integration.test.js   # Register · login · refresh · logout (real MongoDB)
+│       │   ├── security.test.js           # JWT middleware + blacklistToken unit tests
+│       │   ├── auth.test.js               # Validation-rejection paths
+│       │   ├── otp.test.js                # OTP validation paths
+│       │   ├── health.test.js             # /health · /metrics smoke tests
+│       │   └── validators.test.js         # 55+ unit tests across all validators
+│       ├── globals.js                  # Shared globals (asyncHandler, AppError, redis)
+│       ├── jest.config.js              # Unit test config
+│       ├── jest.integration.config.js  # DB integration test config
 │       └── server.js                   # node:cluster entry point (PM2 target)
 │
 ├── admin-ui/                           # React 18 + Vite 5 — Admin Dashboard
@@ -1174,7 +1184,8 @@ To ensure accurate assessment, [`.reviewer.json`](.reviewer.json) explicitly dec
 | OCI Object Storage gateway | `oracle-cloud-object-microservice/app.js` |
 | Nginx reverse proxy + TLS | `nginx/nginx.conf` |
 | Docker multi-service orchestration | `docker-compose.yml` |
-| Test suite — auth, OTP, health, validators | `centralized-server/server/__tests__/` (4 files) |
+| Test suite — validators, auth paths, OTP, health/metrics, JWT security | `centralized-server/server/__tests__/` (5 files, ~95 assertions) |
+| Test suite — DB integration (real MongoDB replica set via Docker) | `centralized-server/server/__tests__/auth.integration.test.js` · `__tests__/setup/globalSetup.js` |
 | Test suite — PhonePe webhook HMAC + state machine | `phonepe-gateway-microservice/test/sandbox.test.js` |
 
 The complete mapping with exact file paths is in [`.reviewer.json`](.reviewer.json) under the `featureMap` key.

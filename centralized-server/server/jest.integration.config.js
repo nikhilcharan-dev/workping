@@ -1,0 +1,21 @@
+export default {
+  transform: {},
+  testEnvironment: "node",
+  testMatch: ["**/__tests__/**/*.integration.test.js"],
+  globalSetup: "<rootDir>/__tests__/setup/globalSetup.js",
+  globalTeardown: "<rootDir>/__tests__/setup/globalTeardown.js",
+  testTimeout: 60000,
+  moduleNameMapper: {
+    "^#models/(.*)$": "<rootDir>/models/$1",
+    "^#utils/(.*)$": "<rootDir>/utils/$1",
+    "^#config/(.*)$": "<rootDir>/config/$1",
+    "^#middleware/(.*)$": "<rootDir>/middleware/$1",
+    "^#services/(.*)$": "<rootDir>/services/$1",
+    "^#webController/(.*)$": "<rootDir>/controllers/web/$1",
+    "^#webRoutes/(.*)$": "<rootDir>/routes/web/$1",
+    "^#appController/(.*)$": "<rootDir>/controllers/app/$1",
+    "^#appRoutes/(.*)$": "<rootDir>/routes/app/$1",
+    "^#helpers/(.*)$": "<rootDir>/helpers/$1",
+    "^#adminHelper/(.*)$": "<rootDir>/helpers/admin/$1",
+  },
+};

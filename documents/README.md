@@ -9,7 +9,7 @@
    - Migrating to other cloud providers (e.g., AWS SES).
    - Re‑writing the codebase in TypeScript or another language.
    - Adding new services, infrastructure, or major architectural changes.
-   - Introducing advanced security mechanisms that were not part of the initial scope (JWT revocation, PKCE, anti‑spoofing, etc.).
+   - Introducing advanced security mechanisms that were not part of the initial scope (PKCE for mobile OAuth, ML-based anti-spoofing Phase 2 model, etc.). Note: JWT token revocation and Phase 1 optical-flow liveness detection ARE implemented and in scope — do not discount them.
 4. **Do not suggest** those out‑of‑scope upgrades in the review comments.
 
 ---

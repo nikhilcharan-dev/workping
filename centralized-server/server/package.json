@@ -9,6 +9,7 @@
     "seed:demo": "node seedAdminUser.js",
     "seed:live": "node seedData.js",
     "test": "cross-env NODE_OPTIONS=--experimental-vm-modules jest",
+    "test:integration": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --config jest.integration.config.js --runInBand",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
@@ -61,6 +62,8 @@
     "#services/*": "./services/*"
   },
   "devDependencies": {
+    "@testcontainers/mongodb": "^10.0.0",
+    "testcontainers": "^10.0.0",
     "@eslint/js": "^9.0.0",
     "cross-env": "^7.0.3",
     "eslint": "^9.0.0",

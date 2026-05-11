@@ -15,7 +15,7 @@ The central Express.js API server for WorkPing. Handles authentication, employee
 - **File uploads**: Multer (profile images, bulk employee Excel import via XLSX)
 - **Security**: helmet · express-rate-limit (200 req/15 min global, 10 req/15 min auth/OTP)
 - **Observability**: prom-client (Prometheus metrics) · Winston (structured logging)
-- **Testing**: Jest · Supertest (integration tests in `__tests__/`)
+- **Testing**: Jest · Supertest · `@testcontainers/mongodb` (containerised MongoDB replica set for DB integration tests)
 
 ## Getting Started
 
@@ -55,8 +55,20 @@ server/
 ├── services/      # Business logic (subscriptions, shift reminders)
 ├── utils/         # Shared utilities
 ├── helpers/       # Formatting, date helpers
-├── scripts/       # Seed scripts
-└── server.js      # Entry point (cluster bootstrap)
+├── __tests__/
+│   ├── setup/
+│   │   ├── globalSetup.js    # Start mongo:7 Docker container (replica set)
+│   │   ├── globalTeardown.js # Stop container
+│   │   └── db.js             # connectTestDB / clearCollections / Redis mock
+│   ├── auth.integration.test.js  # Register · login · refresh · logout (real MongoDB)
+│   ├── security.test.js          # JWT middleware · blacklistToken / isTokenBlacklisted unit
+│   ├── auth.test.js              # Validation-rejection paths (no DB)
+│   ├── otp.test.js               # OTP validation paths (no DB)
+│   ├── health.test.js            # /health · /metrics smoke tests
+│   └── validators.test.js        # 55+ unit tests across all validator functions
+├── jest.config.js              # Unit + security tests
+├── jest.integration.config.js  # DB integration tests (@testcontainers/mongodb)
+└── server.js                   # Entry point (cluster bootstrap)
 ```
 
 ## API Overview
@@ -74,6 +86,33 @@ server/
 | `GET/POST /user/attendance` | Employee check-in/out |
 | `GET/POST /user/leaves` | Leave requests |
 | `GET /user/profile` | Employee profile |
+
+## Testing
+
+### Unit + security tests (no database required)
+```bash
+npm test
+```
+
+Covers: validator functions, auth route rejection paths, OTP validation, health/metrics endpoints, JWT middleware rejection paths, `blacklistToken` / `isTokenBlacklisted` unit tests with mocked Redis.
+
+### DB integration tests (requires Docker)
+```bash
+npm run test:integration
+```
+
+Spins up a `mongo:7` Docker container with a single-node replica set (required for Mongoose transactions used in `register`). Redis is replaced with an in-memory mock. Tests the full auth lifecycle against a real database:
+
+| Test | What is verified |
+|---|---|
+| `register` → 201 | Admin + Account created atomically in a MongoDB transaction; tokens in response |
+| `register` duplicate email → 409 | Unique index on `email` enforced |
+| `login` valid credentials → 200 | bcrypt compare + token pair generation |
+| `login` wrong password → 401 | Credential rejection |
+| `login` unknown email → 401 | Account lookup failure |
+| Token → `GET /verify-cookie` → 200 | JWT + DB round-trip; role in response |
+| Refresh token rotation | New pair issued; same token rejected on second use |
+| Logout → token blacklisted | Subsequent request returns `TOKEN_REVOKED` |
 
 ## Scripts
 

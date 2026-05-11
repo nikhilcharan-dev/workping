@@ -98,6 +98,11 @@
       ],
       "tests_jwt_revocation_blacklist_unit": [
         "centralized-server/server/__tests__/security.test.js"
+      ],
+      "tests_auth_integration_real_mongodb": [
+        "centralized-server/server/__tests__/auth.integration.test.js",
+        "centralized-server/server/__tests__/setup/db.js",
+        "centralized-server/server/__tests__/setup/globalSetup.js"
       ]
     },
     "include": [
@@ -132,7 +137,10 @@
       "centralized-server/server/__tests__/health.test.js",
       "centralized-server/server/__tests__/validators.test.js",
       "phonepe-gateway-microservice/test/sandbox.test.js",
-      "centralized-server/server/__tests__/security.test.js"
+      "centralized-server/server/__tests__/security.test.js",
+      "centralized-server/server/__tests__/auth.integration.test.js",
+      "centralized-server/server/__tests__/setup/globalSetup.js",
+      "centralized-server/server/__tests__/setup/db.js"
     ]
   }
 }
