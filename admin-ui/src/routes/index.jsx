@@ -15,13 +15,6 @@ const NotFound = lazy(() => import('@/app/(other)/(error-pages)/error-404/page')
 const Maintenance = lazy(() => import('@/app/(other)/maintenance/page'))
 const ComingSoon = lazy(() => import('@/app/(other)/coming-soon/page'))
 
-// Profile & billing
-const Welcome = lazy(() => import('@/app/(admin)/pages/welcome/page'))
-const FAQs = lazy(() => import('@/app/(admin)/pages/faqs/page'))
-const Profile = lazy(() => import('@/app/(admin)/pages/profile/page'))
-const Pricing = lazy(() => import('@/app/(admin)/pages/pricing/page'))
-const Billing = lazy(() => import('@/app/(admin)/pages/billing/page'))
-
 // Teams (Departments)
 const AddTeams = lazy(() => import('@/pages/Teams(Department)/EditTeams/AddTeams/AddTeams'))
 const UpdateTeams = lazy(() => import('@/pages/Teams(Department)/EditTeams/UpdateTeams/Update/UpdateTeams'))
@@ -53,9 +46,6 @@ const ProjectTeamMembers = lazy(() => import('@/pages/Projects/ViewProject-Teams
 const TwoFactorAuthCard = lazy(() => import('@/pages/TwoFactorAuthentication/TwoFactorAuthentication'))
 const QrCodeAuthentication = lazy(() => import('@/pages/TwoFactorAuthentication/QrcodeAuthentication'))
 
-// Team member utility
-const ButtonPage = lazy(() => import('@/pages/teamMember/ButtonPage'))
-
 // Holidays
 const ViewHolidays = lazy(() => import('@/pages/Holidays/ViewHolidays'))
 const ManageHolidays = lazy(() => import('@/pages/Holidays/ManageHolidays'))
@@ -72,10 +62,6 @@ const AttendanceAnalytics = lazy(() => import('@/pages/Attendance/Analytics/Atte
 const LeaveApproval = lazy(() => import('@/pages/Attendance/LeaveApproval/LeaveApproval'))
 const MyLeaveRequests = lazy(() => import('@/pages/Attendance/MyLeaveRequests/MyLeaveRequests'))
 const AttendanceRecords = lazy(() => import('@/pages/Attendance/Records/AttendanceRecords'))
-
-// Payment / order flow
-const PhonePeTest = lazy(() => import('@/pages/test/PhonePeTest'))
-const OrderStatus = lazy(() => import('@/pages/order/OrderStatus'))
 
 // Public pages
 const PrivacyPolicy = lazy(() => import('@/pages/public/PrivacyPolicy/page'))
@@ -97,14 +83,6 @@ export const authRoutes = [
 ]
 
 const dashboardRoutes = [{ path: '/dashboard/analytics', name: 'Analytics', element: <Analytics /> }]
-
-const pagesRoutes = [
-  { path: '/pages/welcome', name: 'Welcome', element: <Welcome /> },
-  { path: '/pages/faqs', name: 'FAQs', element: <FAQs /> },
-  { path: '/pages/profile', name: 'Profile', element: <Profile /> },
-  { path: '/pages/pricing', name: 'Pricing', element: <Pricing /> },
-  { path: '/pages/billing', name: 'Billing', element: <Billing /> },
-]
 
 const teamsRoutes = [
   { path: '/teams/edit-teams/add-teams', name: 'Teams', element: <AddTeams /> },
@@ -140,7 +118,6 @@ const projectsRoutes = [
 const twoFactorAuthRoutes = [
   { path: '/two-factor-auth', name: 'TwoFactorAuthCard', element: <TwoFactorAuthCard /> },
   { path: '/2fa-authnticator', name: 'QrCodeAuthentication', element: <QrCodeAuthentication /> },
-  { path: '/button-page', name: 'Button-page', element: <ButtonPage /> },
 ]
 
 const holidaysRoutes = [
@@ -163,11 +140,6 @@ const analyticsRoutes = [
   { path: '/holidays/analytics', name: 'HolidaysAnalytics', element: <HolidaysAnalytics /> },
 ]
 
-const paymentRoutes = [
-  { path: '/test/phonepe', name: 'PhonePe Test', element: <PhonePeTest /> },
-  { path: '/order/:orderId', name: 'Order Status', element: <OrderStatus /> },
-]
-
 export const publicRoutes = [
   { path: '/', name: 'Home', element: <HomePublic /> },
   { path: '/home', name: 'Home Redirect', element: <Navigate to="/" replace /> },
@@ -180,7 +152,6 @@ export const publicRoutes = [
 export const appRoutes = [
   { path: '/', name: 'root', element: <Navigate to="/dashboard/analytics" /> },
   ...dashboardRoutes,
-  ...pagesRoutes,
   ...authRoutes,
   ...teamsRoutes,
   ...organizationRoutes,
@@ -190,5 +161,4 @@ export const appRoutes = [
   ...holidaysRoutes,
   ...attendanceRoutes,
   ...analyticsRoutes,
-  ...paymentRoutes,
 ]

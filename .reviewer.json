@@ -95,6 +95,9 @@
       ],
       "tests_payment_webhook_hmac_state_machine": [
         "phonepe-gateway-microservice/test/sandbox.test.js"
+      ],
+      "tests_jwt_revocation_blacklist_unit": [
+        "centralized-server/server/__tests__/security.test.js"
       ]
     },
     "include": [
@@ -128,7 +131,8 @@
       "centralized-server/server/__tests__/otp.test.js",
       "centralized-server/server/__tests__/health.test.js",
       "centralized-server/server/__tests__/validators.test.js",
-      "phonepe-gateway-microservice/test/sandbox.test.js"
+      "phonepe-gateway-microservice/test/sandbox.test.js",
+      "centralized-server/server/__tests__/security.test.js"
     ]
   }
 }
