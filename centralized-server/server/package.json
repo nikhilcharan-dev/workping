@@ -34,7 +34,7 @@
     "jsonwebtoken": "^9.0.3",
     "lodash": "^4.17.23",
     "module-alias": "^2.2.3",
-    "mongoose": "^8.17.0",
+    "mongoose": "^9.6.2",
     "morgan": "^1.10.1",
     "multer": "^2.0.2",
     "node-cron": "^4.2.1",
