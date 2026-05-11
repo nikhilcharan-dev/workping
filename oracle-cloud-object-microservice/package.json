@@ -40,7 +40,7 @@
     "supertest": "^7.0.0"
   },
   "dependencies": {
-    "content-disposition": "^1.0.1",
+    "content-disposition": "^2.0.0",
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
