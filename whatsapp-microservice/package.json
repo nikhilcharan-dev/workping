@@ -32,7 +32,7 @@
     "prettier": "^3.0.0"
   },
   "dependencies": {
-    "@aws-sdk/client-bedrock-runtime": "^3.1002.0",
+    "@aws-sdk/client-bedrock-runtime": "^3.1045.0",
     "@aws-sdk/client-transcribe": "^3.702.0",
     "@aws-sdk/client-polly": "^3.702.0",
     "axios": "^1.13.2",
