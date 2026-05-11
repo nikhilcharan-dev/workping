@@ -59,7 +59,15 @@ export default function middlewares(app) {
 
   app.use(generalLimiter);
 
-  app.use(express.json({ limit: "10kb" }));
+  app.use(
+    express.json({
+      limit: "10kb",
+      verify: (req, _res, buf) => {
+        // Preserve raw bytes for HMAC signature verification (PhonePe webhook)
+        req.rawBody = buf;
+      },
+    })
+  );
   app.use(express.urlencoded({ extended: true, limit: "10kb" }));
 
   app.use(sanitizeMongo);

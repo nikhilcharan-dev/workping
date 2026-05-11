@@ -1,5 +1,6 @@
 import { chat } from "../utils/llm.provider.js";
 import { getHistory } from "../utils/conversation.state.js";
+import { getObservabilityTracker, LLMMetrics } from "../utils/llm.observability.js";
 
 const RESPONSE_SYSTEM_PROMPT = `You are a warm, friendly, and conversational employee self-service WhatsApp assistant named *WorkPing Assistant*. You work for a company called WorkPing.
 
@@ -60,14 +61,61 @@ const INTENT_GUIDANCE = {
     "The intent wasn't clear. Don't say 'I don't understand' robotically. Instead, try to engage — gently ask what they need help with, maybe suggest a couple of things you're good at. Be warm, not dismissive.",
 };
 
-export async function generateLLMResponse(strategy, context, internalMessage) {
+export async function generateLLMResponse(
+  strategy,
+  context,
+  internalMessage,
+  { organizationId = "default" } = {}
+) {
+  const startTime = Date.now();
+  let success = false;
+  let error = null;
+
   try {
     const history = await getHistory(internalMessage.from);
     const messages = buildMessages(context, internalMessage, history);
     const response = await chat(messages, { temperature: 0.7, maxTokens: 300 });
+    const latencyMs = Date.now() - startTime;
+
+    // Record success metric
+    success = true;
+    const tracker = getObservabilityTracker();
+    tracker.record(
+      new LLMMetrics({
+        operation: "response",
+        intent: context.intent?.intent || "UNKNOWN",
+        confidence: context.intent?.confidence || 0.5,
+        latency_ms: latencyMs,
+        success,
+        provider: process.env.LLM_PROVIDER || "ollama",
+        organization_id: organizationId,
+        user_id: internalMessage.from,
+      })
+    );
+
     return response;
   } catch (err) {
-    console.error("[LLM-GEN] Failed:", err.message);
+    const latencyMs = Date.now() - startTime;
+    error = err.message;
+
+    console.error("[LLM-GEN] Failed:", error);
+
+    // Record failure metric
+    const tracker = getObservabilityTracker();
+    tracker.record(
+      new LLMMetrics({
+        operation: "response",
+        intent: context.intent?.intent || "UNKNOWN",
+        confidence: context.intent?.confidence || 0.5,
+        latency_ms: latencyMs,
+        success: false,
+        provider: process.env.LLM_PROVIDER || "ollama",
+        organization_id: organizationId,
+        user_id: internalMessage.from,
+        error,
+      })
+    );
+
     return "I'm having trouble processing your request right now. Please try again in a moment, or type *help* to see what I can assist you with.";
   }
 }

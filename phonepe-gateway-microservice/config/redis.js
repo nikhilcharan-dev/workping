@@ -13,6 +13,8 @@ const redis = createClient({
 redis.on("error", (err) => console.error("[PhonePe Redis] Error:", err));
 redis.on("ready", () => console.log("[PhonePe Redis] Ready"));
 
-await redis.connect();
+if (process.env.NODE_ENV !== "test") {
+  await redis.connect();
+}
 
 export default redis;

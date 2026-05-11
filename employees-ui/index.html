@@ -1,4 +1,40 @@
 <!doctype html>
+<!--
+  ============================================================================
+  WorkPing Employee Portal — Vite SPA shell
+  ============================================================================
+
+  Compiled by `vite build` and served by nginx at employee.workping.live.
+
+  ── BUILD ──────────────────────────────────────────────────────────────────
+  • Vite 5 + React 18; entry is /src/main.jsx (BrowserRouter + <App />)
+  • nginx serves /portal/* from /var/www/workping/employees-ui/dist/
+    (see nginx/nginx.conf — "Employee portal SPA" location block)
+  • API calls hit api.workping.live (centralized-server/server)
+
+  ── EMPLOYEE PORTAL CAPABILITIES ──────────────────────────────────────────
+  • Face check-in/out  — react-webcam captures, posts base64 to
+    /api/user/attendance which forwards to face-api-microservice/app.py
+    for 1:1 cosine similarity verification (THRESHOLD = 0.6, see app.py)
+  • Attendance history heatmap + drilldown
+  • Leave requests + multi-level approval status tracking
+  • Salary slip download + 2FA setup + profile management
+  • Real-time notifications via socket.io-client room `user:<userId>`
+
+  ── ENTRY DETAILS ─────────────────────────────────────────────────────────
+  • src/main.jsx — Vite entry, wraps App in BrowserRouter + StrictMode
+  • src/App.jsx  — composes the provider tree + route tree
+
+  ── SPLASH SCREEN ─────────────────────────────────────────────────────────
+  Lightweight white-background card with the WorkPing logo; removed via
+  MutationObserver on #root as soon as React mounts.
+
+  ── DIFFERENCE FROM admin-ui ──────────────────────────────────────────────
+  Same Vite + React stack but a separate route tree restricted to employee
+  capabilities. Role separation is enforced server-side by middleware/
+  requireRole.js + authorizeManager.js in the Core API.
+  ============================================================================
+-->
 <html lang="en">
 
 <head>

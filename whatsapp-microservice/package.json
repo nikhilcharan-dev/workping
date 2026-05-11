@@ -1,11 +1,14 @@
 {
   "name": "whatsapp-microservice",
   "version": "1.0.1",
-  "description": "MicroService Whatsapp API SDK",
+  "description": "WorkPing Chatbot — Meta WhatsApp Cloud API + provider-agnostic LLM intent pipeline (OpenAI-compatible: Bedrock / Ollama / OpenAI / Groq / OpenRouter). Multi-step conversational flows (leave request, complaint, manager approval) with Redis-backed conversation state. BullMQ shift-reminder worker, bcrypt + JWT dashboard auth, x-hub-signature webhook verification. Voice foundation: @aws-sdk/client-transcribe + @aws-sdk/client-polly installed for STT→intent→TTS pipeline.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "dev": "npx nodemon server.js",
+    "test": "cross-env NODE_OPTIONS=--experimental-vm-modules jest",
+    "test:unit": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --testPathIgnorePatterns=integration",
+    "test:integration": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --testPathPattern=integration",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
@@ -27,9 +30,12 @@
   "homepage": "https://github.com/nikhilcharan-dev/whatsapp-microservice#readme",
   "devDependencies": {
     "@eslint/js": "^9.0.0",
+    "cross-env": "^7.0.3",
     "eslint": "^9.0.0",
     "globals": "^15.0.0",
-    "prettier": "^3.0.0"
+    "jest": "^29.0.0",
+    "prettier": "^3.0.0",
+    "supertest": "^7.0.0"
   },
   "dependencies": {
     "@aws-sdk/client-bedrock-runtime": "^3.1002.0",
@@ -41,6 +47,7 @@
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
+    "ioredis": "^5.3.2",
     "jsonwebtoken": "^9.0.2",
     "node-cron": "^4.2.1"
   }

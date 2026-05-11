@@ -10,7 +10,7 @@ $dest   = [System.IO.Path]::GetFullPath($Out)
 $excludeDirNames = @(
     'node_modules', '.git', '.gradle', '.idea', '.expo',
     '.cxx', '.kotlin', 'web-build', 'logs', '.claude', '.oci',
-    'dist', '.vscode', 'bin'
+    'dist', '.vscode', 'bin', 'scripts'
 )
 
 $excludePathPrefixes = @(
@@ -51,6 +51,13 @@ $files = Get-ChildItem -Path $source -Recurse -File | Where-Object {
 
     foreach ($pat in $excludeFilePatterns) {
         if ($_.Name -match $pat) { return $false }
+    }
+
+    # Exclude all README files except the root one. The reviewer auto-picks
+    # every README it sees and that crowds out source-file slots; the root
+    # README.md is the single consolidated entry point for all per-service docs.
+    if ($_.Name -match '^README(\.md|\.txt|\.rst)?$' -and $parts.Length -gt 1) {
+        return $false
     }
 
     return $true

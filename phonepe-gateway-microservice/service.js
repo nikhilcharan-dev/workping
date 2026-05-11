@@ -1,3 +1,63 @@
+/**
+ * ============================================================================
+ * WorkPing Payments — PhonePe UPI Gateway Microservice
+ * ============================================================================
+ *
+ * Thin wrapper around the PhonePe UPI payment API. Handles payment
+ * initiation, status polling, refunds, and the server-to-server webhook
+ * that PhonePe calls when a transaction reaches a terminal state.
+ *
+ * ── ENDPOINTS ───────────────────────────────────────────────────────────────
+ *   GET  /health                         — liveness probe (bypasses limiters)
+ *   POST /api/payments/initiate          — initiate a UPI payment (signed)
+ *   GET  /api/payments/status/:txnId     — poll order status
+ *   POST /api/refund/initiate            — initiate a refund
+ *   GET  /api/refund/status/:refundId    — poll refund status
+ *   POST /api/phonepe/webhook            — PhonePe server-to-server callback
+ *                                          (x-webhook-secret verified with
+ *                                          crypto.timingSafeEqual — see
+ *                                          webhook/phonepe.webhook.js:33-45)
+ *   POST /api/payments/phonepe/callback  — browser redirect after payment
+ *
+ * ── SECURITY LAYERS ─────────────────────────────────────────────────────────
+ *   • helmet (CSP disabled here because PhonePe's redirect page injects
+ *     its own scripts; everything else stays locked down)
+ *   • CORS allowlist: only origins from process.env.ORIGIN +
+ *     admin/api/phonepe.workping.live subdomains
+ *   • generalLimiter — 100 req / 15 min site-wide
+ *   • paymentLimiter — 20 req / 15 min on /api/payments and /api/refund
+ *     (tighter brute-force window because each request hits PhonePe and
+ *      costs an outbound API call)
+ *   • timingSafeEqual on the webhook secret to prevent timing-based
+ *     secret-byte enumeration
+ *
+ * ── PAYMENT STATE MACHINE (webhook/phonepe.webhook.js) ─────────────────────
+ *   PENDING ──► COMPLETED  ── Subscription created + WhatsApp receipt
+ *           ──► FAILED     ── Order marked failed, no subscription
+ *           ──► CANCELLED  ── User-abort path
+ *   Terminal states are absorbing — no further transitions accepted.
+ *   On COMPLETED, a MongoDB transaction atomically inserts/updates
+ *   Order + Payment + Subscription documents.
+ *
+ * ── PHONEPE ENVIRONMENTS ────────────────────────────────────────────────────
+ *   Sandbox       https://api-preprod.phonepe.com/apis/pg-sandbox
+ *   Production    https://api.phonepe.com/apis/pg
+ *   Switch via PHONEPE_BASE_URL + PHONEPE_AUTH_BASE_URL env vars.
+ *
+ * ── IMPLEMENTATION FILES IN THIS SERVICE ───────────────────────────────────
+ *   routes/router.payment.js         — /api/payments/* handlers
+ *   routes/router.refund.js          — /api/refund/* handlers
+ *   routes/callback.js               — browser redirect handler
+ *   webhook/phonepe.webhook.js       — HMAC-verified webhook + state machine
+ *   service/phonepe.client.js        — axios wrapper around PhonePe APIs
+ *   test/sandbox.test.js             — HMAC + state-machine tests
+ *
+ * ── CALLED BY ───────────────────────────────────────────────────────────────
+ *   centralized-server/server/services/phonepe/phonepe.gateway.js
+ *   (Core API client that forwards initiate requests with API-key auth.)
+ * ============================================================================
+ */
+
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
@@ -87,8 +147,12 @@ app.use((err, req, res, next) => {
   });
 });
 
-(async () => {
-  app.listen(PORT, () => {
-    console.log(`PhonePe Gateway running on port ${PORT}`);
-  });
-})();
+if (process.env.NODE_ENV !== "test") {
+  (async () => {
+    app.listen(PORT, () => {
+      console.log(`PhonePe Gateway running on port ${PORT}`);
+    });
+  })();
+}
+
+export default app;

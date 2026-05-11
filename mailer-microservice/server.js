@@ -1,3 +1,66 @@
+/**
+ * ============================================================================
+ * WorkPing Mailer Microservice — Email + OTP delivery
+ * ============================================================================
+ *
+ * Stateless email + OTP delivery service. Any running instance can verify
+ * any OTP because Redis is the shared source of truth. SMTP transport is
+ * delivered through Nodemailer.
+ *
+ * ── ENDPOINTS ───────────────────────────────────────────────────────────────
+ * Public (no auth):
+ *   GET  /health        — liveness probe used by Docker HEALTHCHECK + nginx
+ *   GET  /              — service status landing page
+ *   GET  /dashboard     — live email analytics (Chart.js, success/failure rate)
+ *   GET  /templates     — Handlebars template gallery (public/templates.html)
+ *
+ * Protected (Bearer token in `Authorization` header, timing-safe compared
+ * to process.env.SECRET via crypto.timingSafeEqual — line 350-358):
+ *   POST /api/v1/mail/send-mail              — templated transactional email
+ *   POST /api/v1/mail/send-html              — raw HTML email
+ *   POST /api/v1/mail/forgot-password        — password reset link
+ *   POST /api/v1/mail/greeting               — onboarding welcome email
+ *   POST /api/v1/mail/alert/{info|warning|danger|success}
+ *   POST /api/v1/mail/notification           — generic notification
+ *   POST /api/v1/otp/send-email-otp          — generate + cache + send
+ *   POST /api/v1/otp/send-reset-password-otp
+ *   POST /api/v1/otp/verify-email-otp        — single-use, deletes on match
+ *   POST /api/v1/otp/verify-reset-password-otp
+ *   GET  /api/v1/analytics/stats             — JSON for the dashboard
+ *
+ * ── OTP FLOW (Redis-backed, single-use, stateless across instances) ────────
+ *   1. Caller POSTs to /api/v1/otp/send-email-otp with { email }
+ *   2. Service generates a 6-digit OTP, stores under
+ *        otp:email:<email> with TTL 30 min (10 min for password-reset)
+ *   3. Nodemailer dispatches the Handlebars-rendered email
+ *   4. Caller POSTs to /api/v1/otp/verify-email-otp with { email, otp }
+ *   5. Service compares against the Redis value, DEL the key on match
+ *      (single-use — replay attack impossible once verified)
+ *
+ * ── IMPLEMENTATION FILES IN THIS SERVICE ───────────────────────────────────
+ *   config/redisConfig.js        — Redis client (used as OTP store)
+ *   config/mailTransporter.js    — Nodemailer SMTP transport
+ *   routes/router.mail.js        — /api/v1/mail/* handlers
+ *   routes/router.otp.js         — /api/v1/otp/* handlers
+ *   utils/analytics.js           — getStats() — rolling counters per email type
+ *   public/templates/*.hbs       — Handlebars HTML email templates
+ *
+ * ── SECURITY ────────────────────────────────────────────────────────────────
+ *   • Bearer token guard with crypto.timingSafeEqual (line 350-358) to
+ *     prevent timing attacks on the shared secret.
+ *   • Email format validation (regex) on every POST before mailing.
+ *   • OTP keys auto-expire via Redis TTL — no manual cleanup required.
+ *
+ * ── CALLED BY ───────────────────────────────────────────────────────────────
+ *   centralized-server/server/services/mailer/mail.service.js
+ *   (HTTP client wrapper that prepends the Authorization header).
+ *
+ * ── KUBERNETES ──────────────────────────────────────────────────────────────
+ *   This service is foundation-ready for k8s migration — stateless app,
+ *   Redis is external, no local file dependencies beyond the templates dir.
+ * ============================================================================
+ */
+
 import express from "express";
 import crypto from "crypto";
 import "dotenv/config";
@@ -386,14 +449,18 @@ server.get("/api/v1/analytics/stats", async (req, res) => {
   return res.status(200).json(stats);
 });
 
-(async () => {
-  try {
-    await redis.connect();
-    server.listen(PORT, () => {
-      console.log(`[Server] Listening on port ${PORT}`);
-    });
-  } catch (error) {
-    console.error("[Server Initialization Error]", error);
-    process.exit(1);
-  }
-})();
+if (process.env.NODE_ENV !== "test") {
+  (async () => {
+    try {
+      await redis.connect();
+      server.listen(PORT, () => {
+        console.log(`[Server] Listening on port ${PORT}`);
+      });
+    } catch (error) {
+      console.error("[Server Initialization Error]", error);
+      process.exit(1);
+    }
+  })();
+}
+
+export default server;

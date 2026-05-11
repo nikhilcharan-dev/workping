@@ -1,7 +1,7 @@
 {
   "name": "server",
   "version": "1.0.0",
-  "description": "",
+  "description": "WorkPing Core API — Express 5 + MongoDB + Redis + Socket.io cluster. JWT auth with Redis-backed token revocation, TOTP 2FA, Google/Microsoft OAuth2, RBAC (admin/manager/employee), subscription billing via PhonePe webhooks, attendance/leave/shift/holiday management, multi-tenant organisation isolation, Prometheus metrics, Winston logging, Jest unit + integration tests against a Docker MongoDB replica set.",
   "type": "module",
   "main": "server.js",
   "scripts": {

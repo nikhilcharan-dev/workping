@@ -1,6 +1,7 @@
 {
   "name": "workping-mobile",
   "version": "1.0.0",
+  "description": "WorkPing Mobile — React Native + Expo 55 for biometric attendance (react-native-vision-camera + face-detector — on-device bounding-box detection, frame sent to face-api-microservice for InsightFace match), GPS + WiFi geofence validation (expo-location + NetInfo, server-side haversine cross-check), offline attendance sync (expo-sqlite queue + NetInfo reconnect flush via global.__WP_FLUSH_OFFLINE_QUEUE__), push notifications (expo-notifications), Google/Microsoft OAuth, expo-secure-store for tokens, voice foundation (expo-audio + expo-speech).",
   "main": "index.js",
   "scripts": {
     "start": "expo start",

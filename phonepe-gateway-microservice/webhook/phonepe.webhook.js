@@ -93,11 +93,20 @@ const phonepeWebhook = async (req, res) => {
       event,
     };
 
+    // Sign the exact bytes we forward. The centralized server captures req.rawBody
+    // in its express.json verify callback and re-computes the same HMAC, so any
+    // mutation in transit (or by a man-in-the-middle without the shared secret) fails verification.
+    const forwardBody = JSON.stringify(filtered);
+    const forwardSignature = crypto
+      .createHmac("sha256", process.env.ORIGIN_WEBHOOK_SECRET)
+      .update(forwardBody)
+      .digest("hex");
+
     console.log(`[Webhook] Forwarding order ${merchantOrderId} (${state}) to backend`);
 
-    const response = await axios.post(ORIGIN_WEBHOOK_URL, filtered, {
+    const response = await axios.post(ORIGIN_WEBHOOK_URL, forwardBody, {
       headers: {
-        "X-Webhook-Secret": process.env.ORIGIN_WEBHOOK_SECRET,
+        "X-Webhook-Signature": forwardSignature,
         "Content-Type": "application/json",
       },
     });

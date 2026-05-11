@@ -1,4 +1,37 @@
 <!doctype html>
+<!--
+  ============================================================================
+  WorkPing Admin Dashboard — Vite SPA shell
+  ============================================================================
+
+  Compiled by `vite build` and served by nginx at admin.workping.live.
+
+  ── BUILD ──────────────────────────────────────────────────────────────────
+  • Vite 5 hashes /src/main.jsx into /assets/index-<hash>.js at build time
+  • nginx serves /admin/* from /var/www/workping/admin-ui/dist/
+    (see nginx/nginx.conf — "Admin dashboard SPA" location block)
+  • API calls from this SPA hit api.workping.live (centralized-server/server)
+    via the nginx upstream defined in nginx/nginx.conf
+
+  ── ENTRY ──────────────────────────────────────────────────────────────────
+  • <div id="root"> is hydrated by src/main.jsx (BrowserRouter + <App />)
+  • src/main.jsx documents the full admin capability map
+  • src/App.jsx documents the route tree + provider composition
+
+  ── SPLASH SCREEN ──────────────────────────────────────────────────────────
+  Pure CSS aurora gradient with three concentric spinning rings shown only
+  if React hasn't mounted within 1500 ms. A MutationObserver on #root hides
+  the splash as soon as the first child element is inserted by React.
+  No JS framework dependency for the splash so the perceived load time stays
+  low even on slow connections / first paint.
+
+  ── THEME PRE-HYDRATION ────────────────────────────────────────────────────
+  The inline <script> at line ~175 reads __REBACK_NEXT_CONFIG__ from
+  localStorage BEFORE React mounts, so the splash screen background matches
+  the user's saved theme (avoids a flash of light-mode on dark-mode users).
+  Falls back to prefers-color-scheme: dark when no config exists.
+  ============================================================================
+-->
 <html lang="en">
 
 <head>

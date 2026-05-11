@@ -26,28 +26,37 @@ const METHOD_MAP = {
   WALLET: "UPI",
 };
 
-/**
- * Verify PhonePe webhook secret using a constant-time comparison
- * to prevent timing-based secret enumeration attacks.
- */
-function verifyWebhookSecret(req) {
-  const receivedSecret = req.headers["x-webhook-secret"];
-  const expectedSecret = process.env.PHONEPE_SECRET;
+// Idempotency window — dedupes retried deliveries from the gateway for 10 minutes.
+const IDEMPOTENCY_TTL_SECONDS = 10 * 60;
 
-  if (!receivedSecret || !expectedSecret) return false;
+/**
+ * Verify the HMAC-SHA256 signature on the forwarded webhook body.
+ * The gateway microservice signs the raw bytes with ORIGIN_WEBHOOK_SECRET;
+ * we verify with PHONEPE_SECRET (same value at deploy time) over req.rawBody.
+ * timingSafeEqual prevents leaking the secret via response-time analysis.
+ */
+function verifyWebhookSignature(req) {
+  const signature = req.headers["x-webhook-signature"];
+  const secret = process.env.PHONEPE_SECRET;
+
+  if (!signature || !secret || !req.rawBody) return false;
+
+  const expected = crypto.createHmac("sha256", secret).update(req.rawBody).digest("hex");
 
   try {
-    return crypto.timingSafeEqual(Buffer.from(receivedSecret), Buffer.from(expectedSecret));
+    const a = Buffer.from(String(signature).trim(), "hex");
+    const b = Buffer.from(expected, "hex");
+    if (a.length !== b.length) return false;
+    return crypto.timingSafeEqual(a, b);
   } catch {
-    // timingSafeEqual throws if buffers differ in byte length
     return false;
   }
 }
 
 const phonepeWebhook = asyncHandler(async (req, res) => {
-  // --- Static Secret verification ---
-  if (!verifyWebhookSecret(req)) {
-    return res.status(401).json({ type: "error", message: "Invalid webhook secret" });
+  // --- HMAC signature verification ---
+  if (!verifyWebhookSignature(req)) {
+    return res.status(401).json({ type: "error", message: "Invalid webhook signature" });
   }
 
   const { merchantOrderId, state, amount, paymentDetails } = req.body;
@@ -56,12 +65,25 @@ const phonepeWebhook = asyncHandler(async (req, res) => {
     return res.status(400).json({ type: "error", message: "Missing required fields" });
   }
 
+  // --- Redis-backed idempotency ---
+  // Claim {orderId, state} with NX so concurrent / retried deliveries collapse to one processing.
+  // On downstream failure we release the key so the gateway's retry can succeed.
+  const idempotencyKey = `webhook:phonepe:${merchantOrderId}:${state}`;
+  const claimed = await redis.set(idempotencyKey, "1", { NX: true, EX: IDEMPOTENCY_TTL_SECONDS });
+  if (!claimed) {
+    console.log(`[PhonePe Webhook] Duplicate delivery ${merchantOrderId}:${state} — skipping`);
+    return res.status(200).json({ type: "success", message: "OK", note: "duplicate" });
+  }
+
   const orderStatus = STATE_MAP[state] ?? "Pending";
 
+  try {
   // Fetch our order (merchantOrderId = our Order._id)
   const order = await Order.findById(merchantOrderId);
   if (!order) {
     console.warn(`[PhonePe Webhook] Unknown order: ${merchantOrderId}`);
+    // Possibly a race with order creation — release the claim so a retry can succeed.
+    await redis.del(idempotencyKey).catch(() => {});
     return res.status(200).json({ type: "success", message: "OK" });
   }
 
@@ -200,6 +222,11 @@ const phonepeWebhook = asyncHandler(async (req, res) => {
   }
 
   return res.status(200).json({ type: "success", message: "OK" });
+  } catch (err) {
+    // Release the idempotency claim so the gateway's retry isn't silently swallowed.
+    await redis.del(idempotencyKey).catch(() => {});
+    throw err;
+  }
 }, "PHONEPE_WEBHOOK_ERROR");
 
 router.post("/webhook", phonepeWebhook);

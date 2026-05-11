@@ -1,3 +1,59 @@
+/**
+ * ============================================================================
+ * WorkPing Core API — Cluster Bootstrap (PM2-supervised in production)
+ * ============================================================================
+ *
+ * This is the entry point launched by `node server.js` (or `pm2 start`).
+ * It forks one worker per CPU using node's `cluster` module; the primary
+ * process never imports app code — it only manages workers.
+ *
+ * ── BOOT SEQUENCE (worker) ──────────────────────────────────────────────────
+ *  1. Dynamic import of ./app/app.js     (Express stack — see file header)
+ *  2. Dynamic import of ./app/socket.io.js  (Socket.io + Redis adapter)
+ *  3. mongooseConfig() — connect to MongoDB Atlas with retry/back-off
+ *     (see config/mongoose.js — exponential backoff, maxPoolSize 50)
+ *  4. redis.connect() — bring up the shared Redis client used by:
+ *       • token.helper.js blacklist (key prefix "bl:")
+ *       • bruteForce.js login lockout counter
+ *       • Socket.io @socket.io/redis-adapter pub/sub
+ *       • subscription.cron payment status replay
+ *  5. socket(server) attaches Socket.io to the http server with two Redis
+ *     pub/sub clients (cannot share one — see ./app/socket.io.js:20-22).
+ *  6. startRenewalCron() — node-cron job firing at 09:00 IST. Sends
+ *     7d / 3d / 1d expiry alerts via email + WhatsApp.
+ *  7. startShiftReminderCron() — fires at 06:30 IST. Notifies employees
+ *     whose shift starts within 90 minutes (multi-tenant per-org).
+ *  8. server.listen(PORT, "0.0.0.0") — binds for Nginx upstream
+ *     (nginx/nginx.conf forwards api.workping.live → upstream workping_api).
+ *
+ * ── WHY CLUSTER + REDIS ADAPTER ─────────────────────────────────────────────
+ * Each cluster worker is its own Node process with its own memory + sockets.
+ * Without the Socket.io Redis adapter, `io.to("payment:user123").emit(...)`
+ * only reaches the worker that holds that socket — other workers silently
+ * drop the broadcast. The adapter publishes the emit on a Redis channel
+ * that every worker subscribes to, so any worker can broadcast to any room.
+ *
+ * ── WORKER RESILIENCE ───────────────────────────────────────────────────────
+ * The primary watches each worker's "exit" event. Non-zero exits trigger a
+ * re-spawn with exponential back-off (1s, 2s, 4s … cap 30s). A clean SIGTERM
+ * or code=0 is treated as graceful shutdown and is NOT re-spawned, so
+ * `pm2 stop` and `docker stop` work as expected.
+ *
+ * ── CROSS-SERVICE ATTACHMENTS (out-of-process) ──────────────────────────────
+ *  • face-api-microservice/app.py     — biometric enrollment + 1:N FAISS search
+ *  • mailer-microservice/server.js    — OTP + transactional email
+ *  • phonepe-gateway-microservice/service.js  — UPI payments + webhook
+ *  • whatsapp-microservice/server.js  — Meta Cloud API + LLM chatbot
+ *  • oracle-cloud-object-microservice/app.js  — OCI Object Storage proxy
+ * Each runs on its own Ubuntu VM behind nginx (see ../README.md → Infrastructure).
+ *
+ * ── KUBERNETES MIGRATION FOUNDATION ────────────────────────────────────────
+ * k8s/api/deployment.yaml — Deployment (replicas: 3) + HorizontalPodAutoscaler
+ * (minReplicas: 2, maxReplicas: 10, targetCPUUtilizationPercentage: 70).
+ * Liveness + readiness probes hit GET /health (defined in app/app.js).
+ * ============================================================================
+ */
+
 import "./globals.js";
 import "dotenv/config";
 import cluster from "cluster";

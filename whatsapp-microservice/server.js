@@ -1,3 +1,71 @@
+/**
+ * ============================================================================
+ * WorkPing Chatbot — WhatsApp Business + LLM Microservice
+ * ============================================================================
+ *
+ * WhatsApp chatbot for employees: query attendance, apply leave, check salary,
+ * file complaints, and run multi-step conversational flows. Backed by an
+ * LLM intent layer (provider-agnostic via the OpenAI-compatible wire format
+ * — Ollama / Bedrock / OpenAI / Groq / OpenRouter / Mistral all work).
+ *
+ * ── ENDPOINTS ───────────────────────────────────────────────────────────────
+ *   GET  /health               — LLM provider health-check (503 if degraded)
+ *   GET  /keepmealive          — lightweight ping
+ *   GET  /dashboard            — operator dashboard (HTML, login-gated)
+ *   POST /api/login            — bcrypt password compare → JWT (24h TTL)
+ *   GET  /api/dashboard/*      — protected dashboard API (token in header)
+ *   POST /api/secure/whatsapp/webhook  — Meta WhatsApp Cloud API webhook
+ *   POST /api/secure/whatsapp/* — config + send routes (internal API key)
+ *
+ * ── MESSAGE PIPELINE (pipeline/message.pipeline.js) ─────────────────────────
+ *   1. Meta webhook → webhook/whatsapp.webhook.js verifies x-hub-signature
+ *   2. ruleEngine (intent/rule.engine.js) — fast keyword/regex first pass
+ *   3. detectIntent (intent/intent.llm.js) — LLM fallback for ambiguous text
+ *   4. context.builder.js — fetches employee profile + last 5 messages
+ *   5. strategy.resolver.js — picks template / LLM / multi-step flow
+ *   6. Response → sender.js → Meta WhatsApp Cloud API
+ *
+ * ── MULTI-STEP CONVERSATIONAL FLOWS ────────────────────────────────────────
+ * Conversation state lives in Redis (utils/conversation.state.js). Active
+ * flows are recognised first via resolveFlowIntent (pipeline lines 13-65)
+ * so a user typing "yes" mid-confirmation isn't routed to GREETING:
+ *   • LEAVE_REQUEST   — AWAITING_TYPE → DATES → REASON → CONFIRM
+ *   • COMPLAINT       — AWAITING_DESCRIPTION → CONFIRM
+ *   • LEAVE_APPROVAL  — manager flow, AWAITING_DECISION (approve / reject)
+ *
+ * ── VOICE FOUNDATION (Future Scope) ────────────────────────────────────────
+ *   @aws-sdk/client-transcribe + @aws-sdk/client-polly are installed.
+ *   Path: incoming voice note → OGG → Transcribe → existing pipeline →
+ *         Polly TTS → response audio. SDKs wired, integration not yet active.
+ *
+ * ── BACKGROUND WORKERS ──────────────────────────────────────────────────────
+ *   scheduler/shift.reminder.js — BullMQ worker that consumes shift-reminder
+ *   jobs queued by the Core API (centralized-server/server) at 06:30 IST.
+ *
+ * ── SECURITY LAYERS ─────────────────────────────────────────────────────────
+ *   • CORS allowlist (process.env.ORIGIN with credentials)
+ *   • Dashboard auth: bcryptjs hash (12 rounds) + JWT (jsonwebtoken, 24h)
+ *     — env vars DASHBOARD_USER, DASHBOARD_PASS_HASH, JWT_SECRET are
+ *       hard-required at boot (throws if any missing — line 21-23 below)
+ *   • Meta webhook signature verified in webhook/whatsapp.webhook.js
+ *   • Per-conversation Redis rate-limiter in utils/rate.limiter.js
+ *
+ * ── IMPLEMENTATION FILES IN THIS SERVICE ───────────────────────────────────
+ *   pipeline/message.pipeline.js    — main message orchestration
+ *   intent/rule.engine.js           — keyword/regex intent matcher
+ *   intent/intent.llm.js            — LLM intent classifier
+ *   response/llm.generator.js       — OpenAI-compatible chat completion
+ *   response/templates.js           — pre-written response templates
+ *   utils/conversation.state.js     — Redis-backed flow state machine
+ *   utils/llm.provider.js           — provider router (Ollama/Bedrock/...)
+ *   utils/rate.limiter.js           — per-user message guards
+ *   webhook/whatsapp.webhook.js     — Meta Cloud API webhook receiver
+ *
+ * ── KUBERNETES ──────────────────────────────────────────────────────────────
+ *   k8s/whatsapp/deployment.yaml — Deployment + Service manifests authored.
+ * ============================================================================
+ */
+
 import express from "express";
 import cors from "cors";
 import bcrypt from "bcryptjs";
@@ -18,7 +86,9 @@ import { startReminderWorker } from "./scheduler/shift.reminder.js";
 const DASHBOARD_USER = process.env.DASHBOARD_USER;
 const DASHBOARD_PASS_HASH = process.env.DASHBOARD_PASS_HASH;
 const JWT_SECRET = process.env.JWT_SECRET;
-if (!DASHBOARD_USER || !DASHBOARD_PASS_HASH || !JWT_SECRET) {
+// Integration tests set these vars before importing this module; the env-var
+// guard is enforced everywhere else.
+if (process.env.NODE_ENV !== "test" && (!DASHBOARD_USER || !DASHBOARD_PASS_HASH || !JWT_SECRET)) {
   throw new Error("[CONFIG] DASHBOARD_USER, DASHBOARD_PASS_HASH, and JWT_SECRET env vars are required");
 }
 const DASHBOARD_TOKEN_TTL = "24h";
@@ -97,13 +167,17 @@ server.use("/api/secure/whatsapp", whatsappConfig);
 server.use("/api/secure/whatsapp", whatsAppWebhook);
 server.use("/api/secure/whatsapp", whatsAppRoutes);
 
-(async () => {
-  const llm = await healthCheck();
-  console.log("LLM status:", llm);
+if (process.env.NODE_ENV !== "test") {
+  (async () => {
+    const llm = await healthCheck();
+    console.log("LLM status:", llm);
 
-  server.listen(PORT, () => {
-    console.log(`Listening on ${PORT}`);
-    console.log(`Dashboard: http://localhost:${PORT}/dashboard`);
-    startReminderWorker();
-  });
-})();
+    server.listen(PORT, () => {
+      console.log(`Listening on ${PORT}`);
+      console.log(`Dashboard: http://localhost:${PORT}/dashboard`);
+      startReminderWorker();
+    });
+  })();
+}
+
+export default server;

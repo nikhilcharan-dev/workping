@@ -11,6 +11,7 @@ import {
   chat,
 } from "../utils/llm.provider.js";
 import { syncToEnv, buildEnvUpdates } from "../utils/env.sync.js";
+import llmAnalyticsRouter from "./llm.analytics.js";
 
 const router = Router();
 
@@ -130,5 +131,8 @@ router.post("/unrestrict", (req, res) => {
   const ok = unrateLimitUser(normalized);
   res.json({ ok, phone: normalized });
 });
+
+// Mount LLM analytics routes
+router.use(llmAnalyticsRouter);
 
 export default router;

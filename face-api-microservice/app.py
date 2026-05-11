@@ -42,6 +42,7 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from collections import deque
+from pathlib import Path
 from pydantic import BaseModel
 from typing import Optional, List
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
@@ -51,6 +52,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from embedding import get_face_embedding_from_bytes, load_face_app, is_gpu_available, _active_provider
 from db import get_embeddings_collection
 from cache import embedding_key, cache_get, cache_set, cache_del, CACHE_TTL, _get_redis
+from face_search import get_search_engine
 
 import faiss
 
@@ -69,6 +71,8 @@ class FAISSIndex:
     def __init__(self):
         self._indexes: dict = {}   # org_id → faiss.IndexFlatIP
         self._id_maps: dict = {}   # org_id → list[employee_id]
+        self._persist_dir = Path(os.environ.get("FAISS_PERSIST_DIR", "/tmp/faiss_indexes"))
+        self._persist_dir.mkdir(parents=True, exist_ok=True)
 
     def _ensure(self, org_id: str):
         if org_id not in self._indexes:
@@ -110,6 +114,34 @@ class FAISSIndex:
 
     def size(self, org_id: str) -> int:
         return self._indexes[org_id].ntotal if org_id in self._indexes else 0
+
+    def save(self, org_id: str):
+        """Persist index and id_map to disk."""
+        if org_id not in self._indexes:
+            return
+        try:
+            index_path = self._persist_dir / f"{org_id}.index"
+            map_path = self._persist_dir / f"{org_id}.map.json"
+            faiss.write_index(self._indexes[org_id], str(index_path))
+            with open(map_path, "w") as f:
+                json.dump(self._id_maps[org_id], f)
+        except Exception as e:
+            print(f"FAISS persist warning for {org_id}: {e}")
+
+    def load(self, org_id: str) -> bool:
+        """Load index and id_map from disk. Returns True if successful."""
+        try:
+            index_path = self._persist_dir / f"{org_id}.index"
+            map_path = self._persist_dir / f"{org_id}.map.json"
+            if not index_path.exists() or not map_path.exists():
+                return False
+            self._indexes[org_id] = faiss.read_index(str(index_path))
+            with open(map_path, "r") as f:
+                self._id_maps[org_id] = json.load(f)
+            return True
+        except Exception as e:
+            print(f"FAISS load warning for {org_id}: {e}")
+            return False
 
 faiss_index = FAISSIndex()
 
@@ -220,24 +252,27 @@ print(f"Inference workers: {INFERENCE_WORKERS}")
 
 executor = ThreadPoolExecutor(max_workers=INFERENCE_WORKERS)
 
-def do_inference(image_bytes, db_emb, threshold, req_user_id):
+def do_inference(image_bytes, db_emb, org_id, req_user_id):
     start_emb = time.time()
     query_emb = get_face_embedding_from_bytes(image_bytes)
     emb_time = (time.time() - start_emb) * 1000
 
-    start_search = time.time()
-    score = float(np.dot(db_emb, query_emb))
-    search_time = (time.time() - start_search) * 1000
+    search_engine = get_search_engine()
+    result = search_engine.search_1to1(
+        query_embedding=query_emb,
+        reference_embedding=db_emb,
+        organization_id=org_id,
+        employee_id=req_user_id,
+        emb_time_ms=emb_time,
+    )
 
-    success = score >= threshold
-    matched_id = req_user_id if success else "Unknown"
-    
     return {
-        "success": success,
-        "score": score,
-        "matched_id": matched_id,
-        "emb_time": emb_time,
-        "search_time": search_time
+        "success": result.success,
+        "score": result.confidence_score,
+        "matched_id": req_user_id if result.success else "Unknown",
+        "emb_time": result.emb_time_ms,
+        "search_time": result.search_time_ms,
+        "total_time": result.total_time_ms,
     }
 
 async def inference_worker():
@@ -245,11 +280,12 @@ async def inference_worker():
     col = get_embeddings_collection()
     print("Inference Worker loop started!")
     while True:
+        ticket_id = None
         try:
             item = await redis.blpop("face_tasks_queue", timeout=1)
             if not item:
                 continue
-            
+
             _, payload_str = item
             payload = json.loads(payload_str)
             ticket_id = payload["ticket_id"]
@@ -278,9 +314,9 @@ async def inference_worker():
                 result = {"success": False, "error": "User not found"}
             else:
                 image_bytes = base64.b64decode(payload["image_base64"])
-                
+
                 loop = asyncio.get_running_loop()
-                inf_res = await loop.run_in_executor(executor, do_inference, image_bytes, db_emb, THRESHOLD, user_id)
+                inf_res = await loop.run_in_executor(executor, do_inference, image_bytes, db_emb, org_id, user_id)
                 
                 success = inf_res["success"]
                 score = inf_res["score"]
@@ -308,7 +344,7 @@ async def inference_worker():
             break
         except Exception as e:
             print(f"Inference Worker Error: {e}")
-            if 'ticket_id' in locals():
+            if ticket_id:
                 try:
                     await redis.setex(f"ticket:{ticket_id}", 300, json.dumps({"status": "failed", "error": str(e)}))
                 except:
@@ -317,7 +353,7 @@ async def inference_worker():
 
 @app.on_event("startup")
 async def startup_event():
-    # Rebuild FAISS indexes from MongoDB for all organizations
+    # Try loading FAISS indexes from disk first; fall back to MongoDB rebuild
     col = get_embeddings_collection()
     try:
         all_docs = await col.find(
@@ -327,9 +363,14 @@ async def startup_event():
         for doc in all_docs:
             org = doc.get("organization_id", "default")
             orgs.setdefault(org, []).append(doc)
-        for org_id, records in orgs.items():
-            faiss_index.rebuild(org_id, records)
-        print(f"FAISS indexes rebuilt: {len(orgs)} orgs, {len(all_docs)} embeddings")
+
+        loaded_orgs = 0
+        for org_id in orgs.keys():
+            if faiss_index.load(org_id):
+                loaded_orgs += 1
+            else:
+                faiss_index.rebuild(org_id, orgs[org_id])
+        print(f"FAISS indexes: {loaded_orgs} loaded from disk, {len(orgs) - loaded_orgs} rebuilt from MongoDB")
     except Exception as e:
         print(f"FAISS startup warning (non-fatal): {e}")
 
@@ -366,8 +407,9 @@ async def check_rate_limit(user_id: str):
             )
     except HTTPException:
         raise
-    except Exception:
-        pass  # Redis down — fail open
+    except Exception as e:
+        import logging
+        logging.warning(f"Rate limit check failed (Redis unavailable): {e}. Failing open for user {user_id}.")
 
 
 # ---------------- HELPERS ----------------
@@ -418,6 +460,7 @@ async def enroll(req: EnrollRequest):
     """
     Extract a 512-D embedding from the image and upsert it into MongoDB.
     Invalidates the org's Redis cache so the next detect picks up the change.
+    Persists the updated FAISS index to disk.
     """
     image_bytes = validate_image_b64(req.image_base64)
 
@@ -438,6 +481,7 @@ async def enroll(req: EnrollRequest):
     )
     await bust_cache(req.organization_id, req.employee_id)
     faiss_index.add(req.organization_id, req.employee_id, emb)
+    faiss_index.save(req.organization_id)
 
     return {"success": True, "employee_id": req.employee_id}
 
@@ -489,11 +533,19 @@ async def get_embedding_status(employee_id: str):
 
 @app.delete("/api/v1/embeddings/{employee_id}")
 async def delete_embedding(employee_id: str):
-    """Remove a face embedding from MongoDB and invalidate the org's cache."""
+    """Remove a face embedding from MongoDB and invalidate the org's cache.
+    Rebuilds the FAISS index for the org."""
     col = get_embeddings_collection()
     doc = await col.find_one_and_delete({"employee_id": employee_id})
     if doc:
-        await bust_cache(doc["organization_id"], employee_id)
+        org_id = doc["organization_id"]
+        await bust_cache(org_id, employee_id)
+        records = await col.find(
+            {"organization_id": org_id},
+            {"_id": 0, "employee_id": 1, "embedding": 1}
+        ).to_list(length=None)
+        faiss_index.rebuild(org_id, records)
+        faiss_index.save(org_id)
     return {"success": True, "deleted_employee_id": employee_id}
 
 
@@ -539,15 +591,34 @@ async def faiss_bulk_search(req: FAISSSearchRequest):
     """
     image_bytes = validate_image_b64(req.image_base64)
     loop = asyncio.get_running_loop()
+
+    start_emb = time.time()
     try:
         query_emb = await loop.run_in_executor(executor, get_face_embedding_from_bytes, image_bytes)
     except Exception as e:
         raise HTTPException(status_code=422, detail=f"Face extraction failed: {e}")
-    matches = faiss_index.search(req.organization_id, query_emb, k=req.top_k)
+    emb_time_ms = (time.time() - start_emb) * 1000
+
+    start_search = time.time()
+    faiss_matches = faiss_index.search(req.organization_id, query_emb, k=req.top_k)
+    search_time_ms = (time.time() - start_search) * 1000
+
+    search_engine = get_search_engine()
+    result = search_engine.search_1toN(
+        query_embedding=query_emb,
+        faiss_matches=faiss_matches,
+        organization_id=req.organization_id,
+        emb_time_ms=emb_time_ms,
+        search_time_ms=search_time_ms,
+        index_size=faiss_index.size(req.organization_id),
+    )
+
     return {
-        "matches": matches,
+        "matches": result.matches,
         "index_size": faiss_index.size(req.organization_id),
-        "threshold": THRESHOLD,
+        "threshold": result.threshold,
+        "confidence": round(result.confidence_score, 3),
+        "total_time_ms": round(result.total_time_ms, 2),
     }
 
 
@@ -556,6 +627,7 @@ async def build_faiss_index(organization_id: str):
     """Rebuild the FAISS index for an org from MongoDB. Call after bulk enrollment or data import."""
     records = await load_embeddings(organization_id)
     faiss_index.rebuild(organization_id, records)
+    faiss_index.save(organization_id)
     return {
         "success": True,
         "organization_id": organization_id,
@@ -660,6 +732,64 @@ async def get_productivity_insights(organization_id: str, days: int = 30):
             "system_efficiency_pct": analytics["match_rate"],
             "anomaly_flags": [],
         },
+    }
+
+
+@app.get("/api/v1/analytics/search-metrics")
+async def get_search_metrics(search_type: str = "all"):
+    """
+    LLM/face search observability: confidence trends and latency stats for model drift detection.
+    search_type: "1:1", "1:N", or "all"
+    """
+    search_engine = get_search_engine()
+
+    response = {"timestamp": str(datetime.now().isoformat())}
+
+    if search_type in ("1:1", "all"):
+        response["1:1"] = {
+            "confidence_trend": search_engine.metrics.get_confidence_trend("1:1"),
+            "latency_stats": search_engine.metrics.get_latency_stats("1:1"),
+        }
+
+    if search_type in ("1:N", "all"):
+        response["1:N"] = {
+            "confidence_trend": search_engine.metrics.get_confidence_trend("1:N"),
+            "latency_stats": search_engine.metrics.get_latency_stats("1:N"),
+        }
+
+    return response
+
+
+@app.get("/api/v1/analytics/search-history")
+async def get_search_history(search_type: Optional[str] = None, limit: int = 100):
+    """Recent search results for auditing and debugging."""
+    search_engine = get_search_engine()
+    history = search_engine.metrics.metrics
+
+    if search_type:
+        history = [m for m in history if m.search_type == search_type]
+
+    # Return most recent first
+    history = list(reversed(history[-limit:]))
+
+    return {
+        "count": len(history),
+        "search_type_filter": search_type or "all",
+        "history": [
+            {
+                "timestamp": m.timestamp,
+                "search_type": m.search_type,
+                "organization_id": m.organization_id,
+                "employee_id": m.employee_id,
+                "confidence_score": round(m.confidence_score, 3),
+                "success": m.success,
+                "total_latency_ms": round(m.total_latency_ms, 2),
+                "emb_latency_ms": round(m.emb_latency_ms, 2),
+                "search_latency_ms": round(m.search_latency_ms, 2),
+                "index_size": m.query_index_size,
+            }
+            for m in history
+        ],
     }
 
 
