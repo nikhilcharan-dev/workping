@@ -211,9 +211,8 @@ workping/
 │       │   ├── admin/                  # Admin-specific utilities
 │       │   ├── data.reducer.js         # Attendance aggregation helpers
 │       │   └── pagination.js           # Cursor-based pagination
-│       ├── scripts/
-│       │   ├── seedAdminUser.js        # Seed initial super-admin
-│       │   └── seedData.js             # Demo data for development
+│       ├── seedAdminUser.js            # Seed initial super-admin
+│       ├── seedData.js                 # Demo data for development
 │       ├── __tests__/
 │       │   └── health.test.js          # Jest + Supertest smoke tests
 │       ├── globals.js                  # Shared constants (plan limits, roles)
@@ -227,7 +226,7 @@ workping/
 │       ├── pages/                      # Feature pages (employees, attendance, shifts, billing…)
 │       ├── routes/                     # React Router v6 tree
 │       ├── context/                    # AuthContext, ToastContext
-│       ├── hooks/                      # useSocket, useGeofence, useFaceEnroll
+│       ├── hooks/                      # useLocalStorage, useModal, useCountdown, usePendingLeaveCount, useFileUploader
 │       ├── layouts/                    # DashboardLayout, AuthLayout
 │       ├── helpers/                    # Date formatters, Excel export
 │       └── utils/                      # API helpers, validators
@@ -249,7 +248,7 @@ workping/
 │   │   ├── navigation/                 # React Navigation stack + tab config
 │   │   ├── components/                 # Camera overlay, face-box, loaders
 │   │   ├── context/                    # AuthContext
-│   │   ├── hooks/                      # useLocation, useGeofence, usePushNotifications
+│   │   ├── hooks/                      # useFaceCapture, useLocationLock, useOAuth, useStorage
 │   │   ├── services/                   # Face detection, API calls
 │   │   ├── theme/                      # Colours, typography, spacing
 │   │   └── utils/                      # Date helpers, validators
@@ -338,7 +337,7 @@ workping/
 │   └── public/
 │       └── dashboard.html              # Internal storage metrics UI
 │
-└── docs/
+└── documents/
     ├── nginx/                          # Nginx site configs (one per subdomain)
     ├── INFRASTRUCTURE.md               # VM provisioning & deployment run-book
     ├── SECURITY.md                     # Security controls & audit notes
@@ -818,7 +817,7 @@ Redis serves four distinct roles simultaneously:
 
 ## API Reference Overview
 
-Full OpenAPI specs live in `docs/`. High-level namespaces:
+Full OpenAPI specs live in `documents/`. High-level namespaces:
 
 | Namespace | Auth | Description |
 |---|---|---|
@@ -935,7 +934,7 @@ certbot --nginx -d s3.workping.live
 systemctl status certbot.timer
 ```
 
-Nginx site configs live in `docs/nginx/`. Each service gets a `server` block with:
+Nginx site configs live in `documents/nginx/`. Each service gets a `server` block with:
 - `proxy_pass` to the internal port
 - `proxy_http_version 1.1` + `Upgrade`/`Connection` headers for WebSocket
 - `proxy_read_timeout 120s` for long-polling endpoints
