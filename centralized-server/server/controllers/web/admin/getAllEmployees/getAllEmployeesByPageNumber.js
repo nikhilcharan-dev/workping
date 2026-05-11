@@ -1,3 +1,4 @@
+import { asyncHandler } from "#utils/async.handler.js";
 import User from "#models/User.js";
 import mongoose from "mongoose";
 import Pagination from "#helpers/pagination.js";

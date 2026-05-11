@@ -1,3 +1,4 @@
+import { asyncHandler } from "#utils/async.handler.js";
 import Salary from "#models/Salary.js";
 import User from "#models/User.js";
 import mongoose from "mongoose";

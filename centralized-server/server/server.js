@@ -59,6 +59,7 @@ import "dotenv/config";
 import cluster from "cluster";
 import http from "http";
 import mongooseConfig from "./config/mongoose.js";
+import redis from "./config/redis.js";
 
 // Exponential backoff for worker restart — prevents thrash-looping on a crash
 const backoff = (retries, base = 1000, cap = 30000) => Math.min(cap, base * Math.pow(2, retries));

@@ -1,3 +1,4 @@
+import { asyncHandler } from "#utils/async.handler.js";
 import Admin from "#models/Admin.js";
 import { sendEmailOTP, verifyEmailOTP } from "#services/mailer/mail.service.js";
 import { successResponse, errorResponse } from "#utils/response.helper.js";

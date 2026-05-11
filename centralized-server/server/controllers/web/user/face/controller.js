@@ -1,3 +1,4 @@
+import { asyncHandler } from "#utils/async.handler.js";
 import User from "#models/User.js";
 import { successResponse, errorResponse } from "#utils/response.helper.js";
 import { enrollFace, checkFaceStatus } from "#services/face_recognition/enroll.js";

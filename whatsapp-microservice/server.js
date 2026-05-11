@@ -88,8 +88,8 @@ const DASHBOARD_PASS_HASH = process.env.DASHBOARD_PASS_HASH;
 const JWT_SECRET = process.env.JWT_SECRET;
 // Integration tests set these vars before importing this module; the env-var
 // guard is enforced everywhere else.
-if (process.env.NODE_ENV !== "test" && (!DASHBOARD_USER || !DASHBOARD_PASS_HASH || !JWT_SECRET)) {
-  throw new Error("[CONFIG] DASHBOARD_USER, DASHBOARD_PASS_HASH, and JWT_SECRET env vars are required");
+if (process.env.NODE_ENV !== "test" && (!DASHBOARD_USER || !DASHBOARD_PASS_HASH || !JWT_SECRET || !ORIGIN)) {
+  throw new Error("[CONFIG] DASHBOARD_USER, DASHBOARD_PASS_HASH, JWT_SECRET, and ORIGIN env vars are required");
 }
 const DASHBOARD_TOKEN_TTL = "24h";
 

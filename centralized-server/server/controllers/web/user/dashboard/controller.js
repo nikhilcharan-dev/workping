@@ -1,3 +1,4 @@
+import { asyncHandler } from "#utils/async.handler.js";
 import mongoose from "mongoose";
 import Attendance from "#models/Attendance.js";
 import Leave from "#models/Leave.js";

@@ -1,3 +1,4 @@
+import { asyncHandler } from "#utils/async.handler.js";
 import User from "#models/User.js";
 import GovtProof from "#models/GovtProof.js";
 import Organization from "#models/Organization.js";

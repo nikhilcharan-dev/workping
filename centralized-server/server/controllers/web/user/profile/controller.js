@@ -1,3 +1,4 @@
+import { asyncHandler } from "#utils/async.handler.js";
 import User from "#models/User.js";
 import Account from "#models/Account.js";
 import bcrypt from "bcrypt";

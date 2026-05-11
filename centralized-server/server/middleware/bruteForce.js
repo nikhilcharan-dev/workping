@@ -1,3 +1,5 @@
+import redis from "../config/redis.js";
+
 const MAX_ATTEMPTS = 5;
 const WINDOW_SECONDS = 15 * 60; // 15 minutes
 const LOCK_SECONDS = 15 * 60; // 15-minute lockout

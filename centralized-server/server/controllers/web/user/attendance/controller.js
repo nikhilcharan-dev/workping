@@ -1,3 +1,4 @@
+import { asyncHandler } from "#utils/async.handler.js";
 import Attendance from "#models/Attendance.js";
 import User from "#models/User.js";
 import ProjectMember from "#models/ProjectMember.js";
@@ -6,7 +7,7 @@ import Shift from "#models/Shift.js";
 import { validateArray } from "#utils/validators.js";
 import { successResponse, errorResponse } from "#utils/response.helper.js";
 import { validate3DLocation } from "#utils/location.js";
-import { submitRecognitionTask, checkRecognitionStatus } from "#services/face_recognition/model.js";
+import { submitRecognitionTask, checkRecognitionStatus, checkLiveness } from "#services/face_recognition/model.js";
 import { sendWhatsApp } from "#services/whatsapp/whatsapp.service.js";
 import { trace } from "#utils/traceLogger.js";
 
@@ -188,7 +189,25 @@ export const verify_mark_attendance = asyncHandler(async (req, res) => {
   }
   trace("CHECK", "Frame validation passed");
 
-  // 3. Submit to face recognition service
+  // 3. Liveness check (anti-spoofing) - must pass before face recognition
+  try {
+    const livenessRes = await checkLiveness(frames);
+    if (!livenessRes.is_live) {
+      trace("FAILURE", `Liveness check failed: ${JSON.stringify(livenessRes)}`);
+      return errorResponse(
+        res,
+        "Liveness check failed. Please ensure you are using a live face (not a photo or screen). Try again.",
+        422
+      );
+    }
+    trace("CHECK", `Liveness verified: confidence=${livenessRes.confidence}`);
+  } catch (err) {
+    trace("FAILURE", `Liveness check error: ${err.message}`);
+    console.error("[Liveness] Check failed:", err.message);
+    return errorResponse(res, "Liveness verification unavailable. Please try again.", 503);
+  }
+
+  // 4. Submit to face recognition service
   // Use MongoDB userId as the face API key — embeddings are stored by _id, not employeeId string
   const taskRes = await submitRecognitionTask(frames[0].buffer, userId, user.organizationId._id);
   console.log("[FaceRecognition] raw response:", JSON.stringify(taskRes).slice(0, 500));

@@ -1,6 +1,7 @@
 import redis from "./redis.client.js";
 
-const SESSION_TTL = 30 * 60; // 30 minutes (seconds)
+const SESSION_TTL = 48 * 60 * 60; // 48 hours (seconds) - allows multi-step flows over multiple days
+const FLOW_TIMEOUT_MS = 24 * 60 * 60 * 1000; // 24 hours - auto-clear abandoned flows
 const MAX_HISTORY = 20;
 
 function key(phone) {
@@ -50,6 +51,14 @@ export async function startFlow(phone, flow, step, data = {}) {
 export async function getFlow(phone) {
   const session = await getSession(phone);
   if (!session || !session.flow) return null;
+
+  // Auto-clear flows that have timed out (abandoned for 24+ hours)
+  const flowAge = Date.now() - session.lastActivity;
+  if (flowAge > FLOW_TIMEOUT_MS) {
+    await clearFlow(phone);
+    return null;
+  }
+
   return { flow: session.flow, step: session.step, pendingData: session.pendingData };
 }
 

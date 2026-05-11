@@ -1,3 +1,4 @@
+import { asyncHandler } from "#utils/async.handler.js";
 import Account from "#models/Account.js";
 import { sendResetPasswordOTP, verifyResetPasswordOTP } from "#services/mailer/mail.service.js";
 import bcrypt from "bcrypt";

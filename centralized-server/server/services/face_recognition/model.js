@@ -33,3 +33,19 @@ export const checkRecognitionStatus = async (ticketId) => {
     throw err;
   }
 };
+
+/**
+ * Verify liveness detection (anti-spoofing check)
+ * Sends sequential frames to face-api liveness endpoint
+ */
+export const checkLiveness = async (frames) => {
+  const frames_base64 = frames.map(f => f.buffer.toString("base64"));
+
+  const { data } = await axios.post(
+    `${FACE_API_URI}/api/v1/liveness/check`,
+    { frames: frames_base64 },
+    { timeout: 10000 }
+  );
+
+  return data;
+};

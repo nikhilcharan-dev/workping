@@ -148,6 +148,10 @@ app.use((err, req, res, next) => {
 });
 
 if (process.env.NODE_ENV !== "test") {
+  if (!process.env.ORIGIN) {
+    console.error("[Startup] ERROR: ORIGIN environment variable is not set. CORS will be misconfigured.");
+    process.exit(1);
+  }
   (async () => {
     app.listen(PORT, () => {
       console.log(`PhonePe Gateway running on port ${PORT}`);

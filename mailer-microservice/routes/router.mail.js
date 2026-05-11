@@ -14,8 +14,17 @@ import {
 
 const router = Router();
 
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const validateEmail = (req, res, next) => {
+  const { email } = req.body;
+  if (!email || !emailRegex.test(email)) {
+    return res.status(400).json({ status: "error", error: "Valid email is required" });
+  }
+  next();
+};
+
 /* ─── Send templated email (subject + content) ─── */
-router.post("/send-mail", async (req, res) => {
+router.post("/send-mail", validateEmail, async (req, res) => {
   const { email, subject, content } = req.body;
   try {
     if (!subject || !content) {
@@ -30,7 +39,7 @@ router.post("/send-mail", async (req, res) => {
 });
 
 /* ─── Send raw HTML (just provide `to`, `subject`, `html`) ─── */
-router.post("/send-html", async (req, res) => {
+router.post("/send-html", validateEmail, async (req, res) => {
   const { email, subject, html } = req.body;
   try {
     if (!subject || !html) {
@@ -45,7 +54,7 @@ router.post("/send-html", async (req, res) => {
 });
 
 /* ─── Forgot Password (link-based) ─── */
-router.post("/forgot-password", async (req, res) => {
+router.post("/forgot-password", validateEmail, async (req, res) => {
   const { email, resetLink } = req.body;
   try {
     if (!resetLink) {
@@ -60,7 +69,7 @@ router.post("/forgot-password", async (req, res) => {
 });
 
 /* ─── Verify Password Confirmation ─── */
-router.post("/verify-password", async (req, res) => {
+router.post("/verify-password", validateEmail, async (req, res) => {
   const { email } = req.body;
   try {
     await sendVerifyPassword(email);
@@ -72,7 +81,7 @@ router.post("/verify-password", async (req, res) => {
 });
 
 /* ─── Welcome / Greeting ─── */
-router.post("/greeting", async (req, res) => {
+router.post("/greeting", validateEmail, async (req, res) => {
   const { email, name, org, role } = req.body;
   try {
     if (!name || !org || !role) {
@@ -87,7 +96,7 @@ router.post("/greeting", async (req, res) => {
 });
 
 /* ─── Alert: Info ─── */
-router.post("/alert/info", async (req, res) => {
+router.post("/alert/info", validateEmail, async (req, res) => {
   const { email, title, message } = req.body;
   try {
     if (!title || !message) {
@@ -102,7 +111,7 @@ router.post("/alert/info", async (req, res) => {
 });
 
 /* ─── Alert: Warning ─── */
-router.post("/alert/warning", async (req, res) => {
+router.post("/alert/warning", validateEmail, async (req, res) => {
   const { email, title, message, actionLink } = req.body;
   try {
     if (!title || !message) {
@@ -117,7 +126,7 @@ router.post("/alert/warning", async (req, res) => {
 });
 
 /* ─── Alert: Danger ─── */
-router.post("/alert/danger", async (req, res) => {
+router.post("/alert/danger", validateEmail, async (req, res) => {
   const { email, title, message, actionLink } = req.body;
   try {
     if (!title || !message) {
@@ -132,7 +141,7 @@ router.post("/alert/danger", async (req, res) => {
 });
 
 /* ─── Alert: Success ─── */
-router.post("/alert/success", async (req, res) => {
+router.post("/alert/success", validateEmail, async (req, res) => {
   const { email, title, message } = req.body;
   try {
     if (!title || !message) {
@@ -147,7 +156,7 @@ router.post("/alert/success", async (req, res) => {
 });
 
 /* ─── Notification (Generic) ─── */
-router.post("/notification", async (req, res) => {
+router.post("/notification", validateEmail, async (req, res) => {
   const { email, title, message } = req.body;
   try {
     if (!title || !message) {

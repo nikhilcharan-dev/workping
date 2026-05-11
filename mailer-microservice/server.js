@@ -400,7 +400,7 @@ server.get("/templates", (req, res) => {
   return res.sendFile(path.join(__dirname, "public", "templates.html"));
 });
 
-/* ─── Auth Middleware (protects API routes) ─── */
+/* ─── Auth Middleware (protects API routes) — token validation only ─── */
 server.use((req, res, next) => {
   const token = req.headers.authorization;
   if (!token || typeof token !== "string") {
@@ -420,23 +420,6 @@ server.use((req, res, next) => {
     });
   }
 
-  const { email } = req.body;
-  if (!email) {
-    return res.status(400).json({
-      status: "error",
-      error: "Bad Request: Recipient email is required",
-    });
-  }
-
-  // Basic email format validation
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(email)) {
-    return res.status(400).json({
-      status: "error",
-      error: "Bad Request: Invalid email format",
-    });
-  }
-
   next();
 });
 
@@ -450,6 +433,10 @@ server.get("/api/v1/analytics/stats", async (req, res) => {
 });
 
 if (process.env.NODE_ENV !== "test") {
+  if (!SECRET) {
+    console.error("[Startup] ERROR: SECRET environment variable is not set. Bearer token auth will not work.");
+    process.exit(1);
+  }
   (async () => {
     try {
       await redis.connect();

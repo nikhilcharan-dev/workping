@@ -1,3 +1,4 @@
+import { asyncHandler } from "#utils/async.handler.js";
 import express from "express";
 import Attendance from "#models/Attendance.js";
 import Organization from "#models/Organization.js";

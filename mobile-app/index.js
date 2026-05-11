@@ -72,6 +72,7 @@ import { registerRootComponent } from 'expo';
 import NetInfo from '@react-native-community/netinfo';
 
 import App from './App';
+import './services/offlineQueue'; // Ensure offline queue handler is registered before NetInfo listener
 
 // ── Offline attendance sync ─────────────────────────────────────────────────
 // Configure NetInfo to probe a known WorkPing endpoint (avoids false positives
@@ -80,12 +81,10 @@ import App from './App';
 NetInfo.configure({ reachabilityUrl: 'https://api.workping.live/api/v1/health' });
 NetInfo.addEventListener(state => {
   if (state.isConnected && state.isInternetReachable) {
-    // Handler is registered by src/services/offlineQueue.js at App mount time.
-    if (typeof global.__WP_FLUSH_OFFLINE_QUEUE__ === 'function') {
-      global.__WP_FLUSH_OFFLINE_QUEUE__();
-    } else {
-      console.warn('Offline queue handler not registered. Make sure src/services/offlineQueue.js is imported and mounted.');
+    if (typeof global.__WP_FLUSH_OFFLINE_QUEUE__ !== 'function') {
+      throw new Error('[WorkPing] Offline queue handler not registered. offlineQueue.js must be imported in index.js before registerRootComponent.');
     }
+    global.__WP_FLUSH_OFFLINE_QUEUE__();
   }
 });
 

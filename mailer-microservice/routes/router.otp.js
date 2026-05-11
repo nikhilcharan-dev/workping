@@ -6,6 +6,15 @@ const router = Router();
 
 import crypto from "crypto";
 
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const validateEmail = (req, res, next) => {
+  const { email } = req.body;
+  if (!email || !emailRegex.test(email)) {
+    return res.status(400).json({ status: "error", error: "Valid email is required" });
+  }
+  next();
+};
+
 const generatorOtp = (len) => {
   return crypto
     .randomInt(0, 10 ** len)
@@ -14,7 +23,7 @@ const generatorOtp = (len) => {
 };
 
 /* ─── Send Email Verification OTP ─── */
-router.post("/send-email-otp", async (req, res) => {
+router.post("/send-email-otp", validateEmail, async (req, res) => {
   const { email } = req.body;
   try {
     const otp = generatorOtp(6);
@@ -37,7 +46,7 @@ router.post("/send-email-otp", async (req, res) => {
 });
 
 /* ─── Send Reset Password OTP ─── */
-router.post("/send-reset-password-otp", async (req, res) => {
+router.post("/send-reset-password-otp", validateEmail, async (req, res) => {
   const { email } = req.body;
   try {
     const otp = generatorOtp(6);
@@ -60,7 +69,7 @@ router.post("/send-reset-password-otp", async (req, res) => {
 });
 
 /* ─── Verify Reset Password OTP ─── */
-router.post("/verify-reset-password-otp", async (req, res) => {
+router.post("/verify-reset-password-otp", validateEmail, async (req, res) => {
   const { email, otp } = req.body;
   try {
     const OTP = await redis.get(`otp:reset:${email}`);
@@ -101,7 +110,7 @@ router.post("/send-phone-otp", async (req, res) => {
   }
 });
 
-router.post("/verify-email-otp", async (req, res) => {
+router.post("/verify-email-otp", validateEmail, async (req, res) => {
   const { email, otp } = req.body;
   try {
     const OTP = await redis.get(`otp:email:${email}`);

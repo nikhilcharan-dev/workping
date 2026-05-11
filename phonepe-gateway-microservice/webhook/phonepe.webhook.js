@@ -66,14 +66,16 @@ const phonepeWebhook = async (req, res) => {
     const { merchantOrderId, state, amount, metaInfo, paymentDetails } = payload;
 
     // 3. Idempotency check — deduplicate retried webhook deliveries
+    // Re-delivery of terminal states (COMPLETED/FAILED/CANCELLED) is idempotent and returns 200.
     const idempotencyKey = `webhook:seen:${merchantOrderId}:${state}`;
     const alreadyProcessed = await redis.set(idempotencyKey, "1", { NX: true, EX: IDEMPOTENCY_TTL });
     if (!alreadyProcessed) {
-      console.log(`[Webhook] Duplicate delivery skipped for order ${merchantOrderId} state=${state}`);
+      console.log(`[Webhook] Duplicate delivery (idempotent) for order ${merchantOrderId} state=${state}`);
       return res.status(200).json({ success: true, note: "duplicate" });
     }
 
-    // 4. State machine — reject invalid transitions
+    // 4. State machine — reject invalid transitions (terminal states allow no further transitions)
+    // COMPLETED, FAILED, CANCELLED have empty transition sets, making them absorbing states.
     const stateKey = `order:state:${merchantOrderId}`;
     const currentState = (await redis.get(stateKey)) || "PENDING";
     const allowed = VALID_TRANSITIONS[currentState];

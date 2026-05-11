@@ -1,3 +1,4 @@
+import { asyncHandler } from "#utils/async.handler.js";
 import bcrypt from "bcrypt";
 import mongoose from "mongoose";
 import User from "#models/User.js";

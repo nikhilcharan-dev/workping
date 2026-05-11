@@ -1,15 +1,211 @@
+import { asyncHandler } from "#utils/async.handler.js";
 import fs from "fs";
 import xlsx from "xlsx";
-import bcrypt from "bcrypt";
 import mongoose from "mongoose";
-import User from "#models/User.js";
-import Account from "#models/Account.js";
-import GovtProof from "#models/GovtProof.js";
-import Organization from "#models/Organization.js";
-import Team from "#models/Team.js";
 import { successResponse, errorResponse } from "#utils/response.helper.js";
-import { validatePhone } from "#utils/validators.js";
 import { checkEmployeeLimit } from "#utils/plan.limits.js";
+import {
+  REQUIRED_FIELDS,
+  validateRequiredFields,
+  validatePhoneFormat,
+  validateEmailFormat,
+  validateRole,
+  validateGender,
+  validateAadhaar,
+  validateWorkType,
+  validatePAN,
+  validatePassport,
+  validateSalary,
+  validateDateOfJoining,
+  validateDateOfBirth,
+  validatePanBankIdRelationship,
+  checkOrganizationExists,
+  checkTeamExists,
+  checkUserExists,
+  checkAccountExists,
+  createEmployeeRecords,
+  buildUserData,
+  buildAccountData,
+  buildGovtProofData,
+} from "./helpers.js";
+
+/**
+ * Process and validate a single row from Excel
+ */
+async function processRowValidation(row, rowNumber) {
+  // Validate required fields
+  const requiredCheck = validateRequiredFields(row, REQUIRED_FIELDS);
+  if (!requiredCheck.valid) {
+    return { valid: false, error: requiredCheck.error };
+  }
+
+  // Validate phone
+  const phoneCheck = validatePhoneFormat(row.phone);
+  if (!phoneCheck.valid) {
+    return { valid: false, error: phoneCheck.error };
+  }
+
+  // Validate email
+  const emailCheck = validateEmailFormat(row.email);
+  if (!emailCheck.valid) {
+    return { valid: false, error: emailCheck.error };
+  }
+
+  // Validate role
+  const roleCheck = validateRole(row.role);
+  if (!roleCheck.valid) {
+    return { valid: false, error: roleCheck.error };
+  }
+
+  // Validate gender
+  const genderCheck = validateGender(row.gender);
+  if (!genderCheck.valid) {
+    return { valid: false, error: genderCheck.error };
+  }
+
+  // Validate aadhaar
+  const aadhaarCheck = validateAadhaar(row.aadhaar);
+  if (!aadhaarCheck.valid) {
+    return { valid: false, error: aadhaarCheck.error };
+  }
+
+  // Validate work type
+  const workTypeCheck = validateWorkType(row.workType);
+  if (!workTypeCheck.valid) {
+    return { valid: false, error: workTypeCheck.error };
+  }
+
+  // Validate PAN
+  const panCheck = validatePAN(row.pan);
+  if (!panCheck.valid) {
+    return { valid: false, error: panCheck.error };
+  }
+
+  // Validate passport
+  const passportCheck = validatePassport(row.passport);
+  if (!passportCheck.valid) {
+    return { valid: false, error: passportCheck.error };
+  }
+
+  // Validate salary
+  const salaryCheck = validateSalary(row.salary);
+  if (!salaryCheck.valid) {
+    return { valid: false, error: salaryCheck.error };
+  }
+
+  // Validate dates
+  const dojCheck = validateDateOfJoining(row.dateOfJoining);
+  if (!dojCheck.valid) {
+    return { valid: false, error: dojCheck.error };
+  }
+
+  const dobCheck = validateDateOfBirth(row.dob);
+  if (!dobCheck.valid) {
+    return { valid: false, error: dobCheck.error };
+  }
+
+  // Validate PAN and bankId relationship
+  const panBankRelationCheck = validatePanBankIdRelationship(row.pan, row.bankId);
+  if (!panBankRelationCheck.valid) {
+    return { valid: false, error: panBankRelationCheck.error };
+  }
+
+  return {
+    valid: true,
+    data: {
+      email: emailCheck.email,
+      phone: phoneCheck.normalized,
+      role: roleCheck.role,
+      gender: genderCheck.gender,
+      aadhaar: aadhaarCheck.aadhaar,
+      workType: workTypeCheck.workType,
+      pan: panCheck.pan,
+      passport: passportCheck.passport,
+      salary: salaryCheck.salary,
+      dojDate: dojCheck.date,
+      dobDate: dobCheck.date,
+    },
+  };
+}
+
+/**
+ * Process a single row and create records
+ */
+async function processRowCreation(row, validatedData, failedRecords, successfulRecords, rowNumber, userId) {
+  // Check organization
+  const orgCheck = await checkOrganizationExists(row.organizationName);
+  if (!orgCheck.exists) {
+    failedRecords.push({ error: orgCheck.error, rowNumber, rowData: row });
+    return;
+  }
+
+  // Check team if provided
+  const teamCheck = await checkTeamExists(row.teamName, orgCheck.organization._id);
+  if (row.teamName && !teamCheck.exists) {
+    failedRecords.push({
+      error: `Team '${row.teamName}' not found in organization '${row.organizationName}'`,
+      rowNumber,
+      rowData: row,
+    });
+    return;
+  }
+
+  // Check user doesn't exist
+  const userCheck = await checkUserExists(validatedData.email, validatedData.phone, String(row.employeeId).trim(), orgCheck.organization._id);
+  if (userCheck.exists) {
+    failedRecords.push({ error: userCheck.error, rowNumber, rowData: row });
+    return;
+  }
+
+  // Check account doesn't exist
+  const accountCheck = await checkAccountExists(validatedData.email);
+  if (accountCheck.exists) {
+    failedRecords.push({ error: accountCheck.error, rowNumber, rowData: row });
+    return;
+  }
+
+  // Create records in transaction
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const userData = buildUserData(
+      row,
+      validatedData.email,
+      validatedData.phone,
+      orgCheck.organization._id,
+      validatedData.role,
+      validatedData.gender,
+      validatedData.dojDate,
+      validatedData.dobDate,
+      teamCheck.team ? teamCheck.team._id : null
+    );
+
+    const accountData = buildAccountData(row, validatedData.email, validatedData.role);
+
+    const govtProofData = buildGovtProofData(row, validatedData.aadhaar, validatedData.pan, validatedData.passport);
+
+    const newUser = await createEmployeeRecords(userData, accountData, govtProofData, session);
+
+    await session.commitTransaction();
+
+    successfulRecords.push({
+      rowNumber,
+      employeeId: newUser.employeeId,
+      email: newUser.email,
+      name: newUser.name,
+    });
+  } catch (error) {
+    await session.abortTransaction();
+    failedRecords.push({
+      error: error.message || "Database error occurred",
+      rowNumber,
+      rowData: row,
+    });
+  } finally {
+    session.endSession();
+  }
+}
 
 const insertByExcel = asyncHandler(async (req, res) => {
   if (!req.file) {
@@ -25,25 +221,6 @@ const insertByExcel = asyncHandler(async (req, res) => {
   // Delete file after processing
   fs.unlinkSync(filePath);
 
-  const requiredFields = [
-    "name",
-    "email",
-    "phone",
-    "employeeId",
-    "organizationName",
-    "dateOfJoining",
-    "aadhaar",
-    "gender",
-    "dob",
-    "address",
-    "workType",
-  ];
-
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  const validRoles = ["manager", "teamLead", "employee"];
-  const validGenders = ["male", "female", "other"];
-  const validWorkTypes = ["onsite", "remote", "hybrid"];
-
   const failedRecords = [];
   const successfulRecords = [];
 
@@ -53,312 +230,20 @@ const insertByExcel = asyncHandler(async (req, res) => {
   for (let i = 0; i < jsonData.length; i++) {
     const row = jsonData[i];
     const rowNumber = i + 2;
-    let validationError = null;
 
-    // Validate required fields
-    for (const field of requiredFields) {
-      if (
-        row[field] === undefined ||
-        row[field] === null ||
-        (typeof row[field] === "string" && row[field].trim() === "")
-      ) {
-        validationError = `Required field "${field}" is missing or empty`;
-        break;
-      }
-    }
-
-    if (validationError) {
+    // Validate row
+    const validationResult = await processRowValidation(row, rowNumber);
+    if (!validationResult.valid) {
       failedRecords.push({
-        error: validationError,
+        error: validationResult.error,
         rowNumber,
         rowData: row,
       });
       continue;
     }
 
-    // Validate phone format
-    const phoneValidation = validatePhone(row.phone);
-    if (!phoneValidation.valid) {
-      failedRecords.push({ error: phoneValidation.error, rowNumber, rowData: row });
-      continue;
-    }
-
-    // Validate email format
-    const email = String(row.email).trim();
-    if (!emailRegex.test(email)) {
-      failedRecords.push({
-        error: "Invalid email format",
-        rowNumber,
-        rowData: row,
-      });
-      continue;
-    }
-
-    // Validate role enum if provided
-    const role = row.role ? String(row.role).toLowerCase() : null;
-    if (role && !validRoles.includes(role)) {
-      failedRecords.push({
-        error: `Invalid role. Must be one of: ${validRoles.join(", ")}`,
-        rowNumber,
-        rowData: row,
-      });
-      continue;
-    }
-
-    // Validate gender enum
-    const gender = String(row.gender).toLowerCase();
-    if (!validGenders.includes(gender)) {
-      failedRecords.push({
-        error: `Invalid gender. Must be one of: ${validGenders.join(", ")}`,
-        rowNumber,
-        rowData: row,
-      });
-      continue;
-    }
-
-    // Validate aadhaar format
-    const aadhaarRegex = /^\d{12}$/;
-    if (!aadhaarRegex.test(String(row.aadhaar).trim())) {
-      failedRecords.push({
-        error: "Invalid aadhaar format. Must be exactly 12 digits",
-        rowNumber,
-        rowData: row,
-      });
-      continue;
-    }
-
-    if (!validWorkTypes.includes(String(row.workType).toLowerCase())) {
-      failedRecords.push({
-        error: `Invalid work type. Must be one of: ${validWorkTypes.join(", ")}`,
-        rowNumber,
-        rowData: row,
-      });
-      continue;
-    }
-
-    // Validate PAN format if provided
-    if (row.pan) {
-      const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]$/;
-      if (!panRegex.test(String(row.pan).trim().toUpperCase())) {
-        failedRecords.push({
-          error: "Invalid PAN format. Expected format: AAAAA9999A",
-          rowNumber,
-          rowData: row,
-        });
-        continue;
-      }
-    }
-
-    // Validate passport format if provided
-    if (row.passport) {
-      const passportRegex = /^[A-Z0-9]{4,15}$/;
-      if (!passportRegex.test(String(row.passport).trim().toUpperCase())) {
-        failedRecords.push({
-          error: "Invalid passport format. Expected 4-15 alphanumeric characters",
-          rowNumber,
-          rowData: row,
-        });
-        continue;
-      }
-    }
-
-    // Validate salary if provided
-    if (row.salary !== undefined && row.salary !== null && row.salary !== "") {
-      const salaryNum = Number(row.salary);
-      if (isNaN(salaryNum) || salaryNum < 0) {
-        failedRecords.push({
-          error: "Invalid salary value",
-          rowNumber,
-          rowData: row,
-        });
-        continue;
-      }
-    }
-
-    // Validate dateOfJoining is not a future date
-    const dojDate = new Date(row.dateOfJoining);
-    if (isNaN(dojDate.getTime())) {
-      failedRecords.push({
-        error: "Invalid date of joining",
-        rowNumber,
-        rowData: row,
-      });
-      continue;
-    }
-    if (dojDate > new Date()) {
-      failedRecords.push({
-        error: "Date of joining cannot be a future date",
-        rowNumber,
-        rowData: row,
-      });
-      continue;
-    }
-
-    // Validate date of birth
-    const dobDate = new Date(row.dob);
-    if (isNaN(dobDate.getTime())) {
-      failedRecords.push({
-        error: "Invalid date of birth",
-        rowNumber,
-        rowData: row,
-      });
-      continue;
-    }
-    if (dobDate > new Date()) {
-      failedRecords.push({
-        error: "Date of birth cannot be a future date",
-        rowNumber,
-        rowData: row,
-      });
-      continue;
-    }
-
-    // Validate PAN and bankId must be provided together
-    if ((row.pan && !row.bankId) || (!row.pan && row.bankId)) {
-      failedRecords.push({
-        error: "pan and bankId must be provided together",
-        rowNumber,
-        rowData: row,
-      });
-      continue;
-    }
-
-    // Check if organization exists
-    const organization = await Organization.findOne({ name: row.organizationName });
-    if (!organization) {
-      failedRecords.push({
-        error: `Organization '${row.organizationName}' not found`,
-        rowNumber,
-        rowData: row,
-      });
-      continue;
-    }
-
-    // Check if team exists (if teamName provided)
-    let team = null;
-    if (row.teamName) {
-      team = await Team.findOne({
-        teamName: row.teamName,
-        organizationId: organization._id,
-      });
-      if (!team) {
-        failedRecords.push({
-          error: `Team '${row.teamName}' not found in organization '${row.organizationName}'`,
-          rowNumber,
-          rowData: row,
-        });
-        continue;
-      }
-    }
-
-    // Check if user already exists (email/phone globally, employeeId within org)
-    const existingUser = await User.findOne({
-      $or: [
-        { email: email },
-        { phone: phoneValidation.normalized },
-        { employeeId: String(row.employeeId).trim(), organizationId: organization._id },
-      ],
-    });
-
-    if (existingUser) {
-      failedRecords.push({
-        error: "User already exists with this email, phone, or employeeId in this organization",
-        rowNumber,
-        rowData: row,
-      });
-      continue;
-    }
-
-    // Check if account already exists
-    const existingAccount = await Account.findOne({ email: email });
-    if (existingAccount) {
-      failedRecords.push({
-        error: "Account already exists with this email",
-        rowNumber,
-        rowData: row,
-      });
-      continue;
-    }
-
-    const session = await mongoose.startSession();
-    session.startTransaction();
-
-    try {
-      // Prepare user data
-      const userData = {
-        name: String(row.name).trim(),
-        email: email,
-        phone: phoneValidation.normalized,
-        employeeId: String(row.employeeId).trim(),
-        organizationId: organization._id,
-        dateOfJoining: new Date(dojDate.toISOString().split("T")[0]),
-        workType: String(row.workType).trim().toLowerCase(),
-      };
-
-      // Add optional user fields
-      userData.gender = String(row.gender).toLowerCase();
-      if (role) userData.role = role;
-      if (row.salary !== undefined && row.salary !== null && row.salary !== "") {
-        userData.salary = Number(row.salary);
-      }
-      const dobOnly = new Date(new Date(row.dob).toISOString().split("T")[0]);
-      userData.dob = dobOnly;
-      userData.address = String(row.address).trim();
-      if (team) userData.teamId = team._id;
-      if (row.isActive !== undefined) userData.isActive = Boolean(row.isActive);
-
-      // Create user
-      const [newUser] = await User.create([userData], { session });
-
-      // Create account with password
-      const password = process.env.USER_DEFAULT_PASSWORD || "WorkPing@123";
-      const hashedPassword = await bcrypt.hash(password, 10);
-
-      const accountData = {
-        email: email,
-        password: hashedPassword,
-        emailVerified: false,
-      };
-
-      if (role) accountData.role = role;
-
-      await Account.create([accountData], { session });
-
-      // Create government proof
-      if (row.pan && row.bankId) {
-        const govtProofData = {
-          aadhaarNumber: String(row.aadhaar).trim(),
-          panNumber: String(row.pan).trim().toUpperCase(),
-          bankAccount: String(row.bankId).trim(),
-          userId: newUser._id,
-        };
-
-        if (row.passport) {
-          govtProofData.passportNumber = String(row.passport).trim().toUpperCase();
-        }
-
-        await GovtProof.create([govtProofData], { session });
-      }
-
-      await session.commitTransaction();
-
-      successfulRecords.push({
-        rowNumber,
-        employeeId: newUser.employeeId,
-        email: newUser.email,
-        name: newUser.name,
-      });
-    } catch (error) {
-      await session.abortTransaction();
-
-      failedRecords.push({
-        error: error.message || "Database error occurred",
-        rowNumber,
-        rowData: row,
-      });
-    } finally {
-      session.endSession();
-    }
+    // Create records
+    await processRowCreation(row, validationResult.data, failedRecords, successfulRecords, rowNumber, req.user.userId);
   }
 
   const successCount = successfulRecords.length;

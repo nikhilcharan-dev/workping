@@ -153,6 +153,13 @@ MAX_IMAGE_BYTES = 5 * 1024 * 1024   # 5 MB after decoding
 RATE_LIMIT_REQUESTS = int(os.environ.get("RATE_LIMIT_REQUESTS", "30"))
 RATE_LIMIT_WINDOW_SECONDS = int(os.environ.get("RATE_LIMIT_WINDOW_SECONDS", "60"))
 
+# Liveness detection thresholds for optical flow analysis (configurable per deployment)
+LIVENESS_MOTION_THRESHOLD = float(os.environ.get("LIVENESS_MOTION_THRESHOLD", "0.08"))
+LIVENESS_VARIANCE_THRESHOLD = float(os.environ.get("LIVENESS_VARIANCE_THRESHOLD", "0.0005"))
+
+# FAISS index health flag - set to False if indexes fail to load during startup
+FAISS_READY = False
+
 # ---------------- MODELS ----------------
 class EnrollRequest(BaseModel):
     image_base64: str
@@ -219,6 +226,37 @@ class ConnectionManager:
             await ws.send_json(msg)
 
 manager = ConnectionManager()
+
+# ─────── IN-MEMORY RATE LIMITER (fallback for Redis unavailability) ────────
+class MemoryRateLimiter:
+    def __init__(self, window_seconds: int):
+        self.window_seconds = window_seconds
+        self.requests: dict = {}  # user_id -> [(timestamp, count), ...]
+
+    def is_allowed(self, user_id: str, limit: int) -> bool:
+        now = time.time()
+        if user_id not in self.requests:
+            self.requests[user_id] = []
+
+        # Clean old entries outside the window
+        self.requests[user_id] = [
+            (ts, cnt) for ts, cnt in self.requests[user_id]
+            if now - ts < self.window_seconds
+        ]
+
+        # Sum requests within window
+        total = sum(cnt for _, cnt in self.requests[user_id])
+        if total >= limit:
+            return False
+
+        # Record this request
+        self.requests[user_id].append((now, 1))
+        return True
+
+memory_limiter = MemoryRateLimiter(RATE_LIMIT_WINDOW_SECONDS)
+
+# ─────── PROMETHEUS-STYLE METRIC (expose Redis failures) ─────────────────
+rate_limit_redis_failures = 0
 
 # ---------------- APP ----------------
 app = FastAPI(title="Face Recognition API - v3")
@@ -353,26 +391,37 @@ async def inference_worker():
 
 @app.on_event("startup")
 async def startup_event():
-    # Try loading FAISS indexes from disk first; fall back to MongoDB rebuild
+    global FAISS_READY
     col = get_embeddings_collection()
-    try:
-        all_docs = await col.find(
-            {}, {"_id": 0, "organization_id": 1, "employee_id": 1, "embedding": 1}
-        ).to_list(length=None)
-        orgs: dict = {}
-        for doc in all_docs:
-            org = doc.get("organization_id", "default")
-            orgs.setdefault(org, []).append(doc)
+    max_retries = 3
+    retry_delay = 2
 
-        loaded_orgs = 0
-        for org_id in orgs.keys():
-            if faiss_index.load(org_id):
-                loaded_orgs += 1
+    for attempt in range(max_retries):
+        try:
+            orgs: dict = {}
+            batch_size = 500
+            cursor = col.find({}, {"_id": 0, "organization_id": 1, "employee_id": 1, "embedding": 1})
+            cursor.batch_size(batch_size)
+            async for doc in cursor:
+                org = doc.get("organization_id", "default")
+                orgs.setdefault(org, []).append(doc)
+
+            loaded_orgs = 0
+            for org_id in orgs.keys():
+                if faiss_index.load(org_id):
+                    loaded_orgs += 1
+                else:
+                    faiss_index.rebuild(org_id, orgs[org_id])
+            print(f"FAISS indexes: {loaded_orgs} loaded from disk, {len(orgs) - loaded_orgs} rebuilt from MongoDB")
+            FAISS_READY = True
+            break
+        except Exception as e:
+            print(f"FAISS startup attempt {attempt + 1}/{max_retries} failed: {e}")
+            if attempt < max_retries - 1:
+                await asyncio.sleep(retry_delay)
+                retry_delay *= 2
             else:
-                faiss_index.rebuild(org_id, orgs[org_id])
-        print(f"FAISS indexes: {loaded_orgs} loaded from disk, {len(orgs) - loaded_orgs} rebuilt from MongoDB")
-    except Exception as e:
-        print(f"FAISS startup warning (non-fatal): {e}")
+                print("FAISS startup failed after max retries. Indexes will remain empty until service restart.")
 
     for _ in range(INFERENCE_WORKERS):
         asyncio.create_task(inference_worker())
@@ -393,7 +442,8 @@ def validate_image_b64(image_b64: str) -> bytes:
 
 
 async def check_rate_limit(user_id: str):
-    """Redis sliding-window rate limit per user_id. Raises 429 when exceeded."""
+    """Redis sliding-window rate limit per user_id. Falls back to in-memory limiter if Redis unavailable. Raises 429 when exceeded."""
+    global rate_limit_redis_failures
     redis = _get_redis()
     key = f"rl:detect:{user_id}"
     try:
@@ -408,8 +458,14 @@ async def check_rate_limit(user_id: str):
     except HTTPException:
         raise
     except Exception as e:
-        import logging
-        logging.warning(f"Rate limit check failed (Redis unavailable): {e}. Failing open for user {user_id}.")
+        rate_limit_redis_failures += 1
+        print(f"[RateLimit] Redis unavailable (attempt {rate_limit_redis_failures}): {e}. Using in-memory fallback for user {user_id}.")
+        # Fail-closed: use in-memory limiter as fallback (stricter, per-instance)
+        if not memory_limiter.is_allowed(user_id, RATE_LIMIT_REQUESTS):
+            raise HTTPException(
+                status_code=429,
+                detail=f"Rate limit exceeded (failover mode): max {RATE_LIMIT_REQUESTS} requests per {RATE_LIMIT_WINDOW_SECONDS}s",
+            )
 
 
 # ---------------- HELPERS ----------------
@@ -446,6 +502,8 @@ async def home():
 
 @app.get("/api/v1/health")
 async def health():
+    if not FAISS_READY:
+        raise HTTPException(status_code=503, detail="FAISS indexes not ready. MongoDB connection failed or startup incomplete.")
     return {
         "status": "ok",
         "gpu_available": is_gpu_available(),
@@ -673,8 +731,7 @@ def _analyze_liveness_frames(frames_bytes: list) -> dict:
 
     mean_motion = float(np.mean(motion_magnitudes))
     variance = float(np.var(motion_magnitudes))
-    # Empirical thresholds: live face ~0.3–2.0 mean, photo/screen < 0.08
-    is_live = mean_motion > 0.08 and variance > 0.0005
+    is_live = mean_motion > LIVENESS_MOTION_THRESHOLD and variance > LIVENESS_VARIANCE_THRESHOLD
     confidence = min(1.0, mean_motion * 3.0)
     return {
         "is_live": is_live,
