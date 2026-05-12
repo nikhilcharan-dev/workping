@@ -1,3 +1,42 @@
+// Field names whose values should never be retained verbatim. The list errs
+// on the side of over-redaction — a debugging log is allowed to hide a value
+// it doesn't really need to show.
+const SENSITIVE_KEYS = new Set([
+    "password",
+    "currentPassword",
+    "newPassword",
+    "confirmPassword",
+    "token",
+    "accessToken",
+    "refreshToken",
+    "Authorization",
+    "authorization",
+    "code",
+    "code_verifier",
+    "image_base64",
+    "frames",
+    "otp",
+    "pin",
+    "secret",
+    "apiKey",
+    "api_key",
+]);
+
+function redact(value, depth = 0) {
+    if (depth > 5 || value == null) return value;
+    if (Array.isArray(value)) return value.map((v) => redact(v, depth + 1));
+    if (typeof value !== "object") return value;
+    const out = {};
+    for (const [k, v] of Object.entries(value)) {
+        if (SENSITIVE_KEYS.has(k)) {
+            out[k] = typeof v === "string" && v.length ? `[REDACTED:${v.length}]` : "[REDACTED]";
+        } else {
+            out[k] = redact(v, depth + 1);
+        }
+    }
+    return out;
+}
+
 class LogStore {
     constructor() {
         this.logs = [];
@@ -9,7 +48,7 @@ class LogStore {
         const newLog = {
             id: Date.now() + Math.random().toString(36).substr(2, 9),
             timestamp: new Date().toISOString(),
-            ...log,
+            ...redact(log),
         };
         this.logs = [newLog, ...this.logs].slice(0, this.maxLogs);
         this.notify();

@@ -41,10 +41,13 @@
  *                            utils/location.js. Public IP is intentionally
  *                            NOT collected on device — server reads X-
  *                            Forwarded-For so clients can't spoof.
- *   • Offline sync       — index.js installs a NetInfo listener that
- *                          flushes queued check-ins (expo-sqlite) to the
- *                          Core API on reconnect via
- *                          global.__WP_FLUSH_OFFLINE_QUEUE__.
+ *   • Offline sync       — index.js installs a NetInfo listener that awaits
+ *                          src/services/offlineQueue.js's readiness promise,
+ *                          then drains the expo-sqlite queue on reconnect.
+ *                          useFaceCapture enqueues a row when a check-in fails
+ *                          with no server response (network/timeout). Rows are
+ *                          replayed via multipart fetch (attendance) or the
+ *                          shared httpClient (json) in chronological order.
  *   • Push notifications — expo-notifications. Device token registered
  *                          with the Core API on first launch; shift
  *                          reminders + leave-approval events delivered.

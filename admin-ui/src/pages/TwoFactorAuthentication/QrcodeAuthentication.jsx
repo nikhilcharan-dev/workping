@@ -4,6 +4,7 @@ import axiosClient from '@/helpers/httpClient'
 import toast from 'react-hot-toast'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuthContext } from '@/context/useAuthContext'
+import { safeInternalPath } from '@/helpers/safeNavigate'
 
 const MODAL_OVERLAY_Z_INDEX = 99999
 const MODAL_CONTENT_Z_INDEX = 100000
@@ -61,7 +62,7 @@ const QRAuthModal = () => {
         }
 
         if (navigationState?.action === 'ORG' || navigationState?.action === 'SIGN-UP') {
-          navigate(navigationState.path, {
+          navigate(safeInternalPath(navigationState.path), {
             state: { formData: navigationState?.formData },
           })
         } else {
@@ -97,7 +98,7 @@ const QRAuthModal = () => {
   const handleSkip = () => {
     setIs2FAAuthnticator(true)
     if (navigationState?.path) {
-      navigate(navigationState.path, {
+      navigate(safeInternalPath(navigationState.path), {
         state: { formData: navigationState?.formData },
       })
     } else {

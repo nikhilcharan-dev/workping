@@ -289,7 +289,7 @@ describe("Google OAuth Flow", () => {
         .query({ code: "mock-code", state: "mobile" });
 
       expect(res.status).toBe(302);
-      expect(res.headers.location).toContain("reback://auth");
+      expect(res.headers.location).toContain("workping://auth");
       expect(res.headers.location).toContain("token=");
     });
 
@@ -461,7 +461,7 @@ describe("Microsoft OAuth Flow", () => {
         .query({ code: "mock-ms-code", state: "mobile" });
 
       expect(res.status).toBe(302);
-      expect(res.headers.location).toContain("reback://auth");
+      expect(res.headers.location).toContain("workping://auth");
     });
   });
 });

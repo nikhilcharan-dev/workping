@@ -31,8 +31,12 @@ function verifyBasicAuth(authHeader) {
 }
 
 function verifyXVerify(rawBody, xVerifyHeader) {
-  if (!PHONEPE_WEBHOOK_SECRET || !xVerifyHeader) return !PHONEPE_WEBHOOK_SECRET; // skip if not configured
+  // Fail closed: if the secret isn't configured, reject all webhooks. Previously
+  // missing secret skipped HMAC entirely, leaving only basic auth as the gate.
+  if (!PHONEPE_WEBHOOK_SECRET) return false;
+  if (!xVerifyHeader || !rawBody) return false;
   const [signature] = xVerifyHeader.split("###");
+  if (!signature) return false;
   const expected = crypto.createHmac("sha256", PHONEPE_WEBHOOK_SECRET).update(rawBody).digest("hex");
   try {
     return crypto.timingSafeEqual(Buffer.from(signature.trim()), Buffer.from(expected));
@@ -49,8 +53,11 @@ const phonepeWebhook = async (req, res) => {
       return res.status(401).send("Unauthorized");
     }
 
-    // 2. PhonePe HMAC signature verification (X-Verify header)
-    const rawBody = JSON.stringify(req.body);
+    // 2. PhonePe HMAC signature verification (X-Verify header).
+    // req.rawBody is captured by the express.json verify hook in service.js so
+    // the HMAC operates on the exact bytes PhonePe signed (re-serializing the
+    // parsed body would not be byte-stable).
+    const rawBody = req.rawBody;
     if (!verifyXVerify(rawBody, req.headers["x-verify"])) {
       console.warn("[Webhook] Unauthorized: X-Verify signature mismatch");
       return res.status(401).send("Unauthorized");

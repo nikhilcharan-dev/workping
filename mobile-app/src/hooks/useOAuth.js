@@ -31,8 +31,13 @@ const useOAuth = (role = "admin") => {
     const { saveSession } = useAuthContext();
     const { showNotification } = useNotificationContext();
     const isMountedRef = useRef(true);
-    // Store verifier in ref so it survives the redirect round-trip within the same session
+    // Store verifier + state in refs so they survive the redirect round-trip
+    // within the same session. State binds the redirect back to this exact
+    // OAuth attempt — without it, an attacker who can deliver `workping://auth`
+    // deep links could plant a chosen token in the URL and log the user in
+    // as someone they control.
     const pkceVerifierRef = useRef(null);
+    const stateRef = useRef(null);
 
     useEffect(() => {
         return () => {
@@ -41,8 +46,21 @@ const useOAuth = (role = "admin") => {
     }, []);
 
     const handleOAuthResult = useCallback(
-        async (result) => {
+        async (result, initiatedProvider) => {
             if (result.type !== "success" || !result.url) return false;
+
+            // Capture refs once and immediately null them so any second
+            // redirect (e.g. from an attacker-crafted deep link arriving later)
+            // cannot reuse the same verifier/state.
+            const expectedState = stateRef.current;
+            const verifier = pkceVerifierRef.current;
+            stateRef.current = null;
+            pkceVerifierRef.current = null;
+
+            if (!expectedState) {
+                showNotification({ message: "No active OAuth session", variant: "danger" });
+                return false;
+            }
 
             try {
                 const url = new URL(result.url);
@@ -50,20 +68,33 @@ const useOAuth = (role = "admin") => {
                 const token = url.searchParams.get("token");
                 const error = url.searchParams.get("error");
                 const oauthRole = url.searchParams.get("role");
+                const receivedState = url.searchParams.get("state");
+                // Server echoes provider so the exchange can route correctly
+                // even if the start-side ref were ever lost.
+                const redirectProvider = url.searchParams.get("provider") || initiatedProvider;
 
                 if (error) {
                     showNotification({ message: error, variant: "danger" });
                     return false;
                 }
 
+                // Bind the redirect to this exact OAuth attempt. Reject any
+                // response that doesn't echo the state we sent.
+                if (receivedState !== expectedState) {
+                    showNotification({ message: "OAuth state mismatch — possible CSRF", variant: "danger" });
+                    return false;
+                }
+
                 // Server returns a short-lived code that must be exchanged with the verifier
-                if (code && pkceVerifierRef.current) {
-                    const exchangeRes = await fetch(`${runtimeConfig.getApiUrl()}/auth/pkce/exchange`, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ code, code_verifier: pkceVerifierRef.current }),
-                    });
-                    pkceVerifierRef.current = null;
+                if (code && verifier && redirectProvider) {
+                    const exchangeRes = await fetch(
+                        `${runtimeConfig.getApiUrl()}/auth/${redirectProvider}/pkce/exchange`,
+                        {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ code, code_verifier: verifier }),
+                        }
+                    );
                     if (!exchangeRes.ok) {
                         showNotification({ message: "OAuth token exchange failed", variant: "danger" });
                         return false;
@@ -76,7 +107,9 @@ const useOAuth = (role = "admin") => {
                     }
                 }
 
-                // Fallback: server returned token directly (non-PKCE path)
+                // Fallback non-PKCE path: only honored when state already matched.
+                // The token-in-URL pattern is still less safe than the code+verifier
+                // exchange, but the state binding closes the deep-link forgery path.
                 if (token) {
                     saveSession({ token, role: oauthRole || role });
                     showNotification({ message: "Signed in successfully", variant: "success" });
@@ -96,14 +129,18 @@ const useOAuth = (role = "admin") => {
         async (provider) => {
             const verifier = await generateCodeVerifier();
             const challenge = await generateCodeChallenge(verifier);
+            // 16 bytes of randomness = 128 bits — way past any feasible guess.
+            const stateBytes = await Crypto.getRandomBytesAsync(16);
+            const state = base64urlEncode(stateBytes);
             pkceVerifierRef.current = verifier;
+            stateRef.current = state;
 
             const url =
                 `${runtimeConfig.getApiUrl()}/auth/${provider}/start` +
-                `?platform=mobile&code_challenge=${challenge}&code_challenge_method=S256`;
+                `?platform=mobile&code_challenge=${challenge}&code_challenge_method=S256&state=${encodeURIComponent(state)}`;
 
             const result = await WebBrowser.openAuthSessionAsync(url, "workping://auth");
-            await handleOAuthResult(result);
+            await handleOAuthResult(result, provider);
         },
         [handleOAuthResult]
     );

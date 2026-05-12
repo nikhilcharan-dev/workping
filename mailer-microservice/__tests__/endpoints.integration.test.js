@@ -19,9 +19,18 @@ import { jest } from "@jest/globals";
 process.env.NODE_ENV = "test";
 process.env.SECRET = "shared-mailer-secret-32-bytes-long";
 
-// ── In-memory redis mock (mirrors the subset used by router.otp.js) ────────
+// ── In-memory redis mock — covers the subset used by router.otp.js (string
+//    keys + TTLs), utils/rateLimit.js (incr + expire), and utils/analytics.js
+//    (hash counters). Everything is fail-open in the production code, so a
+//    missing method here would mask a real bug — keep this in sync if the
+//    surface area grows.
 const store = new Map();
 const ttls = new Map();
+const hashes = new Map(); // key → Map(field → string)
+const getHash = (key) => {
+  if (!hashes.has(key)) hashes.set(key, new Map());
+  return hashes.get(key);
+};
 const mockRedis = {
   connect: jest.fn().mockResolvedValue(),
   on: jest.fn(),
@@ -36,16 +45,44 @@ const mockRedis = {
     ttls.delete(key);
     return had ? 1 : 0;
   }),
+  incr: jest.fn(async (key) => {
+    const next = (parseInt(store.get(key) || "0", 10)) + 1;
+    store.set(key, String(next));
+    return next;
+  }),
+  expire: jest.fn(async (key, seconds) => {
+    if (!store.has(key)) return 0;
+    ttls.set(key, seconds);
+    return 1;
+  }),
+  hIncrBy: jest.fn(async (key, field, increment) => {
+    const h = getHash(key);
+    const next = parseInt(h.get(field) || "0", 10) + increment;
+    h.set(field, String(next));
+    return next;
+  }),
+  hSet: jest.fn(async (key, field, value) => {
+    const h = getHash(key);
+    const isNew = !h.has(field);
+    h.set(field, String(value));
+    return isNew ? 1 : 0;
+  }),
+  hGetAll: jest.fn(async (key) => Object.fromEntries(getHash(key).entries())),
 };
 
 // ── Fake nodemailer transporter (records every sendMail call) ──────────────
 const sendMail = jest.fn().mockResolvedValue({ messageId: "stub-message-id" });
 const verify = jest.fn((cb) => cb && cb(null, true));
 const mockTransporter = { sendMail, verify };
+const verifyTransport = jest.fn().mockResolvedValue();
 
 // ── Apply module mocks BEFORE importing the app ────────────────────────────
 jest.unstable_mockModule("../config/redisConfig.js", () => ({ default: mockRedis, __esModule: true }));
-jest.unstable_mockModule("../config/mailTransporter.js", () => ({ default: mockTransporter, __esModule: true }));
+jest.unstable_mockModule("../config/mailTransporter.js", () => ({
+  default: mockTransporter,
+  verifyTransport,
+  __esModule: true,
+}));
 
 const { default: request } = await import("supertest");
 const { default: app } = await import("../server.js");
@@ -56,6 +93,7 @@ const headers = { Authorization: SECRET };
 beforeEach(() => {
   store.clear();
   ttls.clear();
+  hashes.clear();
   sendMail.mockClear();
 });
 

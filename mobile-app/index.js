@@ -39,16 +39,29 @@
  * Public IP is deliberately NOT collected on the device — the server reads
  * it from X-Forwarded-For / req.ip so the client can't spoof it.
  *
- * ── OFFLINE ATTENDANCE SYNC (foundation in place) ────────────────────────────
- * Storage:   expo-sqlite — local queue (timestamp + face_image_b64 + location)
+ * ── OFFLINE ATTENDANCE SYNC ──────────────────────────────────────────────────
+ * Storage:   expo-sqlite — local queue with columns (id, kind, created_at,
+ *            endpoint, payload). Owned by src/services/offlineQueue.js. The
+ *            IIFE in that module exposes `offlineQueueReady` (Promise<boolean>)
+ *            so callers can await DB readiness instead of racing a global
+ *            handoff that could fire before SQLite was open.
  * Detector:  @react-native-community/netinfo — reachability probe configured
  *            below against https://api.workping.live/api/v1/health
  * Flush:     When the listener fires with isConnected && isInternetReachable,
- *            global.__WP_FLUSH_OFFLINE_QUEUE__() drains the SQLite queue in
- *            chronological order to the Core API. The handler itself is
- *            registered in src/services/offlineQueue.js when the App tree
- *            mounts. This makes field staff and low-connectivity warehouses
- *            usable without a permanent network.
+ *            it awaits offlineQueueReady and then calls flushQueue(), which
+ *            drains rows in chronological order. `attendance` rows replay
+ *            through multipart fetch (same FormData path faceApi.detect uses).
+ *            `json` rows replay through the shared httpClient so auth refresh
+ *            and logging interceptors still apply. 4xx responses drop the
+ *            poison row to prevent queue jams; 5xx and network errors stop
+ *            the drain so chronological order is preserved on the next retry.
+ * Producer:  useFaceCapture.js enqueues an `attendance` row when detect()
+ *            fails with no server response (network or timeout). The cropped
+ *            face image is first copied via expo-file-system into the app's
+ *            documents directory (FileSystem.documentDirectory + 'offline-queue/')
+ *            so the file survives OS cache purges between enqueue and flush.
+ *            The persistent URI is stored in the payload; the file is deleted
+ *            after a successful upload or a 4xx permanent drop.
  *
  * ── AUTH + SECURE STORAGE ────────────────────────────────────────────────────
  * Tokens stored in expo-secure-store (encrypted Keychain on iOS, EncryptedSharedPreferences on Android).
@@ -72,33 +85,25 @@ import { registerRootComponent } from 'expo';
 import NetInfo from '@react-native-community/netinfo';
 
 import App from './App';
-import './services/offlineQueue'; // Ensure offline queue handler is registered before NetInfo listener
+import { offlineQueueReady, flushQueue } from '@/services/offlineQueue';
 
 // ── Offline attendance sync ─────────────────────────────────────────────────
 // Configure NetInfo to probe a known WorkPing endpoint (avoids false positives
 // where the device has WiFi but no actual internet — common in office routers
 // with captive portals or expired DHCP leases).
 NetInfo.configure({ reachabilityUrl: 'https://api.workping.live/api/v1/health' });
-NetInfo.addEventListener(state => {
+NetInfo.addEventListener(async state => {
+  if (!(state.isConnected && state.isInternetReachable)) return;
   try {
-    if (state.isConnected && state.isInternetReachable) {
-      if (typeof global.__WP_FLUSH_OFFLINE_QUEUE__ !== 'function') {
-        console.warn('[WorkPing] Offline queue handler not yet registered. Retrying in 1s.');
-        setTimeout(() => {
-          try {
-            if (typeof global.__WP_FLUSH_OFFLINE_QUEUE__ === 'function') {
-              global.__WP_FLUSH_OFFLINE_QUEUE__();
-            } else {
-              console.error('[WorkPing] Offline queue handler still not registered after retry.');
-            }
-          } catch (retryError) {
-            console.error('[WorkPing] Error flushing offline queue on retry:', retryError.message);
-          }
-        }, 1000);
-        return;
-      }
-      global.__WP_FLUSH_OFFLINE_QUEUE__();
+    // Await the offline-queue init promise instead of polling a global. If the
+    // DB failed to open (SQLite unavailable, disk full, etc.) `ready` is false
+    // and we skip the flush rather than calling a non-function.
+    const ready = await offlineQueueReady;
+    if (!ready) {
+      console.warn('[WorkPing] Skipping flush — offline queue init failed.');
+      return;
     }
+    await flushQueue();
   } catch (error) {
     console.error('[WorkPing] Unhandled error in NetInfo listener:', error.message);
   }

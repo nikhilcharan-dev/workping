@@ -68,6 +68,7 @@ import paymentRoutes from "./routes/router.payment.js";
 import refundRoutes from "./routes/router.refund.js";
 import phonepeWebhook from "./webhook/phonepe.webhook.js";
 import phonepeCallback from "./routes/callback.js";
+import internalAuth from "./middleware/internalAuth.js";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -119,7 +120,19 @@ const paymentLimiter = rateLimit({
 app.use(generalLimiter);
 
 // --- Body parsing ---
-app.use(express.json({ limit: "10kb" }));
+// Capture raw body on the webhook path so HMAC verification operates on the
+// exact bytes PhonePe signed. Re-serializing parsed JSON would break HMAC
+// because key order / whitespace / Unicode escaping is not guaranteed stable.
+app.use(
+  express.json({
+    limit: "10kb",
+    verify: (req, _res, buf) => {
+      if (req.originalUrl === "/api/phonepe/webhook") {
+        req.rawBody = buf;
+      }
+    },
+  })
+);
 app.use(express.urlencoded({ extended: false, limit: "10kb" }));
 
 // --- Health check (before auth) ---
@@ -128,10 +141,13 @@ app.get("/health", (req, res) => {
 });
 
 // --- Routes ---
-app.use("/api/payments", paymentLimiter, paymentRoutes);
-app.use("/api/refund", paymentLimiter, refundRoutes);
+// /api/payments and /api/refund are server-to-server only (called by
+// centralized-server). The webhook authenticates via PhonePe's HMAC, and the
+// callback authenticates via its own internal secret + PhonePe status re-fetch.
+app.use("/api/payments", paymentLimiter, internalAuth, paymentRoutes);
+app.use("/api/refund", paymentLimiter, internalAuth, refundRoutes);
 app.post("/api/phonepe/webhook", phonepeWebhook);
-app.post("/api/payments/phonepe/callback", phonepeCallback);
+app.post("/api/payments/phonepe/callback", internalAuth, phonepeCallback);
 
 // --- Global Error Handler ---
 app.use((err, req, res, next) => {

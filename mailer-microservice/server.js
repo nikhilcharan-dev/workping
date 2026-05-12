@@ -68,7 +68,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 
 import redis from "./config/redisConfig.js";
-import transporter from "./config/mailTransporter.js";
+import { verifyTransport } from "./config/mailTransporter.js";
 
 import mailRoutes from "./routes/router.mail.js";
 import otpRoutes from "./routes/router.otp.js";
@@ -401,19 +401,31 @@ server.get("/templates", (req, res) => {
 });
 
 /* ─── Auth Middleware (protects API routes) — token validation only ─── */
+// Compare SHA-256 fingerprints rather than raw secrets. Both sides hash to a
+// fixed 32-byte buffer, so timingSafeEqual never throws on length mismatch
+// AND the previous length-leak via early-return is gone.
+const SECRET_HASH = SECRET ? crypto.createHash("sha256").update(SECRET).digest() : null;
+
 server.use((req, res, next) => {
-  const token = req.headers.authorization;
-  if (!token || typeof token !== "string") {
+  if (!SECRET_HASH) {
+    return res.status(503).json({ status: "error", error: "Service not configured" });
+  }
+
+  let header = req.headers.authorization;
+  if (!header || typeof header !== "string") {
     return res.status(403).json({
       status: "error",
       error: "Unauthorized: Invalid or missing secret token",
     });
   }
 
-  // Timing-safe comparison to prevent timing attacks on API key
-  const tokenBuf = Buffer.from(token);
-  const secretBuf = Buffer.from(SECRET);
-  if (tokenBuf.length !== secretBuf.length || !crypto.timingSafeEqual(tokenBuf, secretBuf)) {
+  // Accept both `Bearer <secret>` and bare `<secret>`. The latter is the
+  // legacy form used by centralized-server/utils/mailClient.js — keeping it
+  // working avoids a coordinated rollout. New callers should prefer Bearer.
+  if (header.startsWith("Bearer ")) header = header.slice(7);
+
+  const provided = crypto.createHash("sha256").update(header).digest();
+  if (!crypto.timingSafeEqual(provided, SECRET_HASH)) {
     return res.status(403).json({
       status: "error",
       error: "Unauthorized: Invalid or missing secret token",
@@ -440,6 +452,13 @@ if (process.env.NODE_ENV !== "test") {
   (async () => {
     try {
       await redis.connect();
+      // SMTP verify is best-effort. A transient SMTP outage at boot must not
+      // prevent the service from coming up — the OTP store is what the API
+      // actually depends on, and individual /send-* calls surface their own
+      // errors. Logging is enough for ops to see the gap.
+      verifyTransport()
+        .then(() => console.log("[Mail Service] Verified"))
+        .catch((err) => console.error("[Mail Service] Verify failed:", err.message));
       server.listen(PORT, () => {
         console.log(`[Server] Listening on port ${PORT}`);
       });

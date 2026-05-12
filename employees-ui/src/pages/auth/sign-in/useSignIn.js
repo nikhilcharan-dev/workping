@@ -6,6 +6,7 @@ import * as yup from 'yup'
 import toast from 'react-hot-toast'
 import { useAuthContext } from '@/context/useAuthContext'
 import httpClient from '@/helpers/httpClient'
+import { safeInternalPath } from '@/helpers/safeNavigate'
 
 const loginFormSchema = yup.object({
   email: yup.string().email('Please enter a valid email').required('Please enter your email'),
@@ -24,9 +25,9 @@ const useSignIn = () => {
   })
 
   const redirectUser = () => {
-    const redirectLink = searchParams.get('redirectTo')
-    if (redirectLink) navigate(redirectLink)
-    else navigate('/dashboard')
+    // ?redirectTo=<path> is attacker-supplied via the login URL. Only honor
+    // it if it parses as an internal path; otherwise drop to /dashboard.
+    navigate(safeInternalPath(searchParams.get('redirectTo')))
   }
 
   const onSubmit = handleSubmit(async (values) => {

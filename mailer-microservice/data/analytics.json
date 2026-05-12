@@ -1,14 +1,14 @@
 {
-  "totalSent": 33,
-  "success": 30,
-  "failure": 3,
+  "totalSent": 44,
+  "success": 40,
+  "failure": 4,
   "byType": {
-    "otp": 6,
-    "forgotPassword": 3,
-    "greeting": 3,
-    "alert": 12,
+    "otp": 8,
+    "forgotPassword": 4,
+    "greeting": 4,
+    "alert": 16,
     "notification": 0,
-    "raw": 9
+    "raw": 12
   },
-  "lastUpdated": "2026-05-11T10:57:26.396Z"
+  "lastUpdated": "2026-05-12T06:21:48.103Z"
 }

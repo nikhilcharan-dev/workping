@@ -88,6 +88,7 @@ const DASHBOARD_PASS_HASH = process.env.DASHBOARD_PASS_HASH;
 const JWT_SECRET = process.env.JWT_SECRET;
 // Integration tests set these vars before importing this module; the env-var
 // guard is enforced everywhere else.
+const ORIGIN = process.env.ORIGIN;
 if (process.env.NODE_ENV !== "test" && (!DASHBOARD_USER || !DASHBOARD_PASS_HASH || !JWT_SECRET || !ORIGIN)) {
   throw new Error("[CONFIG] DASHBOARD_USER, DASHBOARD_PASS_HASH, JWT_SECRET, and ORIGIN env vars are required");
 }
@@ -95,7 +96,6 @@ const DASHBOARD_TOKEN_TTL = "24h";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT ?? 3000;
-const ORIGIN = process.env.ORIGIN;
 
 const server = express();
 server.use(cors({ origin: ORIGIN, credentials: true }));

@@ -36,11 +36,9 @@ const useSignIn = (navigation, role = "admin") => {
                     : { userEmail: values.email, password: values.password };
 
             const res = await httpClient.post(endpoint, payload);
-            console.log("[useSignIn] Login Response Data:", res.data);
 
             const sessionData = res.data?.data ?? res.data;
             if (sessionData?.token) {
-                console.log("[useSignIn] Token found, saving session...");
                 playLogin();
                 await saveSession({
                     ...sessionData,

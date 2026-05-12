@@ -38,6 +38,19 @@ export function AuthProvider({ children }) {
     verifySession()
   }, [verifySession])
 
+  // Listen for 401s bubbled from the http client. On a session expiry the
+  // interceptor clears the token and emits this event; we flip auth state so
+  // protected routes redirect to sign-in instead of silently failing.
+  useEffect(() => {
+    const onExpired = () => {
+      clearToken()
+      setUser(null)
+      setIsAuthenticated(false)
+    }
+    window.addEventListener('SESSION_EXPIRED', onExpired)
+    return () => window.removeEventListener('SESSION_EXPIRED', onExpired)
+  }, [])
+
   const login = useCallback(
     (token) => {
       if (token) setToken(token)

@@ -27,6 +27,7 @@
     "expo-secure-store": "~14.2.3",
     "expo-device": "~55.0.15",
     "expo-document-picker": "~55.0.9",
+    "expo-file-system": "~19.0.16",
     "expo-font": "~55.0.4",
     "expo-speech": "~55.0.4",
     "expo-sqlite": "~15.1.4",

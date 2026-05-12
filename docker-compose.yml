@@ -77,26 +77,36 @@ services:
           cpus: "0.25"
 
   # ── Redis (shared by all backend services) ──────────────────────────────
+  # Only reachable on the `workping` Docker network — no host port published.
+  # Previously this listened on 0.0.0.0:6379 and accepted an empty password
+  # whenever REDIS_PASSWORD was unset, which combined to an internet-reachable
+  # unauthenticated Redis. ${REDIS_PASSWORD:?...} makes compose fail loudly
+  # at boot if the env var is missing instead of silently launching open.
   redis:
     image: redis:7-alpine
     container_name: workping-redis
     restart: unless-stopped
     command: >
       redis-server
-      --requirepass ${REDIS_PASSWORD:-}
+      --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}
       --maxmemory 256mb
       --maxmemory-policy allkeys-lru
-    ports:
-      - "6379:6379"
+      --appendonly yes
+    # No `ports:` entry — service-to-service traffic uses the internal Docker
+    # DNS name `redis` on the workping network. For one-off local debugging,
+    # use `docker compose exec redis redis-cli` or temporarily uncomment a
+    # 127.0.0.1-only binding: ports: ["127.0.0.1:6379:6379"]
     volumes:
       - redis_data:/data
     networks:
       - workping
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "sh", "-c", "redis-cli -a $$REDIS_PASSWORD ping"]
       interval: 10s
       timeout: 5s
       retries: 5
+    environment:
+      - REDIS_PASSWORD
     deploy:
       resources:
         limits:
@@ -104,6 +114,10 @@ services:
           cpus: "0.50"
 
   # ── Core API (workping-api) ──────────────────────────────────────────────
+  # Reachable only via nginx (which terminates TLS and proxies internally).
+  # Previously port 5000 was published to host 0.0.0.0 which bypassed every
+  # nginx rate-limit / header / TLS guard. The `expose` directive documents
+  # the port without binding it to the host.
   workping-api:
     build:
       context: ./centralized-server/server
@@ -114,8 +128,8 @@ services:
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-    ports:
-      - "5000:5000"
+    expose:
+      - "5000"
     depends_on:
       redis:
         condition: service_healthy
@@ -144,8 +158,8 @@ services:
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-    ports:
-      - "8001:5000"
+    expose:
+      - "5000"
     volumes:
       # Mount models directory so they survive container rebuilds
       - biometric_models:/app/models
@@ -183,8 +197,8 @@ services:
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-    ports:
-      - "3003:3000"
+    expose:
+      - "3000"
     depends_on:
       redis:
         condition: service_healthy
@@ -209,8 +223,8 @@ services:
     container_name: workping-payments
     restart: unless-stopped
     env_file: ./phonepe-gateway-microservice/.env
-    ports:
-      - "3001:3000"
+    expose:
+      - "3000"
     networks:
       - workping
     healthcheck:
@@ -235,8 +249,8 @@ services:
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-    ports:
-      - "3002:3000"
+    expose:
+      - "3000"
     depends_on:
       redis:
         condition: service_healthy
@@ -261,11 +275,15 @@ services:
     container_name: workping-storage
     restart: unless-stopped
     env_file: ./oracle-cloud-object-microservice/.env
-    ports:
-      - "8000:8000"
-    # OCI SDK needs the credentials directory from the host
+    expose:
+      - "8000"
+    # OCI credentials are mounted read-only to a non-root user's home directory
+    # (the storage container's Dockerfile creates a `node`/`nodeuser`). Mounting
+    # to /root/.oci required the container to run as root — and exposed every
+    # OCI tenancy key to anyone with code-execution inside the container.
+    # The mount path must match the container user's actual $HOME.
     volumes:
-      - ${HOME}/.oci:/root/.oci:ro
+      - ${HOME}/.oci:/home/node/.oci:ro
     networks:
       - workping
     healthcheck:

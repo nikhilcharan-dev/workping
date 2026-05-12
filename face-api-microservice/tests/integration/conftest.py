@@ -47,7 +47,13 @@ def sample_image_b64() -> str:
 
 @pytest.fixture(scope="session")
 def http_client(base_url):
-    with httpx.Client(base_url=base_url, timeout=30.0) as c:
+    # Forward INTERNAL_SECRET on every request — every sensitive endpoint
+    # now requires it. The integration runner must export it before invoking
+    # pytest (same secret the running service is configured with).
+    headers = {}
+    if os.environ.get("INTERNAL_SECRET"):
+        headers["X-Internal-Secret"] = os.environ["INTERNAL_SECRET"]
+    with httpx.Client(base_url=base_url, timeout=30.0, headers=headers) as c:
         # Verify the service is actually reachable before running tests
         try:
             r = c.get("/api/v1/health")

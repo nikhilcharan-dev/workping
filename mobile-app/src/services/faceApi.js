@@ -12,26 +12,14 @@
  * The server reads the client's public IP directly from the request headers.
  */
 
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import httpClient from "@/helpers/httpClient";
 import runtimeConfig from "@/helpers/runtimeConfig";
-import { AUTH_STORAGE_KEY } from "@/context/constants";
+import { getBearerToken } from "@/helpers/sessionStorage";
 
 const API_TIMEOUT = 10000;
 const HEALTH_TIMEOUT = 3000;
 const RETRY_COUNT = 2;
 const RETRY_DELAYS = [500, 1000]; // increasing delay
-
-/** Get the current bearer token from storage */
-async function getBearerToken() {
-    try {
-        const stored = await AsyncStorage.getItem(AUTH_STORAGE_KEY);
-        if (!stored) return null;
-        return JSON.parse(stored)?.token || null;
-    } catch {
-        return null;
-    }
-}
 
 // --- RETRY WRAPPER ---
 async function withRetry(fn, retries = RETRY_COUNT) {

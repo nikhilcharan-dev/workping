@@ -20,7 +20,10 @@ import { playSuccess, playRetry, playError } from "@/services/soundService";
 import { validateFace, checkFaceCount, livenessCheck, THRESHOLDS } from "@/utils/faceValidation";
 import { cropFace, compressFullPhoto } from "@/utils/imageProcessing";
 import { detect, healthCheck, verifyLocation } from "@/services/faceApi";
+import { offlineQueueReady, enqueue as enqueueOffline, persistImageForQueue } from "@/services/offlineQueue";
 import useLocationLock from "@/hooks/useLocationLock";
+
+const ATTENDANCE_ENDPOINT = "/api/user/attendance/verify-mark-attendance";
 
 // --- CONFIG ---
 const CONFIG = {
@@ -141,6 +144,10 @@ export default function useFaceCapture() {
     }, []);
 
     // --- 3D LOCATION LOCK CHECK ---
+    // Geofence is a security boundary, not a UX nicety: a missing snapshot or a
+    // failed verify call must NOT grant attendance. Both paths set the lock to
+    // "invalid" so the capture screen surfaces an error instead of silently
+    // letting a user mark attendance from anywhere on Earth.
     const checkLocationRegion = useCallback(async () => {
         if (!isMountedRef.current) return;
 
@@ -149,27 +156,35 @@ export default function useFaceCapture() {
             // Collect GPS + WiFi snapshot (no public IP — server reads that from the request)
             const snapshot = await collectSnapshot();
 
-            // Fail-open if no location data available
             if (!snapshot || snapshot.status === "unavailable") {
-                safeSetState(setLocationLockState, "valid");
-                safeSetState(setState, S.IDLE);
+                safeSetState(setLocationLockState, "invalid");
+                safeSetState(
+                    setErrorMsg,
+                    "Could not verify your location. Enable GPS and try again."
+                );
+                safeSetState(setState, S.ERROR);
                 return;
             }
 
             const res = await verifyLocation(snapshot);
 
-            if (res.allowed) {
+            if (res?.allowed) {
                 safeSetState(setLocationLockState, "valid");
                 safeSetState(setState, S.IDLE);
             } else {
                 safeSetState(setLocationLockState, "invalid");
-                safeSetState(setErrorMsg, res.message || "Invalid location for attendance");
+                safeSetState(setErrorMsg, res?.message || "Invalid location for attendance");
                 safeSetState(setState, S.ERROR);
             }
-        } catch {
-            // On error, fail-open (best-effort)
-            safeSetState(setLocationLockState, "valid");
-            safeSetState(setState, S.IDLE);
+        } catch (err) {
+            safeSetState(setLocationLockState, "invalid");
+            safeSetState(
+                setErrorMsg,
+                err?.message
+                    ? `Location check failed: ${err.message}`
+                    : "Location check failed. Try again or contact your admin."
+            );
+            safeSetState(setState, S.ERROR);
         }
     }, [collectSnapshot, safeSetState]);
 
@@ -368,6 +383,13 @@ export default function useFaceCapture() {
         const startTime = Date.now();
         console.log("[Capture] ── pipeline start ──────────────────────");
 
+        // Hoisted so the catch block can enqueue the cropped image + meta if
+        // the server call fails with no response (network/timeout).
+        let imageData = null;
+        let locationSnapshot = null;
+        const deviceId = `workping-${Platform.OS}-${Platform.Version}`;
+        const captureTimestamp = new Date().toISOString();
+
         try {
             // 1. Take photo
             console.log("[Capture] 1. takePhoto start");
@@ -415,7 +437,7 @@ export default function useFaceCapture() {
                 return null;
             });
 
-            const [imageData, locationSnapshot] = await Promise.all([cropPromise, locationPromise]);
+            [imageData, locationSnapshot] = await Promise.all([cropPromise, locationPromise]);
             if (!isMountedRef.current) return;
             console.log(
                 "[Capture] 2. imageProcessing OK — uri:",
@@ -430,13 +452,12 @@ export default function useFaceCapture() {
 
             // 3. Send to server
             console.log("[Capture] 3. detect() → POST verify-mark-attendance");
-            const deviceId = `workping-${Platform.OS}-${Platform.Version}`;
             const res = await detect(
                 imageData,
                 {
                     deviceId,
                     locationId: "main-entrance",
-                    timestamp: new Date().toISOString(),
+                    timestamp: captureTimestamp,
                     locationLock: locationSnapshot,
                 },
                 (progress) => {
@@ -477,6 +498,45 @@ export default function useFaceCapture() {
             console.error("[Capture]   response data   :", JSON.stringify(err?.response?.data));
             console.error("[Capture]   err.code        :", err?.code);
             console.error("[Capture]   stack           :", err?.stack?.split("\n").slice(0, 4).join(" | "));
+
+            // Network/timeout failure with an image already cropped → queue
+            // for replay on reconnect. `!err.response` distinguishes transport
+            // failures from server errors (400/500), which should still surface
+            // to the user instead of being silently queued.
+            const isTransportFailure = !err.response;
+            if (isTransportFailure && imageData?.uri) {
+                try {
+                    const ready = await offlineQueueReady;
+                    if (ready) {
+                        // Copy out of expo-image-manipulator's cache (which the OS
+                        // can purge) into the app's documents directory so the
+                        // image is guaranteed to exist at flush time.
+                        const persistedUri = await persistImageForQueue(imageData.uri);
+                        await enqueueOffline({
+                            kind: "attendance",
+                            endpoint: ATTENDANCE_ENDPOINT,
+                            payload: {
+                                imageUri: persistedUri,
+                                meta: {
+                                    deviceId,
+                                    locationId: "main-entrance",
+                                    timestamp: captureTimestamp,
+                                    locationLock: locationSnapshot,
+                                },
+                            },
+                        });
+                        if (!isMountedRef.current) return;
+                        safeSetState(setErrorMsg, "No connection — saved offline. Will sync automatically.");
+                        safeSetState(setState, S.ERROR);
+                        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+                        resultTimerRef.current = setTimeout(safeResetState, 3000);
+                        return;
+                    }
+                } catch (qerr) {
+                    console.error("[Capture] enqueue failed:", qerr?.message);
+                    // Fall through to the normal error display below.
+                }
+            }
 
             const msg = err.response?.data?.message || err.response?.data?.detail || err.message || "Connection error";
             safeSetState(setErrorMsg, msg);

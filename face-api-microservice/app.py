@@ -32,6 +32,7 @@ NOTE: FAISS IndexFlatIP is used for org-level bulk search (/faiss/* routes).
       Single-user verification uses direct cosine similarity (faster for 1:1 match).
 """
 
+import hmac
 import json
 import numpy as np
 import base64
@@ -45,7 +46,7 @@ from collections import deque
 from pathlib import Path
 from pydantic import BaseModel
 from typing import Optional, List
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Depends
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -53,8 +54,10 @@ from embedding import get_face_embedding_from_bytes, load_face_app, is_gpu_avail
 from db import get_embeddings_collection
 from cache import embedding_key, cache_get, cache_set, cache_del, CACHE_TTL, _get_redis
 from face_search import get_search_engine
+from auth import require_internal_secret
 
 import faiss
+import threading
 
 # ---------------- CONFIG ----------------
 DIM = 512          # ArcFace R100 produces 512-dim embeddings
@@ -73,6 +76,23 @@ class FAISSIndex:
         self._id_maps: dict = {}   # org_id → list[employee_id]
         self._persist_dir = Path(os.environ.get("FAISS_PERSIST_DIR", "/tmp/faiss_indexes"))
         self._persist_dir.mkdir(parents=True, exist_ok=True)
+        # Per-org RLock. FAISS C++ indexes are not safe under concurrent
+        # read/write — a search() interleaving with add()/rebuild()/load() can
+        # segfault or return wrong rows. The outer _locks_mutex guards lock
+        # creation itself so two threads cannot race on the dict insert.
+        self._locks: dict = {}
+        self._locks_mutex = threading.Lock()
+
+    def _lock_for(self, org_id: str) -> threading.RLock:
+        lock = self._locks.get(org_id)
+        if lock is not None:
+            return lock
+        with self._locks_mutex:
+            lock = self._locks.get(org_id)
+            if lock is None:
+                lock = threading.RLock()
+                self._locks[org_id] = lock
+            return lock
 
     def _ensure(self, org_id: str):
         if org_id not in self._indexes:
@@ -80,68 +100,81 @@ class FAISSIndex:
             self._id_maps[org_id] = []
 
     def add(self, org_id: str, employee_id: str, embedding: np.ndarray):
-        self._ensure(org_id)
-        vec = embedding.astype(np.float32).reshape(1, -1)
-        norm = np.linalg.norm(vec)
-        if norm > 0:
-            vec = vec / norm
-        self._indexes[org_id].add(vec)
-        self._id_maps[org_id].append(employee_id)
+        with self._lock_for(org_id):
+            self._ensure(org_id)
+            vec = embedding.astype(np.float32).reshape(1, -1)
+            norm = np.linalg.norm(vec)
+            if norm > 0:
+                vec = vec / norm
+            self._indexes[org_id].add(vec)
+            self._id_maps[org_id].append(employee_id)
 
     def search(self, org_id: str, query: np.ndarray, k: int = 5) -> list:
-        if org_id not in self._indexes or self._indexes[org_id].ntotal == 0:
-            return []
-        idx = self._indexes[org_id]
-        ids = self._id_maps[org_id]
-        q = query.astype(np.float32).reshape(1, -1)
-        norm = np.linalg.norm(q)
-        if norm > 0:
-            q = q / norm
-        k = min(k, idx.ntotal)
-        distances, indices = idx.search(q, k)
-        return [
-            {"employee_id": ids[i], "score": round(float(d), 4)}
-            for i, d in zip(indices[0], distances[0])
-            if i >= 0 and float(d) >= THRESHOLD
-        ]
+        with self._lock_for(org_id):
+            if org_id not in self._indexes or self._indexes[org_id].ntotal == 0:
+                return []
+            idx = self._indexes[org_id]
+            ids = self._id_maps[org_id]
+            q = query.astype(np.float32).reshape(1, -1)
+            norm = np.linalg.norm(q)
+            if norm > 0:
+                q = q / norm
+            k = min(k, idx.ntotal)
+            distances, indices = idx.search(q, k)
+            return [
+                {"employee_id": ids[i], "score": round(float(d), 4)}
+                for i, d in zip(indices[0], distances[0])
+                if i >= 0 and float(d) >= THRESHOLD
+            ]
 
     def rebuild(self, org_id: str, records: list):
-        self._indexes[org_id] = faiss.IndexFlatIP(DIM)
-        self._id_maps[org_id] = []
-        for r in records:
-            emb = np.array(r["embedding"], dtype=np.float32)
-            self.add(org_id, r["employee_id"], emb)
+        with self._lock_for(org_id):
+            self._indexes[org_id] = faiss.IndexFlatIP(DIM)
+            self._id_maps[org_id] = []
+            for r in records:
+                emb = np.array(r["embedding"], dtype=np.float32)
+                # Call _add_locked to avoid re-acquiring the RLock unnecessarily
+                # (RLock allows reentry, but this is cleaner).
+                vec = emb.astype(np.float32).reshape(1, -1)
+                norm = np.linalg.norm(vec)
+                if norm > 0:
+                    vec = vec / norm
+                self._indexes[org_id].add(vec)
+                self._id_maps[org_id].append(r["employee_id"])
 
     def size(self, org_id: str) -> int:
-        return self._indexes[org_id].ntotal if org_id in self._indexes else 0
+        with self._lock_for(org_id):
+            return self._indexes[org_id].ntotal if org_id in self._indexes else 0
 
     def save(self, org_id: str):
         """Persist index and id_map to disk."""
-        if org_id not in self._indexes:
-            return
-        try:
-            index_path = self._persist_dir / f"{org_id}.index"
-            map_path = self._persist_dir / f"{org_id}.map.json"
-            faiss.write_index(self._indexes[org_id], str(index_path))
-            with open(map_path, "w") as f:
-                json.dump(self._id_maps[org_id], f)
-        except Exception as e:
-            print(f"FAISS persist warning for {org_id}: {e}")
+        with self._lock_for(org_id):
+            if org_id not in self._indexes:
+                return
+            try:
+                index_path = self._persist_dir / f"{org_id}.index"
+                map_path = self._persist_dir / f"{org_id}.map.json"
+                faiss.write_index(self._indexes[org_id], str(index_path))
+                with open(map_path, "w") as f:
+                    json.dump(self._id_maps[org_id], f)
+            except Exception as e:
+                print(f"FAISS persist warning for {org_id}: {e}")
 
     def load(self, org_id: str) -> bool:
         """Load index and id_map from disk. Returns True if successful."""
-        try:
-            index_path = self._persist_dir / f"{org_id}.index"
-            map_path = self._persist_dir / f"{org_id}.map.json"
-            if not index_path.exists() or not map_path.exists():
+        with self._lock_for(org_id):
+            try:
+                index_path = self._persist_dir / f"{org_id}.index"
+                map_path = self._persist_dir / f"{org_id}.map.json"
+                if not index_path.exists() or not map_path.exists():
+                    return False
+                self._indexes[org_id] = faiss.read_index(str(index_path))
+                with open(map_path, "r") as f:
+                    self._id_maps[org_id] = json.load(f)
+                return True
+            except Exception as e:
+                print(f"FAISS load warning for {org_id}: {e}")
                 return False
-            self._indexes[org_id] = faiss.read_index(str(index_path))
-            with open(map_path, "r") as f:
-                self._id_maps[org_id] = json.load(f)
-            return True
-        except Exception as e:
-            print(f"FAISS load warning for {org_id}: {e}")
-            return False
 
 faiss_index = FAISSIndex()
 
@@ -469,16 +502,46 @@ async def startup_event():
 
 # ---------------- SECURITY HELPERS ----------------
 
+# Magic-byte signatures for the only image types we accept.
+# Bound the check at the first 12 bytes (enough for JPEG/PNG/WebP/GIF) so we
+# can reject before handing the buffer to cv2.imdecode / InsightFace.
+_IMAGE_MAGICS = (
+    b"\xff\xd8\xff",                       # JPEG (any variant)
+    b"\x89PNG\r\n\x1a\n",                  # PNG
+)
+
+def _is_supported_image(buf: bytes) -> bool:
+    if len(buf) < 12:
+        return False
+    if any(buf.startswith(sig) for sig in _IMAGE_MAGICS):
+        return True
+    # WebP: "RIFF" .... "WEBP"
+    if buf[:4] == b"RIFF" and buf[8:12] == b"WEBP":
+        return True
+    return False
+
+
 def validate_image_b64(image_b64: str) -> bytes:
-    """Validate base64 string size then decode. Raises HTTPException on violation."""
+    """Validate base64 string size, decode, then verify magic bytes.
+
+    Order matters: length-check the encoded string first so we never decode a
+    bomb payload. After decoding, re-check decoded size and reject anything
+    that does not look like a JPEG/PNG/WebP file. This is a defense-in-depth
+    layer against attacker payloads that decode harmlessly but then hit
+    cv2.imdecode / InsightFace with unexpected content.
+    """
+    if not isinstance(image_b64, str) or not image_b64:
+        raise HTTPException(status_code=400, detail="Missing image_base64")
     if len(image_b64) > MAX_IMAGE_B64_LEN:
         raise HTTPException(status_code=413, detail="Image exceeds maximum allowed size of 5 MB")
     try:
-        image_bytes = base64.b64decode(image_b64)
+        image_bytes = base64.b64decode(image_b64, validate=True)
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid base64 image data")
     if len(image_bytes) > MAX_IMAGE_BYTES:
         raise HTTPException(status_code=413, detail="Decoded image exceeds maximum allowed size of 5 MB")
+    if not _is_supported_image(image_bytes):
+        raise HTTPException(status_code=415, detail="Unsupported image type (expected JPEG, PNG, or WebP)")
     return image_bytes
 
 
@@ -553,7 +616,7 @@ async def health():
     }
 
 
-@app.post("/api/v1/enroll")
+@app.post("/api/v1/enroll", dependencies=[Depends(require_internal_secret)])
 async def enroll(req: EnrollRequest):
     """
     Extract a 512-D embedding from the image and upsert it into MongoDB.
@@ -584,7 +647,7 @@ async def enroll(req: EnrollRequest):
     return {"success": True, "employee_id": req.employee_id}
 
 
-@app.post("/api/v1/detect")
+@app.post("/api/v1/detect", dependencies=[Depends(require_internal_secret)])
 async def detect(req: DetectRequest):
     """
     Submits a face verification task to the Redis queue.
@@ -615,7 +678,7 @@ async def detect(req: DetectRequest):
         "position": queue_len
     }
 
-@app.get("/api/v1/ticket/{ticket_id}")
+@app.get("/api/v1/ticket/{ticket_id}", dependencies=[Depends(require_internal_secret)])
 async def get_ticket(ticket_id: str):
     redis = _get_redis()
     data = await redis.get(f"ticket:{ticket_id}")
@@ -624,7 +687,7 @@ async def get_ticket(ticket_id: str):
     return json.loads(data)
 
 
-@app.get("/api/v1/embeddings/{employee_id}")
+@app.get("/api/v1/embeddings/{employee_id}", dependencies=[Depends(require_internal_secret)])
 async def get_embedding_status(employee_id: str):
     """Check whether a face embedding exists for a specific employee."""
     col = get_embeddings_collection()
@@ -632,7 +695,7 @@ async def get_embedding_status(employee_id: str):
     return {"registered": doc is not None}
 
 
-@app.delete("/api/v1/embeddings/{employee_id}")
+@app.delete("/api/v1/embeddings/{employee_id}", dependencies=[Depends(require_internal_secret)])
 async def delete_embedding(employee_id: str):
     """Remove a face embedding from MongoDB and invalidate the org's cache.
     Rebuilds the FAISS index for the org.
@@ -672,7 +735,7 @@ async def delete_embedding(employee_id: str):
     return {"success": True, "deleted_employee_id": employee_id}
 
 
-@app.get("/api/v1/embeddings")
+@app.get("/api/v1/embeddings", dependencies=[Depends(require_internal_secret)])
 async def list_embeddings(organization_id: Optional[str] = None, skip: int = 0, limit: int = 50):
     """List enrolled employee IDs, optionally filtered by org."""
     col = get_embeddings_collection()
@@ -684,7 +747,7 @@ async def list_embeddings(organization_id: Optional[str] = None, skip: int = 0, 
     return {"total": total, "skip": skip, "limit": limit, "employees": docs}
 
 
-@app.post("/api/v1/extract-embedding")
+@app.post("/api/v1/extract-embedding", dependencies=[Depends(require_internal_secret)])
 async def extract_embedding(req: ExtractEmbeddingRequest):
     """Extract a 512-D embedding and return it without persisting. Useful for testing."""
     image_bytes = validate_image_b64(req.image_base64)
@@ -699,13 +762,16 @@ async def extract_embedding(req: ExtractEmbeddingRequest):
 
 # ---------------- FAISS ROUTES ----------------
 
+MAX_FAISS_TOP_K = 50
+
+
 class FAISSSearchRequest(BaseModel):
     image_base64: str
     organization_id: str
     top_k: int = 5
 
 
-@app.post("/api/v1/faiss/search")
+@app.post("/api/v1/faiss/search", dependencies=[Depends(require_internal_secret)])
 async def faiss_bulk_search(req: FAISSSearchRequest):
     """
     1:N face identification via FAISS IndexFlatIP.
@@ -714,6 +780,12 @@ async def faiss_bulk_search(req: FAISSSearchRequest):
     """
     if not FAISS_READY:
         raise HTTPException(status_code=503, detail="Face identification service is not ready. FAISS indexes failed to load.")
+
+    # Bound top_k to a sane range. Without this a caller can request a huge k
+    # which forces FAISS to scan the entire org index and serialize a giant
+    # response — a cheap amplification vector.
+    if req.top_k < 1 or req.top_k > MAX_FAISS_TOP_K:
+        raise HTTPException(status_code=400, detail=f"top_k must be between 1 and {MAX_FAISS_TOP_K}")
 
     image_bytes = validate_image_b64(req.image_base64)
     loop = asyncio.get_running_loop()
@@ -748,7 +820,7 @@ async def faiss_bulk_search(req: FAISSSearchRequest):
     }
 
 
-@app.post("/api/v1/faiss/index/build")
+@app.post("/api/v1/faiss/index/build", dependencies=[Depends(require_internal_secret)])
 async def build_faiss_index(organization_id: str):
     """Rebuild the FAISS index for an org from MongoDB. Call after bulk enrollment or data import."""
     records = await load_embeddings(organization_id)
@@ -810,7 +882,7 @@ def _analyze_liveness_frames(frames_bytes: list) -> dict:
     }
 
 
-@app.post("/api/v1/liveness/check")
+@app.post("/api/v1/liveness/check", dependencies=[Depends(require_internal_secret)])
 async def check_liveness(req: LivenessRequest):
     """
     Anti-spoofing liveness check (PAD Phase 1) via multi-frame optical flow.
@@ -828,7 +900,7 @@ async def check_liveness(req: LivenessRequest):
 
 # ---------------- AI PRODUCTIVITY INSIGHTS ----------------
 
-@app.get("/api/v1/analytics/productivity")
+@app.get("/api/v1/analytics/productivity", dependencies=[Depends(require_internal_secret)])
 async def get_productivity_insights(organization_id: str, days: int = 30):
     """
     AI-driven workforce productivity insights derived from biometric attendance data.
@@ -860,7 +932,7 @@ async def get_productivity_insights(organization_id: str, days: int = 30):
     }
 
 
-@app.get("/api/v1/analytics/search-metrics")
+@app.get("/api/v1/analytics/search-metrics", dependencies=[Depends(require_internal_secret)])
 async def get_search_metrics(search_type: str = "all"):
     """
     LLM/face search observability: confidence trends and latency stats for model drift detection.
@@ -885,7 +957,7 @@ async def get_search_metrics(search_type: str = "all"):
     return response
 
 
-@app.get("/api/v1/analytics/search-history")
+@app.get("/api/v1/analytics/search-history", dependencies=[Depends(require_internal_secret)])
 async def get_search_history(search_type: Optional[str] = None, limit: int = 100):
     """Recent search results for auditing and debugging."""
     search_engine = get_search_engine()
@@ -922,6 +994,16 @@ async def get_search_history(search_type: Optional[str] = None, limit: int = 100
 
 @app.websocket("/ws/stats")
 async def ws_endpoint(websocket: WebSocket):
+    # WebSocket auth: the stats stream leaks employee IDs and scores, so it is
+    # gated by the same INTERNAL_SECRET as the HTTP routes. The header pattern
+    # is awkward in browser WebSocket APIs, so we accept it as a query param
+    # (?secret=...) too. Compared timing-safely.
+    secret = websocket.query_params.get("secret") or websocket.headers.get("x-internal-secret")
+    expected = os.environ.get("INTERNAL_SECRET")
+    if not expected or not secret or not hmac.compare_digest(secret, expected):
+        await websocket.close(code=4401)
+        return
+
     await manager.connect(websocket)
     try:
         await websocket.send_json({
@@ -937,7 +1019,7 @@ async def ws_endpoint(websocket: WebSocket):
 
 # ---------------- DASHBOARD ----------------
 
-@app.get("/dashboard", response_class=HTMLResponse)
+@app.get("/dashboard", response_class=HTMLResponse, dependencies=[Depends(require_internal_secret)])
 async def get_dashboard():
     return """
 <!DOCTYPE html>
@@ -1023,7 +1105,9 @@ async def get_dashboard():
         }
         function connect() {
             const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const ws = new WebSocket(proto + '//' + location.host + '/ws/stats');
+            const secret = new URLSearchParams(location.search).get('secret');
+            const qs = secret ? '?secret=' + encodeURIComponent(secret) : '';
+            const ws = new WebSocket(proto + '//' + location.host + '/ws/stats' + qs);
             ws.onopen = () => { conn.textContent = 'Connected / Live'; conn.style.color = '#fff'; };
             ws.onmessage = (ev) => {
                 const msg = JSON.parse(ev.data);

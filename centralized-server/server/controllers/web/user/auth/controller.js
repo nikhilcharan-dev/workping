@@ -18,11 +18,28 @@ import {
 } from "#utils/validators.js";
 
 export const register = asyncHandler(async (req, res) => {
-  const { name, userEmail, password, organizationId, role, phone, employeeId, workType, dateOfJoining } = req.body;
+  const { name, userEmail, password, role: requestedRole, phone, employeeId, workType, dateOfJoining } = req.body;
+
+  // organizationId and role are derived from the authenticated caller — never
+  // accepted from the request body. This is enforced by route middleware
+  // (validateCookie + requireRole("admin","manager")), but the controller
+  // re-applies the constraints in case the route is ever remounted.
+  if (!req.user?.organizationId || !req.user?.role) {
+    return errorResponse(res, "Unauthorized: caller has no organization context", 403);
+  }
+  const organizationId = req.user.organizationId;
+  const callerRole = req.user.role;
+
+  // Admins may create any non-admin role within their org.
+  // Managers may only create plain employees ("user" / "employee").
+  const ROLES_ADMIN_MAY_CREATE = ["user", "manager", "teamlead", "employee"];
+  const ROLES_MANAGER_MAY_CREATE = ["user", "employee"];
+  const allowed = callerRole === "admin" ? ROLES_ADMIN_MAY_CREATE : ROLES_MANAGER_MAY_CREATE;
+  const role = requestedRole && allowed.includes(requestedRole) ? requestedRole : "user";
 
   const requiredCheck = validateRequiredFields(
-    { name, userEmail, password, organizationId, role, phone, employeeId, workType, dateOfJoining },
-    ["name", "userEmail", "password", "organizationId", "role", "phone", "employeeId", "workType", "dateOfJoining"]
+    { name, userEmail, password, phone, employeeId, workType, dateOfJoining },
+    ["name", "userEmail", "password", "phone", "employeeId", "workType", "dateOfJoining"]
   );
   if (!requiredCheck.valid) return errorResponse(res, requiredCheck.error);
 
@@ -37,11 +54,6 @@ export const register = asyncHandler(async (req, res) => {
 
   const orgIdValidation = validateObjectId(organizationId, "Organization ID");
   if (!orgIdValidation.valid) return errorResponse(res, orgIdValidation.error);
-
-  const VALID_USER_ROLES = ["user", "manager", "teamlead", "employee"];
-  if (!VALID_USER_ROLES.includes(role)) {
-    return errorResponse(res, `Role must be one of: ${VALID_USER_ROLES.join(", ")}`);
-  }
 
   const validWorkTypes = ["remote", "onsite", "hybrid"];
   if (!validWorkTypes.includes(workType.toLowerCase())) {

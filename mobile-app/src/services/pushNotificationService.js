@@ -106,7 +106,14 @@ export function routeNotificationTap(data) {
     if (!nav?.isReady()) return;
 
     const rootScreen = _currentRole === "admin" ? "Admin" : "User";
-    const resolver = SCREEN_ROUTES[data?.type] ?? SCREEN_ROUTES.default;
+    // data.type comes from untrusted push payloads. Use own-property check
+    // so values like "__proto__", "constructor", "toString" can't trick the
+    // dispatch into invoking a non-route function.
+    const requestedType = typeof data?.type === "string" ? data.type : null;
+    const resolver =
+        requestedType && Object.prototype.hasOwnProperty.call(SCREEN_ROUTES, requestedType)
+            ? SCREEN_ROUTES[requestedType]
+            : SCREEN_ROUTES.default;
     const [name, params] = resolver(rootScreen);
 
     nav.navigate(name, params);

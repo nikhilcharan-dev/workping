@@ -11,6 +11,7 @@ import {
   sendNotification,
   sendVerifyPassword,
 } from "../mail/mailer.js";
+import { perRecipientRateLimit } from "../utils/rateLimit.js";
 
 const router = Router();
 
@@ -22,6 +23,10 @@ const validateEmail = (req, res, next) => {
   }
   next();
 };
+
+// Apply to every email-sending route. validateEmail runs first so we don't
+// charge the rate-limit counter for malformed payloads.
+router.use(validateEmail, perRecipientRateLimit());
 
 /* ─── Send templated email (subject + content) ─── */
 router.post("/send-mail", validateEmail, async (req, res) => {
@@ -53,12 +58,42 @@ router.post("/send-html", validateEmail, async (req, res) => {
   }
 });
 
+// Only allow links that point to known WorkPing origins, and only over
+// http(s). Without this, a caller could plant `javascript:` URLs or
+// attacker-controlled hosts in the password-reset mail.
+const ALLOWED_RESET_LINK_HOSTS = new Set(
+  (process.env.ALLOWED_RESET_LINK_HOSTS || "workping.live,admin.workping.live,employee.workping.live")
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean)
+);
+
+function isSafeResetLink(value) {
+  if (typeof value !== "string" || value.length > 2048) return false;
+  let url;
+  try {
+    url = new URL(value);
+  } catch {
+    return false;
+  }
+  if (url.protocol !== "https:" && url.protocol !== "http:") return false;
+  // Match host or any subdomain of an allowed host.
+  const host = url.hostname.toLowerCase();
+  for (const allowed of ALLOWED_RESET_LINK_HOSTS) {
+    if (host === allowed || host.endsWith(`.${allowed}`)) return true;
+  }
+  return false;
+}
+
 /* ─── Forgot Password (link-based) ─── */
 router.post("/forgot-password", validateEmail, async (req, res) => {
   const { email, resetLink } = req.body;
   try {
     if (!resetLink) {
       return res.status(400).json({ status: "error", error: "resetLink is required" });
+    }
+    if (!isSafeResetLink(resetLink)) {
+      return res.status(400).json({ status: "error", error: "resetLink is not in the allowed host list" });
     }
     await sendForgotPassword(email, resetLink);
     return res.status(200).json({ status: "success", message: "Forgot password link sent successfully" });

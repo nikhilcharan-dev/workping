@@ -104,6 +104,14 @@ def _install_stubs():
     cache._get_redis = lambda: _FakeRedis()
     sys.modules["cache"] = cache
 
+    # ── Stub: auth ─────────────────────────────────────────────────────
+    # Bypass internal-secret gating in tests — the real module sys.exit(1)s
+    # at import time if INTERNAL_SECRET is unset. Tests assert handler logic,
+    # not auth wiring (that has its own coverage).
+    auth = types.ModuleType("auth")
+    auth.require_internal_secret = lambda x_internal_secret=None: None
+    sys.modules["auth"] = auth
+
 
 _install_stubs()
 

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import redis from "../config/redisConfig.js";
 import { sendEmailOTP, sendResetPasswordOTP } from "../mail/mailer.js";
+import { perRecipientRateLimit } from "../utils/rateLimit.js";
 
 const router = Router();
 
@@ -22,8 +23,23 @@ const generatorOtp = (len) => {
     .padStart(len, "0");
 };
 
+// timingSafeEqual throws on length mismatch. Wrap so a user-supplied OTP of
+// the wrong length cleanly fails (HTTP 400) instead of bubbling up as 500.
+function constantTimeEquals(a, b) {
+  const aStr = String(a);
+  const bStr = String(b);
+  if (aStr.length !== bStr.length) return false;
+  try {
+    return crypto.timingSafeEqual(Buffer.from(aStr), Buffer.from(bStr));
+  } catch {
+    return false;
+  }
+}
+
 /* ─── Send Email Verification OTP ─── */
-router.post("/send-email-otp", validateEmail, async (req, res) => {
+// Rate-limit by recipient — only SEND, not verify. Rate-limiting verify would
+// let an attacker burn the legitimate user's retry budget.
+router.post("/send-email-otp", validateEmail, perRecipientRateLimit(), async (req, res) => {
   const { email } = req.body;
   try {
     const otp = generatorOtp(6);
@@ -46,7 +62,7 @@ router.post("/send-email-otp", validateEmail, async (req, res) => {
 });
 
 /* ─── Send Reset Password OTP ─── */
-router.post("/send-reset-password-otp", validateEmail, async (req, res) => {
+router.post("/send-reset-password-otp", validateEmail, perRecipientRateLimit(), async (req, res) => {
   const { email } = req.body;
   try {
     const otp = generatorOtp(6);
@@ -74,7 +90,7 @@ router.post("/verify-reset-password-otp", validateEmail, async (req, res) => {
   try {
     const OTP = await redis.get(`otp:reset:${email}`);
     if (!OTP) return res.status(400).json({ status: "error", error: "OTP expired or not found" });
-    if (!crypto.timingSafeEqual(Buffer.from(OTP), Buffer.from(String(otp)))) {
+    if (!constantTimeEquals(OTP, otp)) {
       return res.status(400).json({ status: "error", error: "Invalid OTP" });
     }
 
@@ -93,23 +109,12 @@ router.post("/verify-reset-password-otp", validateEmail, async (req, res) => {
   }
 });
 
-router.post("/send-phone-otp", async (req, res) => {
-  const { phone } = req.body;
-  try {
-    if (!phone) {
-      return res.status(400).json({
-        error: "Phone number is required",
-      });
-    }
-    const otp = generatorOtp(6);
-    // await sendPhoneOTP(phone, otp);
-    // await redis.set(`otp:phone:${phone}`, otp, { EX: 30 * 60 } );
-    res.status(200).json({
-      status: "success",
-    });
-  } catch (err) {
-    console.log(err);
-  }
+// Phone OTP delivery is not implemented in this service. Previously these
+// handlers returned `success: true` / `verified: true` without doing anything,
+// which would silently authenticate any caller that wired them into a real
+// flow. Fail loudly instead — a 501 makes the gap visible to callers.
+router.post("/send-phone-otp", (_req, res) => {
+  return res.status(501).json({ status: "error", error: "Phone OTP delivery is not implemented" });
 });
 
 router.post("/verify-email-otp", validateEmail, async (req, res) => {
@@ -122,7 +127,7 @@ router.post("/verify-email-otp", validateEmail, async (req, res) => {
         error: "OTP expired or not found",
       });
 
-    if (!crypto.timingSafeEqual(Buffer.from(OTP), Buffer.from(String(otp))))
+    if (!constantTimeEquals(OTP, otp))
       return res.status(400).json({
         status: "error",
         error: "Invalid OTP",
@@ -143,33 +148,8 @@ router.post("/verify-email-otp", validateEmail, async (req, res) => {
   }
 });
 
-router.post("/verify-phone-otp", async (req, res) => {
-  const { phone, otp } = req.body;
-  try {
-    if (!phone || !otp) {
-      return res.status(400).json({
-        error: "Invalid Fields",
-      });
-    }
-
-    if (phone.length !== 10) {
-      return res.status(400).json({
-        error: "Invalid Phone",
-      });
-    }
-
-    // const OTP = await redis.get(`otp:phone:${phone}`);
-
-    res.status(200).json({
-      verified: true,
-      status: "success",
-    });
-  } catch (err) {
-    console.log(err);
-    res.status(500).json({
-      error: "Internal Server Error",
-    });
-  }
+router.post("/verify-phone-otp", (_req, res) => {
+  return res.status(501).json({ status: "error", error: "Phone OTP verification is not implemented" });
 });
 
 export default router;

@@ -31,7 +31,10 @@ export default function centralRoutes(app) {
 
       let decoded;
       try {
-        decoded = jwt.verify(token, process.env.SECRET_KEY);
+        // Pin the algorithm to HS256 to prevent algorithm-confusion attacks
+        // (e.g. attacker tricking the verifier into treating an RS256-signed
+        // token as HS256 with the public key as the HMAC secret, or "alg:none").
+        decoded = jwt.verify(token, process.env.SECRET_KEY, { algorithms: ["HS256"] });
       } catch (jwtErr) {
         return res.status(401).json({ type: "error", message: "Unauthorized" });
       }

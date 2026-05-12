@@ -1,13 +1,15 @@
 import axios from "axios";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { DeviceEventEmitter } from "react-native";
 import { API_BASE_URL } from "@/helpers/config";
-import { AUTH_STORAGE_KEY } from "@/context/constants";
 import logStore from "@/helpers/logStore";
+import { getSession, setSession, clearSession } from "@/helpers/sessionStorage";
 import runtimeConfig from "./runtimeConfig";
 
+// Global request timeout so an unreachable host can't pin a request open forever.
+// 30s matches the longest legitimate face-recognition poll.
 const httpClient = axios.create({
     baseURL: API_BASE_URL,
+    timeout: 30000,
 });
 
 // ── Refresh token state ──────────────────────────────────────────────────────
@@ -17,10 +19,7 @@ let isRefreshing = false;
 let refreshPromise = null;
 
 async function attemptTokenRefresh() {
-    const stored = await AsyncStorage.getItem(AUTH_STORAGE_KEY);
-    if (!stored) return null;
-
-    const session = JSON.parse(stored);
+    const session = await getSession();
     if (!session?.refreshToken) return null;
 
     const baseUrl = await runtimeConfig.init();
@@ -36,19 +35,18 @@ async function attemptTokenRefresh() {
                 "User-Agent": "WorkPing Agent",
                 Origin: "https://workping.live",
             },
+            timeout: 10000,
         }
     );
 
     const data = res.data?.data ?? res.data;
     if (!data?.token) return null;
 
-    // Update stored session with new tokens
-    const updatedSession = {
-        ...session,
-        token: data.token,
-        refreshToken: data.refreshToken,
-    };
-    await AsyncStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(updatedSession));
+    // Update stored session with new tokens in the same store the AuthProvider
+    // reads from. The previous AsyncStorage write was invisible to the rest
+    // of the app, so refresh appeared to "succeed" while the bearer never
+    // updated on the next request.
+    await setSession({ ...session, token: data.token, refreshToken: data.refreshToken });
 
     return data.token;
 }
@@ -66,12 +64,9 @@ httpClient.interceptors.request.use(
         config.baseURL = currentBaseUrl;
 
         try {
-            const stored = await AsyncStorage.getItem(AUTH_STORAGE_KEY);
-            if (stored) {
-                const user = JSON.parse(stored);
-                if (user && user.token) {
-                    config.headers.Authorization = `Bearer ${user.token}`;
-                }
+            const session = await getSession();
+            if (session?.token) {
+                config.headers.Authorization = `Bearer ${session.token}`;
             }
         } catch (error) {
             // Error loading token
@@ -180,7 +175,7 @@ httpClient.interceptors.response.use(
 
             // Refresh failed — clear session so user gets redirected to login
             DeviceEventEmitter.emit("session_expired");
-            await AsyncStorage.removeItem(AUTH_STORAGE_KEY).catch(() => {});
+            await clearSession();
             return Promise.reject(error);
         }
 
@@ -188,7 +183,7 @@ httpClient.interceptors.response.use(
         // Note: 403 means "forbidden" (wrong role), not "invalid session" — don't logout
         if (status === 401) {
             DeviceEventEmitter.emit("session_expired");
-            await AsyncStorage.removeItem(AUTH_STORAGE_KEY).catch(() => {});
+            await clearSession();
         }
 
         return Promise.reject(error);

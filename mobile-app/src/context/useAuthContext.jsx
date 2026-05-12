@@ -1,12 +1,6 @@
-import * as SecureStore from "expo-secure-store";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { DeviceEventEmitter } from "react-native";
-import { AUTH_STORAGE_KEY } from "./constants";
-
-// expo-secure-store only accepts string values and keys ≤ 255 chars
-const secureGet = (key) => SecureStore.getItemAsync(key);
-const secureSet = (key, value) => SecureStore.setItemAsync(key, value);
-const secureDel = (key) => SecureStore.deleteItemAsync(key);
+import { getSession, setSession, clearSession } from "@/helpers/sessionStorage";
 
 const AuthContext = createContext(undefined);
 
@@ -26,13 +20,13 @@ export function AuthProvider({ children }) {
         let active = true;
         (async () => {
             try {
-                const stored = await secureGet(AUTH_STORAGE_KEY);
+                const stored = await getSession();
                 if (active && stored) {
-                    setUser(JSON.parse(stored));
+                    setUser(stored);
                 }
             } catch (e) {
                 // Corrupted session data — clear it
-                await secureDel(AUTH_STORAGE_KEY).catch(() => {});
+                await clearSession();
             } finally {
                 if (active) setIsLoading(false);
             }
@@ -40,7 +34,7 @@ export function AuthProvider({ children }) {
 
         const subscription = DeviceEventEmitter.addListener("session_expired", () => {
             setUser(null);
-            secureDel(AUTH_STORAGE_KEY).catch(() => {});
+            clearSession();
         });
 
         return () => {
@@ -53,7 +47,7 @@ export function AuthProvider({ children }) {
         if (!userData) return;
         setUser(userData);
         try {
-            await secureSet(AUTH_STORAGE_KEY, JSON.stringify(userData));
+            await setSession(userData);
         } catch (e) {
             // Persist failed — session won't survive app restart
         }
@@ -61,11 +55,7 @@ export function AuthProvider({ children }) {
 
     const removeSession = useCallback(async () => {
         setUser(null);
-        try {
-            await secureDel(AUTH_STORAGE_KEY);
-        } catch (e) {
-            // Remove failed — in-memory state already cleared
-        }
+        await clearSession();
     }, []);
 
     const value = useMemo(

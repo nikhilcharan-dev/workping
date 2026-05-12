@@ -5,8 +5,6 @@ const UploadImage = ({ onCapture }) => {
   const canvasRef = useRef(null)
 
   const handleImage = async (files) => {
-    console.log('FILES FROM DROPZONE:', files)
-
     const file = files?.[0]
     if (!file) return
 
@@ -27,8 +25,6 @@ const UploadImage = ({ onCapture }) => {
       const hash = Array.from(new Uint8Array(hashBuffer))
         .map((b) => b.toString(16).padStart(2, '0'))
         .join('')
-
-      console.log('ENCRYPTED PIXEL HASH (UPLOAD):', hash)
 
       onCapture?.({
         source: 'upload',

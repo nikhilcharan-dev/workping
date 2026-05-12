@@ -1,6 +1,9 @@
 import axios from "axios";
 
 const FACE_API_URI = process.env.IMAGE_CLASSIFICATION_URI;
+const INTERNAL_SECRET = process.env.INTERNAL_SECRET;
+
+const internalHeaders = () => ({ "X-Internal-Secret": INTERNAL_SECRET });
 
 /**
  * Enroll a face for an employee.
@@ -14,11 +17,15 @@ export const enrollFace = async (imageBuffer, user) => {
   const image_base64 = imageBuffer.toString("base64");
 
   // Embeddings are keyed by MongoDB _id (consistent with detect calls)
-  const { data } = await axios.post(`${FACE_API_URI}/api/v1/enroll`, {
-    image_base64,
-    employee_id: user._id.toString(),
-    organization_id: user.organizationId.toString(),
-  });
+  const { data } = await axios.post(
+    `${FACE_API_URI}/api/v1/enroll`,
+    {
+      image_base64,
+      employee_id: user._id.toString(),
+      organization_id: user.organizationId.toString(),
+    },
+    { headers: internalHeaders() }
+  );
 
   if (!data.success) {
     throw new Error("Face API failed to enroll face");
@@ -33,9 +40,10 @@ export const enrollFace = async (imageBuffer, user) => {
  */
 export const checkFaceStatus = async (userId) => {
   try {
-    const { data } = await axios.get(`${FACE_API_URI}/api/v1/embeddings/${encodeURIComponent(userId.toString())}`, {
-      timeout: 5000,
-    });
+    const { data } = await axios.get(
+      `${FACE_API_URI}/api/v1/embeddings/${encodeURIComponent(userId.toString())}`,
+      { timeout: 5000, headers: internalHeaders() }
+    );
     return data.registered === true;
   } catch {
     return false;
@@ -48,7 +56,10 @@ export const checkFaceStatus = async (userId) => {
  */
 export const deleteFace = async (userId) => {
   try {
-    await axios.delete(`${FACE_API_URI}/api/v1/embeddings/${encodeURIComponent(userId)}`);
+    await axios.delete(
+      `${FACE_API_URI}/api/v1/embeddings/${encodeURIComponent(userId)}`,
+      { headers: internalHeaders() }
+    );
   } catch (err) {
     console.error(`[FaceAPI] Failed to delete face for userId "${userId}":`, err?.response?.data || err.message);
   }

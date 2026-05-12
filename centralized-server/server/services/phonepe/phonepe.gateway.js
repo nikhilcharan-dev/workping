@@ -9,6 +9,7 @@ import { successResponse, errorResponse } from "#utils/response.helper.js";
 const router = Router();
 
 const PHONEPE_URI = process.env.PHONE_PE;
+const INTERNAL_SECRET = process.env.INTERNAL_SECRET;
 
 const phonepeGateway = asyncHandler(async (req, res) => {
   const { planId } = req.body;
@@ -39,11 +40,15 @@ const phonepeGateway = asyncHandler(async (req, res) => {
   });
 
   const phonepeRes = (
-    await axios.post(`${PHONEPE_URI}/api/payments/initiate-payment`, {
-      orderId: newOrder._id,
-      userId,
-      amount: plan.amount, // microservice converts to paise
-    })
+    await axios.post(
+      `${PHONEPE_URI}/api/payments/initiate-payment`,
+      {
+        orderId: newOrder._id,
+        userId,
+        amount: plan.amount, // microservice converts to paise
+      },
+      { headers: { "X-Internal-Secret": INTERNAL_SECRET } }
+    )
   ).data; // { orderId, state, expireAt, redirectUrl }
 
   newOrder.phonepeOrderId = phonepeRes.orderId;

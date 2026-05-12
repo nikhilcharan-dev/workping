@@ -1,47 +1,42 @@
+/*
+ * Analytics counters are stored in a Redis hash (mail:analytics) — see
+ * utils/analytics.js. The previous implementation wrote to data/analytics.json
+ * with an unsynchronized read-modify-write; under any concurrency that lost
+ * counters. These tests pin the Redis-hash contract behind the same public
+ * API (logEmailEvent, getStats).
+ */
 import { jest } from "@jest/globals";
-import fs from "fs/promises";
-import path from "path";
-import os from "os";
-import { fileURLToPath } from "url";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// In-memory hash store mirroring the subset of node-redis used by analytics.js.
+const hash = new Map();
+const mockRedis = {
+  hIncrBy: jest.fn(async (_key, field, increment) => {
+    const current = parseInt(hash.get(field) || "0", 10);
+    const next = current + increment;
+    hash.set(field, String(next));
+    return next;
+  }),
+  hSet: jest.fn(async (_key, field, value) => {
+    const isNew = !hash.has(field);
+    hash.set(field, String(value));
+    return isNew ? 1 : 0;
+  }),
+  hGetAll: jest.fn(async () => Object.fromEntries(hash.entries())),
+};
 
-const DATA_FILE = path.join(__dirname, "..", "data", "analytics.json");
+jest.unstable_mockModule("../config/redisConfig.js", () => ({ default: mockRedis, __esModule: true }));
 
-let snapshot = null;
+const { logEmailEvent, getStats } = await import("../utils/analytics.js");
 
-beforeAll(async () => {
-  try {
-    snapshot = await fs.readFile(DATA_FILE, "utf-8");
-  } catch {
-    snapshot = null;
-  }
-});
-
-afterAll(async () => {
-  if (snapshot !== null) {
-    await fs.writeFile(DATA_FILE, snapshot);
-  } else {
-    try {
-      await fs.unlink(DATA_FILE);
-    } catch {
-      /* ignore */
-    }
-  }
-});
-
-beforeEach(async () => {
-  try {
-    await fs.unlink(DATA_FILE);
-  } catch {
-    /* ignore — fresh state */
-  }
+beforeEach(() => {
+  hash.clear();
+  mockRedis.hIncrBy.mockClear();
+  mockRedis.hSet.mockClear();
+  mockRedis.hGetAll.mockClear();
 });
 
 describe("analytics.logEmailEvent", () => {
-  it("creates the analytics file on first event and increments totalSent", async () => {
-    const { logEmailEvent, getStats } = await import(`../utils/analytics.js?t=${Date.now()}-1`);
+  it("increments totalSent, success, and the per-type bucket on a success event", async () => {
     await logEmailEvent("otp", "success");
     const stats = await getStats();
     expect(stats.totalSent).toBe(1);
@@ -51,7 +46,6 @@ describe("analytics.logEmailEvent", () => {
   });
 
   it("splits success vs failure counters", async () => {
-    const { logEmailEvent, getStats } = await import(`../utils/analytics.js?t=${Date.now()}-2`);
     await logEmailEvent("otp", "success");
     await logEmailEvent("otp", "failure");
     await logEmailEvent("otp", "failure");
@@ -62,7 +56,6 @@ describe("analytics.logEmailEvent", () => {
   });
 
   it("increments per-type counters independently", async () => {
-    const { logEmailEvent, getStats } = await import(`../utils/analytics.js?t=${Date.now()}-3`);
     await logEmailEvent("otp", "success");
     await logEmailEvent("greeting", "success");
     await logEmailEvent("alert", "success");
@@ -76,7 +69,6 @@ describe("analytics.logEmailEvent", () => {
   });
 
   it("routes unknown types into the 'raw' bucket (no silent loss)", async () => {
-    const { logEmailEvent, getStats } = await import(`../utils/analytics.js?t=${Date.now()}-4`);
     await logEmailEvent("nonexistent-type-xyz", "success");
     const stats = await getStats();
     expect(stats.byType.raw).toBe(1);
@@ -84,7 +76,6 @@ describe("analytics.logEmailEvent", () => {
   });
 
   it("updates lastUpdated to a valid ISO timestamp", async () => {
-    const { logEmailEvent, getStats } = await import(`../utils/analytics.js?t=${Date.now()}-5`);
     const before = new Date().toISOString();
     await logEmailEvent("otp", "success");
     const stats = await getStats();
@@ -93,34 +84,40 @@ describe("analytics.logEmailEvent", () => {
     expect(stats.lastUpdated >= before).toBe(true);
   });
 
-  it("persists state across module reloads (file is the source of truth)", async () => {
-    const m1 = await import(`../utils/analytics.js?t=${Date.now()}-6a`);
-    await m1.logEmailEvent("otp", "success");
-    await m1.logEmailEvent("otp", "success");
-
-    const m2 = await import(`../utils/analytics.js?t=${Date.now()}-6b`);
-    const stats = await m2.getStats();
-    expect(stats.totalSent).toBe(2);
-    expect(stats.byType.otp).toBe(2);
+  it("uses HINCRBY so concurrent increments do not clobber each other", async () => {
+    // 50 parallel writes — with the old read-modify-write JSON impl this
+    // race-condition test would non-deterministically lose counters. With
+    // HINCRBY the final value must equal the number of writes.
+    await Promise.all(Array.from({ length: 50 }, () => logEmailEvent("otp", "success")));
+    const stats = await getStats();
+    expect(stats.totalSent).toBe(50);
+    expect(stats.success).toBe(50);
+    expect(stats.byType.otp).toBe(50);
   });
 });
 
 describe("analytics.getStats", () => {
-  it("returns the initial shape when the file does not exist", async () => {
-    const { getStats } = await import(`../utils/analytics.js?t=${Date.now()}-7`);
+  it("returns the initial zero shape when no events have been logged", async () => {
     const stats = await getStats();
     expect(stats).toMatchObject({
       totalSent: 0,
       success: 0,
       failure: 0,
-      byType: expect.objectContaining({
-        otp: expect.any(Number),
-        forgotPassword: expect.any(Number),
-        greeting: expect.any(Number),
-        alert: expect.any(Number),
-        notification: expect.any(Number),
-        raw: expect.any(Number),
-      }),
+      byType: {
+        otp: 0,
+        forgotPassword: 0,
+        greeting: 0,
+        alert: 0,
+        notification: 0,
+        raw: 0,
+      },
     });
+  });
+
+  it("returns the initial shape on a Redis failure (fail-open read)", async () => {
+    mockRedis.hGetAll.mockRejectedValueOnce(new Error("redis-down"));
+    const stats = await getStats();
+    expect(stats.totalSent).toBe(0);
+    expect(stats.byType.otp).toBe(0);
   });
 });

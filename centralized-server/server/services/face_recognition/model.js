@@ -1,6 +1,9 @@
 import axios from "axios";
 
 const FACE_API_URI = process.env.IMAGE_CLASSIFICATION_URI;
+const INTERNAL_SECRET = process.env.INTERNAL_SECRET;
+
+const internalHeaders = () => ({ "X-Internal-Secret": INTERNAL_SECRET });
 
 /**
  * Submit face recognition task to queue
@@ -15,7 +18,7 @@ export const submitRecognitionTask = async (imageBuffer, userId, organizationId)
       user_id: userId,
       organization_id: organizationId.toString(),
     },
-    { timeout: 30000 }
+    { timeout: 30000, headers: internalHeaders() }
   );
 
   return data;
@@ -26,7 +29,10 @@ export const submitRecognitionTask = async (imageBuffer, userId, organizationId)
  */
 export const checkRecognitionStatus = async (ticketId) => {
   try {
-    const { data } = await axios.get(`${FACE_API_URI}/api/v1/ticket/${ticketId}`, { timeout: 5000 });
+    const { data } = await axios.get(
+      `${FACE_API_URI}/api/v1/ticket/${ticketId}`,
+      { timeout: 5000, headers: internalHeaders() }
+    );
     return data;
   } catch (err) {
     if (err.response?.status === 404) return { status: "failed", error: "Ticket not found" };
@@ -44,7 +50,7 @@ export const checkLiveness = async (frames) => {
   const { data } = await axios.post(
     `${FACE_API_URI}/api/v1/liveness/check`,
     { frames: frames_base64 },
-    { timeout: 10000 }
+    { timeout: 10000, headers: internalHeaders() }
   );
 
   return data;
