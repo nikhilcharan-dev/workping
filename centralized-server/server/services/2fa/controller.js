@@ -49,20 +49,27 @@ export const createController = (config) => {
 
         const secret = await getSecret(id);
 
-        // GENERIC ERROR: Don't reveal if user exists or has 2FA specific error
-        // Unless we really want to, but security audit said no.
-        // However, if secret is null, verification fails naturally.
-        const verified = secret
-          ? speakeasy.totp.verify({
-              secret: secret,
-              encoding: "base32",
-              token: token,
-              window: 1, // Allow 1 step (30s) leeway either side, creating a 90s window.
-              // Standard is often 1.
-            })
-          : false;
+        // Use constant-time verification: always call speakeasy.totp.verify
+        // to avoid timing attacks that distinguish 'no 2FA' from 'wrong code'
+        let verified;
+        if (secret) {
+          verified = speakeasy.totp.verify({
+            secret: secret,
+            encoding: "base32",
+            token: token,
+            window: 1, // Allow 1 step (30s) leeway either side, creating a 90s window.
+          });
+        } else {
+          // Use a dummy secret to maintain constant execution time
+          verified = speakeasy.totp.verify({
+            secret: "JBSWY3DPEBLW64TMMQ======",
+            encoding: "base32",
+            token: token,
+            window: 1,
+          });
+        }
 
-        if (verified) {
+        if (verified && secret) {
           // Optional: Mark 2FA as enabled in DB if it was pending
           if (config.enable2FA && typeof config.enable2FA === "function") {
             enable2FA(id);
@@ -70,7 +77,7 @@ export const createController = (config) => {
 
           res.json({ verified: true, message: "2FA verified successfully" });
         } else {
-          // Generic error message
+          // Generic error message applies to both no secret and wrong code
           res.status(401).json({ verified: false, error: "2FA verification failed" });
         }
       } catch (error) {
@@ -95,16 +102,26 @@ export const createController = (config) => {
         }
 
         const secret = await getSecret(id);
-        const verified = secret
-          ? speakeasy.totp.verify({
-              secret: secret,
-              encoding: "base32",
-              token: token,
-              window: 1,
-            })
-          : false;
+        // Use constant-time verification to avoid timing attacks
+        let verified;
+        if (secret) {
+          verified = speakeasy.totp.verify({
+            secret: secret,
+            encoding: "base32",
+            token: token,
+            window: 1,
+          });
+        } else {
+          // Use a dummy secret to maintain constant execution time
+          verified = speakeasy.totp.verify({
+            secret: "JBSWY3DPEBLW64TMMQ======",
+            encoding: "base32",
+            token: token,
+            window: 1,
+          });
+        }
 
-        if (verified) {
+        if (verified && secret) {
           res.json({ verified: true, message: "Re-authentication successful" });
         } else {
           res.status(401).json({ verified: false, error: "Re-authentication failed" });

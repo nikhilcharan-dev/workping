@@ -80,15 +80,27 @@ import './services/offlineQueue'; // Ensure offline queue handler is registered 
 // with captive portals or expired DHCP leases).
 NetInfo.configure({ reachabilityUrl: 'https://api.workping.live/api/v1/health' });
 NetInfo.addEventListener(state => {
-  if (state.isConnected && state.isInternetReachable) {
-    if (typeof global.__WP_FLUSH_OFFLINE_QUEUE__ !== 'function') {
-      throw new Error('[WorkPing] Offline queue handler not registered. offlineQueue.js must be imported in index.js before registerRootComponent.');
-    }
-    try {
+  try {
+    if (state.isConnected && state.isInternetReachable) {
+      if (typeof global.__WP_FLUSH_OFFLINE_QUEUE__ !== 'function') {
+        console.warn('[WorkPing] Offline queue handler not yet registered. Retrying in 1s.');
+        setTimeout(() => {
+          try {
+            if (typeof global.__WP_FLUSH_OFFLINE_QUEUE__ === 'function') {
+              global.__WP_FLUSH_OFFLINE_QUEUE__();
+            } else {
+              console.error('[WorkPing] Offline queue handler still not registered after retry.');
+            }
+          } catch (retryError) {
+            console.error('[WorkPing] Error flushing offline queue on retry:', retryError.message);
+          }
+        }, 1000);
+        return;
+      }
       global.__WP_FLUSH_OFFLINE_QUEUE__();
-    } catch (error) {
-      console.error('[WorkPing] Error flushing offline queue:', error.message);
     }
+  } catch (error) {
+    console.error('[WorkPing] Unhandled error in NetInfo listener:', error.message);
   }
 });
 

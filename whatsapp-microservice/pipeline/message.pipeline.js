@@ -11,6 +11,19 @@ import { getFlow, addMessage, clearFlow } from "../utils/conversation.state.js";
 import { checkGuards } from "../utils/rate.limiter.js";
 import { Queue } from "bullmq";
 
+let failedMessagesQueue = null;
+
+function getFailedMessagesQueue() {
+  if (!failedMessagesQueue) {
+    failedMessagesQueue = new Queue("failed-messages", {
+      connection: {
+        url: process.env.REDIS_URL || "redis://localhost:6379"
+      }
+    });
+  }
+  return failedMessagesQueue;
+}
+
 async function resolveFlowIntent(phone, text, ruleIntent) {
   const flow = await getFlow(phone);
   if (!flow) return null;
@@ -69,7 +82,7 @@ async function resolveFlowIntent(phone, text, ruleIntent) {
   return null;
 }
 
-async function process(internalMessage) {
+async function processMessage(internalMessage) {
   const startTime = Date.now();
   try {
     /* 0. Rate limit & profanity guard */
@@ -202,8 +215,9 @@ async function process(internalMessage) {
     trackError();
     console.error("[PIPELINE] Failure:", error.message);
     try {
-      const failedMessagesQueue = new Queue("failed-messages", { connection: { url: process.env.REDIS_URL || "redis://localhost:6379" } });
-      await failedMessagesQueue.add(
+      const queue = getFailedMessagesQueue();
+      await queue.add(
+        "failed-message",
         {
           internalMessage,
           error: error.message,
@@ -219,4 +233,16 @@ async function process(internalMessage) {
   }
 }
 
-export default { process };
+process.on("SIGTERM", async () => {
+  if (failedMessagesQueue) {
+    await failedMessagesQueue.close();
+  }
+});
+
+process.on("SIGINT", async () => {
+  if (failedMessagesQueue) {
+    await failedMessagesQueue.close();
+  }
+});
+
+export default { process: processMessage };

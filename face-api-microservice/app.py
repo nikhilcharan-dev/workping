@@ -229,9 +229,11 @@ manager = ConnectionManager()
 
 # ─────── IN-MEMORY RATE LIMITER (fallback for Redis unavailability) ────────
 class MemoryRateLimiter:
-    def __init__(self, window_seconds: int):
+    def __init__(self, window_seconds: int, max_users: int = 10000):
         self.window_seconds = window_seconds
+        self.max_users = max_users
         self.requests: dict = {}  # user_id -> [(timestamp, count), ...]
+        self.last_cleanup = time.time()
 
     def is_allowed(self, user_id: str, limit: int) -> bool:
         now = time.time()
@@ -251,7 +253,22 @@ class MemoryRateLimiter:
 
         # Record this request
         self.requests[user_id].append((now, 1))
+
+        # Periodic cleanup of inactive users (every 60s or when approaching max_users)
+        if (now - self.last_cleanup > 60) or len(self.requests) > self.max_users * 0.9:
+            self._cleanup_inactive(now)
+            self.last_cleanup = now
+
         return True
+
+    def _cleanup_inactive(self, now: float):
+        """Remove entries for users with no recent activity."""
+        inactive_users = [
+            uid for uid, entries in self.requests.items()
+            if not entries or all(now - ts >= self.window_seconds for ts, _ in entries)
+        ]
+        for uid in inactive_users:
+            del self.requests[uid]
 
 memory_limiter = MemoryRateLimiter(RATE_LIMIT_WINDOW_SECONDS)
 
@@ -572,23 +589,26 @@ async def detect(req: DetectRequest):
     """
     Submits a face verification task to the Redis queue.
     """
+    if not FAISS_READY:
+        raise HTTPException(status_code=503, detail="Face detection service is not ready. FAISS indexes failed to load.")
+
     validate_image_b64(req.image_base64)  # size check before queuing
     await check_rate_limit(req.user_id)
 
     ticket_id = str(uuid.uuid4())
     redis = _get_redis()
-    
+
     payload = {
         "ticket_id": ticket_id,
         "image_base64": req.image_base64,
         "user_id": req.user_id,
         "organization_id": req.organization_id
     }
-    
+
     await redis.setex(f"ticket:{ticket_id}", 300, json.dumps({"status": "queued"}))
     await redis.rpush("face_tasks_queue", json.dumps(payload))
     queue_len = await redis.llen("face_tasks_queue")
-    
+
     return {
         "status": "queued",
         "ticket_id": ticket_id,
@@ -692,6 +712,9 @@ async def faiss_bulk_search(req: FAISSSearchRequest):
     Returns top-k employees above the cosine threshold from the org's index.
     Intended for kiosk-mode attendance where the employee scans without typing their ID.
     """
+    if not FAISS_READY:
+        raise HTTPException(status_code=503, detail="Face identification service is not ready. FAISS indexes failed to load.")
+
     image_bytes = validate_image_b64(req.image_base64)
     loop = asyncio.get_running_loop()
 
