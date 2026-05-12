@@ -1,5 +1,6 @@
 import { createClient } from "redis";
 import "dotenv/config";
+import { logger } from "../utils/logger.js";
 
 const redis = createClient({
   socket: {
@@ -11,11 +12,11 @@ const redis = createClient({
 });
 
 redis.on("ready", () => {
-  console.log("[Redis Client] Ready");
+  logger.info("[Redis Client] Ready");
 });
 
 redis.on("error", (err) => {
-  console.log("[Redis Client] Error occurred: " + err);
+  logger.error("[Redis Client] Error occurred:", { err: err.message });
 });
 
 export default redis;

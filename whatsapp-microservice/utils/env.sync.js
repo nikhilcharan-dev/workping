@@ -1,6 +1,7 @@
 import { readFileSync, writeFileSync } from "fs";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
+import { logger } from "./logger.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ENV_PATH = resolve(__dirname, "..", ".env");
@@ -98,7 +99,7 @@ export function syncToEnv(updates) {
 
   writeFileSync(ENV_PATH, newLines.join("\n"), "utf-8");
   // Log all .env modifications for audit purposes
-  console.log(`[ENV-SYNC-AUDIT] Updated keys: ${Array.from(keysToUpdate).join(", ")}`);
+  logger.info(`[ENV-SYNC-AUDIT] Updated keys: ${Array.from(keysToUpdate).join(", ")}`);
 }
 
 /**

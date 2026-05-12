@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { logger } from "../utils/logger.js";
 import { getStats } from "../utils/analytics.js";
 import { getGuardStats, getGuardedUsers, unbanUser, unrateLimitUser } from "../utils/rate.limiter.js";
 import {
@@ -39,7 +40,7 @@ router.post("/provider", (req, res) => {
   }
   try {
     const active = setProvider(provider);
-    console.log("LLM provider switched to:", active);
+    logger.info("LLM provider switched to:", active);
     res.json({ provider: active });
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -59,7 +60,7 @@ router.get("/config/:provider", (req, res) => {
 router.put("/config/:provider", (req, res) => {
   try {
     const updated = updateProviderConfig(req.params.provider, req.body);
-    console.log("Config updated for:", req.params.provider);
+    logger.info("Config updated for:", req.params.provider);
     res.json(updated);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -76,10 +77,10 @@ router.post("/sync", (req, res) => {
     const envUpdates = buildEnvUpdates(provider, rawConfig);
     syncToEnv(envUpdates);
 
-    console.log("Config synced to .env for:", provider);
+    logger.info("Config synced to .env for:", provider);
     res.json({ synced: true, provider, keys: Object.keys(envUpdates) });
   } catch (err) {
-    console.error("Sync to disk failed:", err.message);
+    logger.error("Sync to disk failed:", err.message);
     // Don't expose detailed error messages that might reveal security restrictions
     res.status(400).json({ error: "Configuration sync failed. Check that all required values are set." });
   }
@@ -99,7 +100,7 @@ router.post("/test-chat", async (req, res) => {
     const elapsed = Date.now() - startTime;
     res.json({ ok: true, provider, response, elapsed });
   } catch (err) {
-    console.error("[TEST-CHAT] Failed:", err.message);
+    logger.error("[TEST-CHAT] Failed:", err.message);
     res.json({ ok: false, provider: getProvider(), error: err.message });
   }
 });

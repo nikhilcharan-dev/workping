@@ -1,4 +1,5 @@
 import redis from "../config/redisConfig.js";
+import { logger } from "./logger.js";
 
 // Counters live in a single Redis hash keyed by field. HINCRBY is atomic at
 // the Redis side, so concurrent /send-* calls from multiple replicas can no
@@ -36,7 +37,7 @@ export async function logEmailEvent(type, status) {
     ]);
   } catch (err) {
     // Fail open — losing a counter is acceptable, blocking the email isn't.
-    console.error("[Analytics Error] Failed to log event:", err.message);
+    logger.error("[Analytics Error] Failed to log event:", { err: err.message });
   }
 }
 
@@ -63,7 +64,7 @@ export async function getStats() {
       lastUpdated: raw.lastUpdated || INITIAL_DATA.lastUpdated,
     };
   } catch (err) {
-    console.error("[Analytics Error] Failed to get stats:", err.message);
+    logger.error("[Analytics Error] Failed to get stats:", { err: err.message });
     return INITIAL_DATA;
   }
 }

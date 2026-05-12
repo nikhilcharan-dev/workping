@@ -2,6 +2,7 @@ import { Router } from "express";
 import redis from "../config/redisConfig.js";
 import { sendEmailOTP, sendResetPasswordOTP } from "../mail/mailer.js";
 import { perRecipientRateLimit } from "../utils/rateLimit.js";
+import { logger } from "../utils/logger.js";
 
 const router = Router();
 
@@ -53,7 +54,7 @@ router.post("/send-email-otp", validateEmail, perRecipientRateLimit(), async (re
       message: "OTP sent successfully",
     });
   } catch (err) {
-    console.error("[OTP Error]", err);
+    logger.error("[OTP Error]", { err: err.message });
     return res.status(500).json({
       status: "error",
       error: "Internal Server Error",
@@ -76,7 +77,7 @@ router.post("/send-reset-password-otp", validateEmail, perRecipientRateLimit(), 
       message: "Reset password OTP sent successfully",
     });
   } catch (err) {
-    console.error("[OTP Error]", err);
+    logger.error("[OTP Error]", { err: err.message });
     return res.status(500).json({
       status: "error",
       error: "Internal Server Error",
@@ -101,7 +102,7 @@ router.post("/verify-reset-password-otp", validateEmail, async (req, res) => {
       message: "OTP verified successfully",
     });
   } catch (err) {
-    console.error("[OTP Error]", err);
+    logger.error("[OTP Error]", { err: err.message });
     return res.status(500).json({
       status: "error",
       error: "Internal Server Error",
@@ -140,7 +141,7 @@ router.post("/verify-email-otp", validateEmail, async (req, res) => {
       message: "Email OTP verified successfully",
     });
   } catch (err) {
-    console.error("[OTP Error]", err);
+    logger.error("[OTP Error]", { err: err.message });
     return res.status(500).json({
       status: "error",
       error: "Internal Server Error",

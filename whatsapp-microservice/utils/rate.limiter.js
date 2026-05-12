@@ -1,4 +1,5 @@
 import redis from "./redis.client.js";
+import { logger } from "./logger.js";
 
 const DAILY_LIMIT = 10;
 const WARN_AT = 5;
@@ -115,7 +116,7 @@ export async function checkGuards(phone, text) {
 
     return { allowed: true, warning, remaining };
   } catch (error) {
-    console.error("[RateLimit] Redis unavailable, allowing message without enforcement:", error.message);
+    logger.error("[RateLimit] Redis unavailable, allowing message without enforcement:", error.message);
     return { allowed: true, warning: null, remaining: null };
   }
 }

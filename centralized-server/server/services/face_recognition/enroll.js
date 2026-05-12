@@ -1,4 +1,5 @@
 import axios from "axios";
+import logger from "#utils/logger.js";
 
 const FACE_API_URI = process.env.IMAGE_CLASSIFICATION_URI;
 const INTERNAL_SECRET = process.env.INTERNAL_SECRET;
@@ -61,6 +62,6 @@ export const deleteFace = async (userId) => {
       { headers: internalHeaders() }
     );
   } catch (err) {
-    console.error(`[FaceAPI] Failed to delete face for userId "${userId}":`, err?.response?.data || err.message);
+    logger.error(`[FaceAPI] Failed to delete face for userId "${userId}":`, err?.response?.data || err.message);
   }
 };

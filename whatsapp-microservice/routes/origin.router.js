@@ -1,5 +1,6 @@
 import { Router } from "express";
 import crypto from "crypto";
+import { logger } from "../utils/logger.js";
 import { sendWhatsAppMessage } from "../whatsapp/sender.js";
 import { startFlow } from "../utils/conversation.state.js";
 import { scheduleShiftReminder, cancelShiftReminder } from "../scheduler/shift.reminder.js";
@@ -74,10 +75,10 @@ originRouter.post("/send", authGuard, async (req, res) => {
   }
   try {
     await sendWhatsAppMessage({ to, text });
-    console.log("Message sent to:", to);
+    logger.info("Message sent to:", to);
     res.json({ sent: true, to });
   } catch (err) {
-    console.error("Send message failed:", err.message);
+    logger.error("Send message failed:", err.message);
     res.status(500).json({ error: "Failed to send message" });
   }
 });
@@ -141,7 +142,7 @@ originRouter.post("/schedule-reminder", authGuard, async (req, res) => {
     const result = await scheduleShiftReminder({ userId, shiftDate, phone, name, role, shift });
     res.json(result);
   } catch (err) {
-    console.error("[ROUTE] schedule-reminder failed:", err.message);
+    logger.error("[ROUTE] schedule-reminder failed:", err.message);
     res.status(500).json({ error: err.message });
   }
 });
@@ -167,7 +168,7 @@ originRouter.post("/cancel-reminder", authGuard, async (req, res) => {
     const result = await cancelShiftReminder(userId, shiftDate);
     res.json(result);
   } catch (err) {
-    console.error("[ROUTE] cancel-reminder failed:", err.message);
+    logger.error("[ROUTE] cancel-reminder failed:", err.message);
     res.status(500).json({ error: err.message });
   }
 });

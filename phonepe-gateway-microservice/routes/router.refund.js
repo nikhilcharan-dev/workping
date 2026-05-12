@@ -2,6 +2,7 @@ import { Router } from "express";
 import axios from "axios";
 import PHONEPE_CONFIG from "../config/phonepe.env.js";
 import getAuthorisationToken from "../config/phonepe.auth.js";
+import { logger } from "../utils/logger.js";
 
 const PHONE_BASE_URL = PHONEPE_CONFIG.baseUrl;
 const REFUND_PATH = "/payments/v2/refund";
@@ -41,12 +42,12 @@ router.post("/initiate-refund", async (req, res) => {
         return res.status(409).json({ error: "Original order amount could not be verified" });
       }
     } catch (statusErr) {
-      console.error("Refund pre-check status fetch failed:", statusErr?.response?.data || statusErr.message);
+      logger.error("Refund pre-check status fetch failed:", { err: statusErr?.response?.data || statusErr.message });
       return res.status(409).json({ error: "Original order not found or not in a refundable state" });
     }
 
     if (refundAmountPaise > originalAmountPaise) {
-      console.warn(`[Refund] Rejected: refund ${refundAmountPaise} > original ${originalAmountPaise} for ${orderId}`);
+      logger.warn(`[Refund] Rejected: refund ${refundAmountPaise} > original ${originalAmountPaise} for ${orderId}`);
       return res.status(400).json({ error: "Refund amount exceeds original order amount" });
     }
 
@@ -69,7 +70,7 @@ router.post("/initiate-refund", async (req, res) => {
       refundDetails: refundResponse.data,
     });
   } catch (err) {
-    console.error("Refund Initiation Error:", err?.response?.data || err.message);
+    logger.error("Refund Initiation Error:", { err: err?.response?.data || err.message });
     res.status(err?.response?.status || 500).json({
       error: err?.response?.data?.error || "Refund initiation failed",
     });
@@ -94,7 +95,7 @@ router.post("/get-refund-status", async (req, res) => {
     const data = refundResponse.data;
     return res.status(200).json(data);
   } catch (err) {
-    console.error("Refund Status Error:", err?.response?.data || err.message);
+    logger.error("Refund Status Error:", { err: err?.response?.data || err.message });
     res.status(err?.response?.status || 500).json({
       error: err?.response?.data?.error || "Failed to fetch refund status",
     });

@@ -1,4 +1,5 @@
 import redis from "./redis.client.js";
+import { logger } from "./logger.js";
 
 const SESSION_TTL = 48 * 60 * 60; // 48 hours (seconds) - allows multi-step flows over multiple days
 const FLOW_TIMEOUT_MS = 24 * 60 * 60 * 1000; // 24 hours - auto-clear abandoned flows
@@ -13,7 +14,7 @@ async function getSession(phone) {
     const raw = await redis.get(key(phone));
     return raw ? JSON.parse(raw) : null;
   } catch (error) {
-    console.error("[ConversationState] Failed to retrieve session, treating as new:", error.message);
+    logger.error("[ConversationState] Failed to retrieve session, treating as new:", error.message);
     return null;
   }
 }
@@ -23,7 +24,7 @@ async function saveSession(phone, session) {
     session.lastActivity = Date.now();
     await redis.set(key(phone), JSON.stringify(session), "EX", SESSION_TTL);
   } catch (error) {
-    console.error("[ConversationState] Failed to save session (context will be lost on reload):", error.message);
+    logger.error("[ConversationState] Failed to save session (context will be lost on reload):", error.message);
   }
 }
 

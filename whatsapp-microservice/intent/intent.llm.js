@@ -1,6 +1,7 @@
 import { chat } from "../utils/llm.provider.js";
 import { INTENT_SYSTEM_PROMPT, INTENT_FEW_SHOT } from "../utils/intent.prompts.js";
 import { getObservabilityTracker, LLMMetrics } from "../utils/llm.observability.js";
+import { logger } from "../utils/logger.js";
 
 /**
  * Detect intent using Ollama LLM with few-shot prompting.

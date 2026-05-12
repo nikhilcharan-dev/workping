@@ -5,6 +5,7 @@ import Account from "#models/Account.js";
 import Admin from "#models/Admin.js";
 import User from "#models/User.js";
 import { setAuthCookie } from "#utils/cookie.helper.js";
+import logger from "#utils/logger.js";
 
 const router = Router();
 
@@ -170,7 +171,7 @@ router.get("/callback", async (req, res) => {
           </script>
         `);
   } catch (err) {
-    console.error("Microsoft OAuth Error:", err.response?.data || err.message);
+    logger.error("Microsoft OAuth Error:", err.response?.data || err.message);
     if (isMobile) {
       return res.redirect(
         `workping://auth?error=${encodeURIComponent("Microsoft OAuth failed")}${mobileStateParam}`
@@ -220,7 +221,7 @@ router.post("/pkce/exchange", async (req, res) => {
 
     return res.json({ token: result.token, role: result.role });
   } catch (err) {
-    console.error("Microsoft PKCE exchange error:", err.response?.data || err.message);
+    logger.error("Microsoft PKCE exchange error:", err.response?.data || err.message);
     return res.status(500).json({ error: "Microsoft OAuth exchange failed" });
   }
 });

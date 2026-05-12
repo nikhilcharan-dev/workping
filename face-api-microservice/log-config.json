@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "disable_existing_loggers": false,
+  "formatters": {
+    "json": {
+      "()": "logger._JsonFormatter"
+    }
+  },
+  "handlers": {
+    "stdout": {
+      "class": "logging.StreamHandler",
+      "stream": "ext://sys.stdout",
+      "formatter": "json",
+      "filters": ["below_warning"]
+    },
+    "stderr": {
+      "class": "logging.StreamHandler",
+      "stream": "ext://sys.stderr",
+      "formatter": "json",
+      "level": "WARNING"
+    }
+  },
+  "filters": {
+    "below_warning": {
+      "()": "logging.Filter"
+    }
+  },
+  "loggers": {
+    "uvicorn": {
+      "handlers": ["stdout", "stderr"],
+      "level": "INFO",
+      "propagate": false
+    },
+    "uvicorn.access": {
+      "handlers": ["stdout"],
+      "level": "INFO",
+      "propagate": false
+    },
+    "uvicorn.error": {
+      "handlers": ["stderr"],
+      "level": "WARNING",
+      "propagate": false
+    },
+    "workping-biometric": {
+      "handlers": ["stdout", "stderr"],
+      "level": "INFO",
+      "propagate": false
+    }
+  },
+  "root": {
+    "level": "INFO",
+    "handlers": ["stdout", "stderr"]
+  }
+}

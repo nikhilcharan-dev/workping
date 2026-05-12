@@ -1,5 +1,6 @@
 import { createClient } from "redis";
 import "dotenv/config";
+import { logger } from "../utils/logger.js";
 
 const redis = createClient({
   socket: {
@@ -10,8 +11,8 @@ const redis = createClient({
   password: process.env.REDIS_PASSWORD || undefined,
 });
 
-redis.on("error", (err) => console.error("[PhonePe Redis] Error:", err));
-redis.on("ready", () => console.log("[PhonePe Redis] Ready"));
+redis.on("error", (err) => logger.error("[PhonePe Redis] Error:", { err: err.message }));
+redis.on("ready", () => logger.info("[PhonePe Redis] Ready"));
 
 if (process.env.NODE_ENV !== "test") {
   await redis.connect();

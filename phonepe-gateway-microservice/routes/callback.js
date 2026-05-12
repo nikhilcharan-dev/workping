@@ -1,6 +1,7 @@
 import axios from "axios";
 import PHONEPE_CONFIG from "../config/phonepe.env.js";
 import getAuthorisationToken from "../config/phonepe.auth.js";
+import { logger } from "../utils/logger.js";
 
 const STATUS_PATH = "/checkout/v2/order";
 
@@ -57,12 +58,12 @@ const phonepeCallBack = async (req, res) => {
         }
       )
       .catch((err) => {
-        console.error("[Callback] Failed to forward to origin server:", err?.response?.data || err.message);
+        logger.error("[Callback] Failed to forward to origin server:", { err: err?.response?.data || err.message });
       });
 
     return res.status(200).json({ success: true, state, amount, paymentDetails });
   } catch (err) {
-    console.error("[Callback] Error:", err?.response?.data || err.message);
+    logger.error("[Callback] Error:", { err: err?.response?.data || err.message });
     return res.status(err?.response?.status || 500).json({
       success: false,
       error: err?.response?.data?.error || "Failed to verify payment status",

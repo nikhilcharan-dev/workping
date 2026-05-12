@@ -1,6 +1,7 @@
 import { chat } from "../utils/llm.provider.js";
 import { getHistory } from "../utils/conversation.state.js";
 import { getObservabilityTracker, LLMMetrics } from "../utils/llm.observability.js";
+import { logger } from "../utils/logger.js";
 
 const RESPONSE_SYSTEM_PROMPT = `You are a warm, friendly, and conversational employee self-service WhatsApp assistant named *WorkPing Assistant*. You work for a company called WorkPing.
 
@@ -98,7 +99,7 @@ export async function generateLLMResponse(
     const latencyMs = Date.now() - startTime;
     error = err.message;
 
-    console.error("[LLM-GEN] Failed:", error);
+    logger.error("[LLM-GEN] Failed:", error);
 
     // Record failure metric
     const tracker = getObservabilityTracker();

@@ -54,5 +54,7 @@ EXPOSE 5000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=3 \
     CMD python3.10 -c "import urllib.request; urllib.request.urlopen('http://localhost:5000/api/v1/health')"
 
-# Single uvicorn process — parallelism handled by inference workers inside the process
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "5000", "--workers", "1", "--loop", "uvloop", "--http", "httptools"]
+# Single uvicorn process — parallelism handled by inference workers inside the process.
+# --log-config routes uvicorn's own access/error logs through the same JSON formatter
+# as app code (logger.py) so every line in stdout/stderr is parseable JSON.
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "5000", "--workers", "1", "--loop", "uvloop", "--http", "httptools", "--log-config", "log-config.json"]

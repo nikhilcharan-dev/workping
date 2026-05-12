@@ -5,6 +5,7 @@ import Account from "#models/Account.js";
 import Admin from "#models/Admin.js";
 import User from "#models/User.js";
 import { setAuthCookie } from "#utils/cookie.helper.js";
+import logger from "#utils/logger.js";
 
 const router = Router();
 
@@ -164,7 +165,7 @@ router.get("/callback", async (req, res) => {
             </script>
         `);
   } catch (error) {
-    console.error("Google OAuth error:", error.response?.data || error.message);
+    logger.error("Google OAuth error:", error.response?.data || error.message);
     if (isMobile) {
       return res.redirect(
         `workping://auth?error=${encodeURIComponent("Google OAuth failed")}${mobileStateParam}`
@@ -212,7 +213,7 @@ router.post("/pkce/exchange", async (req, res) => {
 
     return res.json({ token: result.token, role: result.role });
   } catch (error) {
-    console.error("Google PKCE exchange error:", error.response?.data || error.message);
+    logger.error("Google PKCE exchange error:", error.response?.data || error.message);
     return res.status(500).json({ error: "Google OAuth exchange failed" });
   }
 });

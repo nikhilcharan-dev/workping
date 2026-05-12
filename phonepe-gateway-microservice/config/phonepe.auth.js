@@ -1,5 +1,6 @@
 import axios from "axios";
 import PHONEPE_CONFIG from "./phonepe.env.js";
+import { logger } from "../utils/logger.js";
 
 const AUTH_BASE_URI = PHONEPE_CONFIG.authBaseUrl;
 const API_PATH = "/v1/oauth/token";
@@ -48,7 +49,7 @@ const generateAuthorisationToken = async () => {
 
     return access_token;
   } catch (err) {
-    console.error("Failed to generate PhonePe authorisation token:", err?.response?.data || err.message);
+    logger.error("Failed to generate PhonePe authorisation token:", { err: err?.response?.data || err.message });
     throw new Error("Authentication with PhonePe failed");
   }
 };

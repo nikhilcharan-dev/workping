@@ -12,6 +12,7 @@ import {
   sendVerifyPassword,
 } from "../mail/mailer.js";
 import { perRecipientRateLimit } from "../utils/rateLimit.js";
+import { logger } from "../utils/logger.js";
 
 const router = Router();
 
@@ -38,7 +39,7 @@ router.post("/send-mail", validateEmail, async (req, res) => {
     await sendEMail(email, subject, content);
     return res.status(200).json({ status: "success", message: "Email sent successfully" });
   } catch (err) {
-    console.error("[Mail Error]", err);
+    logger.error("[Mail Error]", { err: err.message });
     return res.status(500).json({ status: "error", error: "Internal Server Error" });
   }
 });
@@ -53,7 +54,7 @@ router.post("/send-html", validateEmail, async (req, res) => {
     await sendRawHTML(email, subject, html);
     return res.status(200).json({ status: "success", message: "HTML email sent successfully" });
   } catch (err) {
-    console.error("[Mail Error]", err);
+    logger.error("[Mail Error]", { err: err.message });
     return res.status(500).json({ status: "error", error: "Internal Server Error" });
   }
 });
@@ -98,7 +99,7 @@ router.post("/forgot-password", validateEmail, async (req, res) => {
     await sendForgotPassword(email, resetLink);
     return res.status(200).json({ status: "success", message: "Forgot password link sent successfully" });
   } catch (err) {
-    console.error("[Mail Error]", err);
+    logger.error("[Mail Error]", { err: err.message });
     return res.status(500).json({ status: "error", error: "Internal Server Error" });
   }
 });
@@ -110,7 +111,7 @@ router.post("/verify-password", validateEmail, async (req, res) => {
     await sendVerifyPassword(email);
     return res.status(200).json({ status: "success", message: "Verification email sent successfully" });
   } catch (err) {
-    console.error("[Mail Error]", err);
+    logger.error("[Mail Error]", { err: err.message });
     return res.status(500).json({ status: "error", error: "Internal Server Error" });
   }
 });
@@ -125,7 +126,7 @@ router.post("/greeting", validateEmail, async (req, res) => {
     await sendGreeting(email, name, org, role);
     return res.status(200).json({ status: "success", message: "Greeting email sent successfully" });
   } catch (err) {
-    console.error("[Mail Error]", err);
+    logger.error("[Mail Error]", { err: err.message });
     return res.status(500).json({ status: "error", error: "Internal Server Error" });
   }
 });
@@ -140,7 +141,7 @@ router.post("/alert/info", validateEmail, async (req, res) => {
     await sendAlertInfo(email, title, message);
     return res.status(200).json({ status: "success", message: "Info alert sent successfully" });
   } catch (err) {
-    console.error("[Mail Error]", err);
+    logger.error("[Mail Error]", { err: err.message });
     return res.status(500).json({ status: "error", error: "Internal Server Error" });
   }
 });
@@ -155,7 +156,7 @@ router.post("/alert/warning", validateEmail, async (req, res) => {
     await sendAlertWarning(email, title, message, actionLink);
     return res.status(200).json({ status: "success", message: "Warning alert sent successfully" });
   } catch (err) {
-    console.error("[Mail Error]", err);
+    logger.error("[Mail Error]", { err: err.message });
     return res.status(500).json({ status: "error", error: "Internal Server Error" });
   }
 });
@@ -170,7 +171,7 @@ router.post("/alert/danger", validateEmail, async (req, res) => {
     await sendAlertDanger(email, title, message, actionLink);
     return res.status(200).json({ status: "success", message: "Danger alert sent successfully" });
   } catch (err) {
-    console.error("[Mail Error]", err);
+    logger.error("[Mail Error]", { err: err.message });
     return res.status(500).json({ status: "error", error: "Internal Server Error" });
   }
 });
@@ -185,7 +186,7 @@ router.post("/alert/success", validateEmail, async (req, res) => {
     await sendAlertSuccess(email, title, message);
     return res.status(200).json({ status: "success", message: "Success alert sent successfully" });
   } catch (err) {
-    console.error("[Mail Error]", err);
+    logger.error("[Mail Error]", { err: err.message });
     return res.status(500).json({ status: "error", error: "Internal Server Error" });
   }
 });
@@ -200,7 +201,7 @@ router.post("/notification", validateEmail, async (req, res) => {
     await sendNotification(email, title, message);
     return res.status(200).json({ status: "success", message: "Notification sent successfully" });
   } catch (err) {
-    console.error("[Mail Error]", err);
+    logger.error("[Mail Error]", { err: err.message });
     return res.status(500).json({ status: "error", error: "Internal Server Error" });
   }
 });

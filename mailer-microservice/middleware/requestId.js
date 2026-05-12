@@ -1,11 +1,13 @@
 import { randomUUID } from "node:crypto";
+import logger from "../utils/logger.js";
 
 /**
- * Attach a per-request correlation ID. See utils/logger.js for log usage.
+ * Attach a per-request correlation ID AND a bound child logger.
  *
- * Honors inbound `X-Request-ID` (riding through from nginx / centralized-server)
- * if it looks safe, otherwise mints a fresh UUID. The id is exposed back to
- * the caller via the response header for log-trace correlation.
+ * `req.id`  — correlation ID, mirrored in X-Request-ID response header.
+ * `req.log` — child logger with { requestId } baked in. Every log call from
+ *              a route handler or service called within this request will
+ *              automatically include the id without manual plumbing.
  */
 const ID_PATTERN = /^[A-Za-z0-9._\-:]{1,128}$/;
 
@@ -13,6 +15,7 @@ export default function requestId(req, res, next) {
   const inbound = req.headers["x-request-id"];
   const id = typeof inbound === "string" && ID_PATTERN.test(inbound) ? inbound : randomUUID();
   req.id = id;
+  req.log = logger.child({ requestId: id });
   res.setHeader("X-Request-ID", id);
   next();
 }

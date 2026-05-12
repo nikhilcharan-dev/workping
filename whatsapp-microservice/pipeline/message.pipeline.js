@@ -10,6 +10,7 @@ import { trackMessage, trackError } from "../utils/analytics.js";
 import { getFlow, addMessage, clearFlow } from "../utils/conversation.state.js";
 import { checkGuards } from "../utils/rate.limiter.js";
 import { Queue } from "bullmq";
+import { logger } from "../utils/logger.js";
 
 let failedMessagesQueue = null;
 
@@ -190,7 +191,7 @@ async function processMessage(internalMessage) {
     }
 
     if (!replyText) {
-      console.warn("[PIPELINE] No reply generated, skipping send");
+      logger.warn("[PIPELINE] No reply generated, skipping send");
       return;
     }
 
@@ -213,7 +214,7 @@ async function processMessage(internalMessage) {
     });
   } catch (error) {
     trackError();
-    console.error("[PIPELINE] Failure:", error.message);
+    logger.error("[PIPELINE] Failure:", error.message);
     try {
       const queue = getFailedMessagesQueue();
       await queue.add(
@@ -226,9 +227,9 @@ async function processMessage(internalMessage) {
         },
         { attempts: 3, backoff: { type: "exponential", delay: 2000 } }
       );
-      console.error("[PIPELINE] Message pushed to DLQ for retry:", internalMessage.from);
+      logger.error("[PIPELINE] Message pushed to DLQ for retry:", internalMessage.from);
     } catch (dlqError) {
-      console.error("[PIPELINE] Failed to push to DLQ:", dlqError.message);
+      logger.error("[PIPELINE] Failed to push to DLQ:", dlqError.message);
     }
   }
 }

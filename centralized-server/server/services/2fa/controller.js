@@ -1,5 +1,6 @@
 import speakeasy from "speakeasy";
 import QRCode from "qrcode";
+import logger from "#utils/logger.js";
 
 export const createController = (config) => {
   // Validate config
@@ -33,7 +34,7 @@ export const createController = (config) => {
           qrCode: qrCodeUrl,
         });
       } catch (error) {
-        console.error("2FA Setup Error:", error);
+        logger.error("2FA Setup Error:", error);
         res.status(500).json({ error: "Internal Server Error" });
       }
     },

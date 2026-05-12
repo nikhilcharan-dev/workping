@@ -1,6 +1,7 @@
 import axios from "axios";
 import crypto from "node:crypto";
 import redis from "../config/redis.js";
+import { logger } from "../utils/logger.js";
 
 const USERNAME = process.env.WEBHOOK_USERNAME;
 const PASSWORD = process.env.WEBHOOK_PASSWORD;
@@ -49,7 +50,7 @@ const phonepeWebhook = async (req, res) => {
   try {
     // 1. Basic auth verification
     if (!verifyBasicAuth(req.headers["authorization"])) {
-      console.warn("[Webhook] Unauthorized: basic auth failed");
+      logger.warn("[Webhook] Unauthorized: basic auth failed");
       return res.status(401).send("Unauthorized");
     }
 
@@ -59,14 +60,14 @@ const phonepeWebhook = async (req, res) => {
     // parsed body would not be byte-stable).
     const rawBody = req.rawBody;
     if (!verifyXVerify(rawBody, req.headers["x-verify"])) {
-      console.warn("[Webhook] Unauthorized: X-Verify signature mismatch");
+      logger.warn("[Webhook] Unauthorized: X-Verify signature mismatch");
       return res.status(401).send("Unauthorized");
     }
 
     const { event, payload } = req.body;
 
     if (!payload || !payload.merchantOrderId) {
-      console.error("[Webhook] Invalid payload received");
+      logger.error("[Webhook] Invalid payload received");
       return res.status(400).json({ error: "Invalid payload" });
     }
 
@@ -77,7 +78,7 @@ const phonepeWebhook = async (req, res) => {
     const idempotencyKey = `webhook:seen:${merchantOrderId}:${state}`;
     const alreadyProcessed = await redis.set(idempotencyKey, "1", { NX: true, EX: IDEMPOTENCY_TTL });
     if (!alreadyProcessed) {
-      console.log(`[Webhook] Duplicate delivery (idempotent) for order ${merchantOrderId} state=${state}`);
+      logger.info(`[Webhook] Duplicate delivery (idempotent) for order ${merchantOrderId} state=${state}`);
       return res.status(200).json({ success: true, note: "duplicate" });
     }
 
@@ -87,7 +88,7 @@ const phonepeWebhook = async (req, res) => {
     const currentState = (await redis.get(stateKey)) || "PENDING";
     const allowed = VALID_TRANSITIONS[currentState];
     if (allowed !== undefined && !allowed.has(state)) {
-      console.warn(`[Webhook] Invalid transition ${currentState} → ${state} for order ${merchantOrderId}`);
+      logger.warn(`[Webhook] Invalid transition ${currentState} → ${state} for order ${merchantOrderId}`);
       return res.status(409).json({ error: `Invalid state transition: ${currentState} → ${state}` });
     }
     // Persist new state (keep 30 days for auditing)
@@ -111,7 +112,7 @@ const phonepeWebhook = async (req, res) => {
       .update(forwardBody)
       .digest("hex");
 
-    console.log(`[Webhook] Forwarding order ${merchantOrderId} (${state}) to backend`);
+    logger.info(`[Webhook] Forwarding order ${merchantOrderId} (${state}) to backend`);
 
     const response = await axios.post(ORIGIN_WEBHOOK_URL, forwardBody, {
       headers: {
@@ -120,10 +121,10 @@ const phonepeWebhook = async (req, res) => {
       },
     });
 
-    console.log(`[Webhook] Backend responded ${response.status} for order ${merchantOrderId}`);
+    logger.info(`[Webhook] Backend responded ${response.status} for order ${merchantOrderId}`);
     return res.status(200).json({ success: true });
   } catch (err) {
-    console.error("[Webhook] Error:", err?.response?.data || err.message);
+    logger.error("[Webhook] Error:", { err: err?.response?.data || err.message });
     return res.status(500).json({ error: "Failed to process webhook" });
   }
 };

@@ -1,4 +1,5 @@
 import redis from "../config/redisConfig.js";
+import { logger } from "./logger.js";
 
 const PER_RECIPIENT_PER_HOUR = parseInt(process.env.MAIL_RL_PER_HOUR || "10", 10);
 const PER_RECIPIENT_PER_DAY = parseInt(process.env.MAIL_RL_PER_DAY || "50", 10);
@@ -36,7 +37,7 @@ export function perRecipientRateLimit() {
       // Fail open on Redis blip — better to deliver real mail than block
       // legitimate users on a transient cache outage. The error is logged
       // so operators can see the gap forming.
-      console.error("[RateLimit] Redis check failed, allowing through:", err.message);
+      logger.error("[RateLimit] Redis check failed, allowing through:", { err: err.message });
       next();
     }
   };

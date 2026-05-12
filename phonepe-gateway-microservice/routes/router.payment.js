@@ -2,6 +2,7 @@ import { Router } from "express";
 import axios from "axios";
 import PHONEPE_CONFIG from "../config/phonepe.env.js";
 import getAuthorisationToken from "../config/phonepe.auth.js";
+import { logger } from "../utils/logger.js";
 
 const PHONE_PAYMENT_BASE_URI = PHONEPE_CONFIG.baseUrl;
 const REDIRECT_URI = PHONEPE_CONFIG.redirectUri;
@@ -37,7 +38,7 @@ router.post("/initiate-payment", async (req, res) => {
     // Validate amount matches a known plan price (in paise)
     const amountPaise = Math.round(amount * 100);
     if (VALID_AMOUNTS.size > 0 && !VALID_AMOUNTS.has(amountPaise)) {
-      console.warn(`[Payment] Rejected unknown amount ${amountPaise} paise for order ${orderId}`);
+      logger.warn(`[Payment] Rejected unknown amount ${amountPaise} paise for order ${orderId}`);
       return res.status(400).json({ error: "Amount does not match any active plan price" });
     }
 
@@ -78,7 +79,7 @@ router.post("/initiate-payment", async (req, res) => {
 
     return res.status(200).json(response.data);
   } catch (err) {
-    console.error("Payment Initiation Error:", err?.response?.data || err.message);
+    logger.error("Payment Initiation Error:", { err: err?.response?.data || err.message });
     res.status(err?.response?.status || 500).json({
       success: false,
       error: err?.response?.data?.error || "Payment initiation failed",
@@ -105,7 +106,7 @@ router.post("/get-payment-status", async (req, res) => {
 
     return res.status(200).json(statusRes.data);
   } catch (err) {
-    console.error("Payment Status Error:", err?.response?.data || err.message);
+    logger.error("Payment Status Error:", { err: err?.response?.data || err.message });
     res.status(err?.response?.status || 500).json({
       success: false,
       error: err?.response?.data?.error || "Failed to fetch payment status",

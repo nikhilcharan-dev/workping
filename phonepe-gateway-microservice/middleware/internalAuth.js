@@ -1,9 +1,10 @@
 import crypto from "node:crypto";
+import { logger } from "../utils/logger.js";
 
 const INTERNAL_SECRET = process.env.INTERNAL_SECRET;
 
 if (!INTERNAL_SECRET && process.env.NODE_ENV !== "test") {
-  console.error("[Startup] FATAL: INTERNAL_SECRET is not set. Payment/refund endpoints would fail open.");
+  logger.error("[Startup] FATAL: INTERNAL_SECRET is not set. Payment/refund endpoints would fail open.");
   process.exit(1);
 }
 

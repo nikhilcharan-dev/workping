@@ -58,6 +58,7 @@ import "./globals.js";
 import "dotenv/config";
 import cluster from "cluster";
 import http from "http";
+import logger from "./utils/logger.js";
 import mongooseConfig from "./config/mongoose.js";
 import redis from "./config/redis.js";
 
@@ -81,13 +82,13 @@ if (cluster.isPrimary) {
   const spawnWorker = () => {
     const worker = cluster.fork();
     worker.on("online", () => {
-      console.log(`[Cluster] Worker ${worker.process.pid} online`);
+      logger.info(`[Cluster] Worker ${worker.process.pid} online`);
       retries = 0;
     });
     worker.on("exit", (code, signal) => {
       if (signal === "SIGTERM" || code === 0) return;
       const delay = backoff(retries++);
-      console.warn(`[Cluster] Worker exited (${signal || code}), restarting in ${delay}ms`);
+      logger.warn(`[Cluster] Worker exited (${signal || code}), restarting in ${delay}ms`);
       setTimeout(spawnWorker, delay);
     });
   };
@@ -98,7 +99,6 @@ if (cluster.isPrimary) {
   // never imports app code (avoids double-initialization of globals).
   const { default: app } = await import("./app/app.js");
   const { default: socket } = await import("./app/socket.io.js");
-  const { default: logger } = await import("./utils/logger.js");
 
   // Last-resort capture — without these, an uncaught throw or rejection
   // exits the worker silently (no stack, no context). The cluster primary
@@ -138,6 +138,6 @@ if (cluster.isPrimary) {
   startShiftReminderCron();
 
   server.listen(PORT, "0.0.0.0", () => {
-    console.log(`[Server] Running on http://0.0.0.0:${PORT}`);
+    logger.info(`[Server] Running on http://0.0.0.0:${PORT}`);
   });
 }

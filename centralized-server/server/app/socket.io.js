@@ -2,6 +2,7 @@ import { Server } from "socket.io";
 import { createAdapter } from "@socket.io/redis-adapter";
 import { createClient } from "redis";
 import jwt from "jsonwebtoken";
+import logger from "#utils/logger.js";
 
 import { allowedOrigins } from "#config/cors.js";
 
@@ -50,13 +51,13 @@ export default async function socket(server) {
   const pubClient = makeRedisClient();
   const subClient = pubClient.duplicate();
 
-  pubClient.on("error", (err) => console.error("[Socket.io pubClient]", err.message));
-  subClient.on("error", (err) => console.error("[Socket.io subClient]", err.message));
+  pubClient.on("error", (err) => logger.error("[Socket.io pubClient]", err.message));
+  subClient.on("error", (err) => logger.error("[Socket.io subClient]", err.message));
 
   try {
     await Promise.all([pubClient.connect(), subClient.connect()]);
   } catch (err) {
-    console.error("[Socket.io] CRITICAL: Redis connection failed, real-time payment events will not be delivered:", err.message);
+    logger.error("[Socket.io] CRITICAL: Redis connection failed, real-time payment events will not be delivered:", err.message);
     throw new Error(`[Socket.io] Failed to initialize Redis adapter: ${err.message}`);
   }
 
@@ -68,7 +69,7 @@ export default async function socket(server) {
     adapter: createAdapter(pubClient, subClient),
   });
 
-  console.log("[Socket.io] Redis adapter attached — cluster-safe");
+  logger.info("[Socket.io] Redis adapter attached — cluster-safe");
 
   // Connection-level auth: every socket must present a valid JWT at handshake.
   // Without this, any client can join any user's payment room (see audit P0).
@@ -115,7 +116,7 @@ export default async function socket(server) {
           socket.emit("payment:status", { status: "None" });
         }
       } catch (err) {
-        console.error("[Socket] redis.get error:", err.message);
+        logger.error("[Socket] redis.get error:", err.message);
         socket.emit("payment:error", "Failed to fetch payment status");
       }
     });
