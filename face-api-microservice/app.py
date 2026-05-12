@@ -55,6 +55,7 @@ from db import get_embeddings_collection
 from cache import embedding_key, cache_get, cache_set, cache_del, CACHE_TTL, _get_redis
 from face_search import get_search_engine
 from auth import require_internal_secret
+from logger import log
 
 import faiss
 import threading
@@ -158,7 +159,7 @@ class FAISSIndex:
                 with open(map_path, "w") as f:
                     json.dump(self._id_maps[org_id], f)
             except Exception as e:
-                print(f"FAISS persist warning for {org_id}: {e}")
+                log.warning("FAISS persist failed", extra={"org_id": org_id, "err": str(e)})
 
     def load(self, org_id: str) -> bool:
         """Load index and id_map from disk. Returns True if successful."""
@@ -173,7 +174,7 @@ class FAISSIndex:
                     self._id_maps[org_id] = json.load(f)
                 return True
             except Exception as e:
-                print(f"FAISS load warning for {org_id}: {e}")
+                log.warning("FAISS load failed", extra={"org_id": org_id, "err": str(e)})
                 return False
 
 faiss_index = FAISSIndex()
@@ -329,14 +330,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-print("Preloading InsightFace antelopev2 model...")
+log.info("preloading InsightFace antelopev2 model")
 load_face_app()
-print("InsightFace model ready")
+log.info("InsightFace model ready")
 
 # 0 → use all CPU cores (keeps every GPU CUDA stream fed)
 _cfg_workers = int(os.environ.get("INFERENCE_WORKERS", "0"))
 INFERENCE_WORKERS = _cfg_workers if _cfg_workers > 0 else (os.cpu_count() or 8)
-print(f"Inference workers: {INFERENCE_WORKERS}")
+log.info("inference workers configured", extra={"workers": INFERENCE_WORKERS})
 
 executor = ThreadPoolExecutor(max_workers=INFERENCE_WORKERS)
 
@@ -366,7 +367,7 @@ def do_inference(image_bytes, db_emb, org_id, req_user_id):
 async def inference_worker():
     redis = _get_redis()
     col = get_embeddings_collection()
-    print("Inference Worker loop started!")
+    log.info("inference worker loop started")
     consecutive_errors = 0
     max_consecutive_errors = 10
     error_backoff = 1.0
@@ -441,15 +442,25 @@ async def inference_worker():
             break
         except Exception as e:
             consecutive_errors += 1
-            print(f"[InferenceWorker] Error #{consecutive_errors}: {e}")
+            log.error(
+                "inference worker error",
+                extra={
+                    "ticket_id": ticket_id,
+                    "consecutive_errors": consecutive_errors,
+                    "err": str(e),
+                },
+            )
             if ticket_id:
                 try:
                     await redis.setex(f"ticket:{ticket_id}", 300, json.dumps({"status": "failed", "error": str(e)}))
                 except Exception as redis_err:
-                    print(f"[InferenceWorker] Failed to update ticket status: {redis_err}")
+                    log.error("failed to update ticket status", extra={"ticket_id": ticket_id, "err": str(redis_err)})
 
             if consecutive_errors >= max_consecutive_errors:
-                print(f"[InferenceWorker] CIRCUIT_BREAKER: {consecutive_errors} consecutive errors. Pausing for {max_backoff}s.")
+                log.error(
+                    "circuit breaker tripped, pausing inference worker",
+                    extra={"consecutive_errors": consecutive_errors, "backoff_s": max_backoff},
+                )
                 await asyncio.sleep(max_backoff)
             else:
                 await asyncio.sleep(error_backoff)
@@ -482,20 +493,26 @@ async def startup_event():
                         faiss_index.rebuild(org_id, orgs[org_id])
                         loaded_orgs += 1
                     except Exception as org_err:
-                        print(f"[FAISS] Failed to rebuild index for {org_id}: {org_err}")
+                        log.error("FAISS rebuild failed", extra={"org_id": org_id, "err": str(org_err)})
                         failed_orgs.append(org_id)
-            print(f"FAISS indexes: {loaded_orgs} loaded from disk, {len(orgs) - loaded_orgs} rebuilt from MongoDB")
+            log.info(
+                "FAISS startup complete",
+                extra={"loaded_orgs": loaded_orgs, "rebuilt_orgs": len(orgs) - loaded_orgs},
+            )
             if failed_orgs:
-                print(f"[FAISS] WARNING: Failed to initialize indexes for orgs: {failed_orgs}")
+                log.warning("FAISS partial init", extra={"failed_orgs": failed_orgs})
             FAISS_READY = loaded_orgs > 0
             break
         except Exception as e:
-            print(f"FAISS startup attempt {attempt + 1}/{max_retries} failed: {e}")
+            log.error(
+                "FAISS startup attempt failed",
+                extra={"attempt": attempt + 1, "max_retries": max_retries, "err": str(e)},
+            )
             if attempt < max_retries - 1:
                 await asyncio.sleep(retry_delay)
                 retry_delay *= 2
             else:
-                print("FAISS startup failed after max retries. Indexes will remain empty until service restart.")
+                log.critical("FAISS startup failed after max retries; indexes will remain empty until restart")
 
     for _ in range(INFERENCE_WORKERS):
         asyncio.create_task(inference_worker())
@@ -563,7 +580,10 @@ async def check_rate_limit(user_id: str):
         raise
     except Exception as e:
         rate_limit_redis_failures += 1
-        print(f"[RateLimit] Redis unavailable (attempt {rate_limit_redis_failures}): {e}. Falling back to in-memory limiter.")
+        log.warning(
+            "rate-limit redis unavailable, falling back to memory limiter",
+            extra={"failure_count": rate_limit_redis_failures, "err": str(e)},
+        )
         if not memory_limiter.is_allowed(user_id, RATE_LIMIT_REQUESTS):
             raise HTTPException(
                 status_code=429,
@@ -725,7 +745,10 @@ async def delete_embedding(employee_id: str):
         faiss_index.rebuild(org_id, records)
         faiss_index.save(org_id)
     except Exception as e:
-        print(f"[DeleteEmbedding] Error during deletion for {employee_id}: {e}. Reverting 'deleting' status.")
+        log.error(
+            "embedding deletion failed; reverting 'deleting' status",
+            extra={"employee_id": employee_id, "err": str(e)},
+        )
         await col.update_one(
             {"employee_id": employee_id},
             {"$unset": {"status": ""}}

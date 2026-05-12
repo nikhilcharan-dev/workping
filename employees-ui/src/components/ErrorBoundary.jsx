@@ -1,4 +1,5 @@
 import { Component } from 'react'
+import { reportError } from '@/helpers/errorReporter'
 
 /**
  * Last-resort catch for render-time exceptions anywhere in the tree.
@@ -6,7 +7,8 @@ import { Component } from 'react'
  * Without this, a single throw in a lazy-loaded route white-screens the whole
  * portal — the user is left staring at a blank page with no way to recover
  * short of a full reload. The boundary surfaces a recoverable error UI and
- * logs the error so it can be wired into Sentry/Datadog later.
+ * forwards the error to the central /api/client-errors endpoint, which logs
+ * it via winston and (if configured) forwards to Logstash/ELK.
  */
 export default class ErrorBoundary extends Component {
   state = { error: null }
@@ -18,6 +20,7 @@ export default class ErrorBoundary extends Component {
   componentDidCatch(error, info) {
     // eslint-disable-next-line no-console
     console.error('[ErrorBoundary]', error, info?.componentStack)
+    reportError(error, { kind: 'react.boundary', componentStack: info?.componentStack })
   }
 
   handleReload = () => {

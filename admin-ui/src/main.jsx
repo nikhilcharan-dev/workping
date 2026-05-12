@@ -56,6 +56,10 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import App from './App'
 import { basePath } from './context/constants'
+import { installGlobalErrorListeners } from './helpers/errorReporter'
+
+installGlobalErrorListeners()
+
 createRoot(document.getElementById('root')).render(
   <BrowserRouter basename={basePath}>
     <App />

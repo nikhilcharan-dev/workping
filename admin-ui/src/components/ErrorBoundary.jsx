@@ -1,4 +1,5 @@
 import { Component } from 'react'
+import { reportError } from '@/helpers/errorReporter'
 
 class ErrorBoundary extends Component {
   constructor(props) {
@@ -12,6 +13,7 @@ class ErrorBoundary extends Component {
 
   componentDidCatch(error, errorInfo) {
     console.error('[ErrorBoundary] Uncaught error:', error, errorInfo)
+    reportError(error, { kind: 'react.boundary', componentStack: errorInfo?.componentStack })
   }
 
   handleRetry = () => {

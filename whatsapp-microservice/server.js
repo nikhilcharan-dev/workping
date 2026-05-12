@@ -80,6 +80,8 @@ import whatsAppRoutes from "./routes/origin.router.js";
 import dashboardApi from "./routes/dashboard.api.js";
 import { healthCheck } from "./utils/llm.provider.js";
 import { startReminderWorker } from "./scheduler/shift.reminder.js";
+import logger from "./utils/logger.js";
+import requestId from "./middleware/requestId.js";
 
 // Dashboard auth — password is stored as a bcrypt hash in the env var.
 // To generate: node -e "const b=require('bcryptjs');console.log(b.hashSync('yourpass',12))"
@@ -98,16 +100,26 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT ?? 3000;
 
 const server = express();
+// Request correlation. Must run before any logging so 4xx/5xx responses are
+// also tagged with an X-Request-ID the operator can grep against.
+server.use(requestId);
 server.use(cors({ origin: ORIGIN, credentials: true }));
 server.use(express.json({ limit: "10kb" }));
 server.use(express.urlencoded({ extended: false, limit: "10kb" }));
 
-// Request logging
+// Structured request lifecycle log — JSON line per response, status-aware level.
 server.use((req, res, next) => {
   const start = Date.now();
   res.on("finish", () => {
     const ms = Date.now() - start;
-    console.log(`${req.method} ${req.originalUrl} ${res.statusCode} ${ms}ms`);
+    const level = res.statusCode >= 500 ? "error" : res.statusCode >= 400 ? "warn" : "info";
+    logger[level]("request", {
+      requestId: req.id,
+      method: req.method,
+      path: req.originalUrl,
+      status: res.statusCode,
+      durationMs: ms,
+    });
   });
   next();
 });

@@ -69,9 +69,15 @@ import refundRoutes from "./routes/router.refund.js";
 import phonepeWebhook from "./webhook/phonepe.webhook.js";
 import phonepeCallback from "./routes/callback.js";
 import internalAuth from "./middleware/internalAuth.js";
+import requestId from "./middleware/requestId.js";
+import logger from "./utils/logger.js";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Request correlation. Runs before everything else so 4xx/5xx responses are
+// also tagged with an X-Request-ID the operator can grep against.
+app.use(requestId);
 
 // --- Security headers ---
 app.use(helmet({ contentSecurityPolicy: false }));
@@ -150,12 +156,12 @@ app.post("/api/phonepe/webhook", phonepeWebhook);
 app.post("/api/payments/phonepe/callback", internalAuth, phonepeCallback);
 
 // --- Global Error Handler ---
-app.use((err, req, res, next) => {
+app.use((err, req, res, _next) => {
   const status = err.statusCode || 500;
   const clientMessage = status === 500 ? "Internal Server Error" : err.message;
 
-  console.error({
-    level: "error",
+  logger.error("unhandled error", {
+    requestId: req.id,
     status,
     message: err.message,
     method: req.method,

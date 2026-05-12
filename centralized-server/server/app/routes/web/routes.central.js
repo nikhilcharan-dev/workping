@@ -1,5 +1,6 @@
 import otpRoutes from "#webRoutes/admin/otp/router.js";
 import publicStatsRouter from "#webRoutes/public/stats.router.js";
+import clientErrorsRouter from "#webRoutes/public/clientErrors.router.js";
 import { authLimiter } from "../../middleware.js";
 
 import googleServicesRoutes from "../../../services/google/google.signin.js";
@@ -122,4 +123,8 @@ export default function centralRoutes(app) {
 
   // Public stats — no auth
   app.use("/api/public", publicStatsRouter);
+
+  // Client error ingestion — no auth (errors may occur before login).
+  // Origin enforcement still applies; only allowlisted UIs can POST here.
+  app.use("/api/client-errors", clientErrorsRouter);
 }

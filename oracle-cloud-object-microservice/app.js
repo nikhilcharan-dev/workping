@@ -70,6 +70,7 @@ import logger from "./logger.js";
 import { apiKeyAuth } from "./middleware/auth.js";
 import { errorHandler } from "./middleware/error-handler.js";
 import { metricsMiddleware, getMetrics, getMetricsCSV, startStatusTicker, saveToDisk } from "./middleware/metrics.js";
+import requestId from "./middleware/request-id.js";
 import bucketRoutes from "./routes/bucket.routes.js";
 import presignRoutes from "./routes/presigned.routes.js";
 
@@ -89,6 +90,10 @@ if (process.env.NODE_ENV !== "test") {
 }
 
 const app = express();
+
+// Request correlation. Runs before everything else so 4xx/5xx responses are
+// also tagged with an X-Request-ID the operator can grep against.
+app.use(requestId);
 
 // --- Security middleware ---
 app.use(helmet());

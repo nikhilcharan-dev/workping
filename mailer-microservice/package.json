@@ -28,6 +28,7 @@
   "homepage": "https://github.com/nikhilcharan-dev/mailer-microservice#readme",
   "devDependencies": {
     "@eslint/js": "^9.0.0",
+    "@jest/globals": "^29.7.0",
     "cross-env": "^7.0.3",
     "eslint": "^9.0.0",
     "globals": "^15.0.0",

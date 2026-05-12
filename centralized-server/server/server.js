@@ -98,6 +98,27 @@ if (cluster.isPrimary) {
   // never imports app code (avoids double-initialization of globals).
   const { default: app } = await import("./app/app.js");
   const { default: socket } = await import("./app/socket.io.js");
+  const { default: logger } = await import("./utils/logger.js");
+
+  // Last-resort capture — without these, an uncaught throw or rejection
+  // exits the worker silently (no stack, no context). The cluster primary
+  // will respawn either way, but we lose the error. Log structured data
+  // before the process dies so winston/ELK retain the trail.
+  process.on("uncaughtException", (err) => {
+    logger.error("uncaughtException", {
+      feature: "PROCESS",
+      message: err?.message,
+      stack: err?.stack,
+    });
+    process.exit(1);
+  });
+  process.on("unhandledRejection", (reason) => {
+    logger.error("unhandledRejection", {
+      feature: "PROCESS",
+      message: reason?.message ?? String(reason),
+      stack: reason?.stack,
+    });
+  });
 
   const PORT = process.env.PORT || 5000;
   const server = http.createServer(app);

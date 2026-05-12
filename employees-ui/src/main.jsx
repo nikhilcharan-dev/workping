@@ -46,6 +46,10 @@ import { BrowserRouter } from 'react-router-dom'
 import App from './App'
 import ErrorBoundary from './components/ErrorBoundary'
 import { basePath } from './context/constants'
+import { installGlobalErrorListeners } from './helpers/errorReporter'
+
+installGlobalErrorListeners()
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <ErrorBoundary>

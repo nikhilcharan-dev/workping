@@ -5,6 +5,8 @@ import helmet from "helmet";
 import { rateLimit } from "express-rate-limit";
 import sanitizeMongo from "#middleware/sanitizeMongo.js";
 import originGuard from "#middleware/originGuard.js";
+import requestId from "#middleware/requestId.js";
+import logger from "#utils/logger.js";
 
 const MODE = process.env.MODE;
 
@@ -57,6 +59,10 @@ export const sensitiveOpLimiter = rateLimit({
 
 export default function middlewares(app) {
   app.set("trust proxy", 1);
+
+  // Request correlation. Must run before any logging middleware so every log
+  // line in the request lifecycle carries the same `req.id` / X-Request-ID.
+  app.use(requestId);
 
   // Security headers — CSP locked down for a JSON-only API (no scripts/styles served)
   app.use(
@@ -119,16 +125,37 @@ export default function middlewares(app) {
   // (PhonePe webhook, /internal routes) are exempt and use their own auth.
   app.use(originGuard);
 
-  // Request logging — reduced to warn/error level only
+  // Structured request logging — winston, JSON output, request-ID correlated.
+  // Mutating requests get a full log line on completion; safe requests are
+  // silent to keep the volume manageable. Replaces the prior console.log
+  // shape so the lines parse cleanly in Loki / Cloudwatch.
   app.use((req, res, next) => {
-    // Log only sensitive operations and errors
-    if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(req.method)) {
-      console.log(`[${req.method}] ${req.path} [${req.ip}]`);
-    }
     if (req.headers["user-agent"]?.includes("PostmanRuntime") && MODE === "production") {
+      logger.warn("rejected request from API testing tool in production", {
+        requestId: req.id,
+        method: req.method,
+        path: req.path,
+        ip: req.ip,
+      });
       return res.status(403).json({
         type: "error",
         message: "API testing tools not allowed in production",
+      });
+    }
+
+    if (["POST", "PUT", "DELETE", "PATCH"].includes(req.method)) {
+      const startedAt = process.hrtime.bigint();
+      res.on("finish", () => {
+        const durationMs = Number(process.hrtime.bigint() - startedAt) / 1e6;
+        const level = res.statusCode >= 500 ? "error" : res.statusCode >= 400 ? "warn" : "info";
+        logger.log(level, "request", {
+          requestId: req.id,
+          method: req.method,
+          path: req.path,
+          status: res.statusCode,
+          durationMs: Math.round(durationMs * 100) / 100,
+          ip: req.ip,
+        });
       });
     }
     next();

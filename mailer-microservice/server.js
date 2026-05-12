@@ -73,6 +73,8 @@ import { verifyTransport } from "./config/mailTransporter.js";
 import mailRoutes from "./routes/router.mail.js";
 import otpRoutes from "./routes/router.otp.js";
 import { getStats } from "./utils/analytics.js";
+import logger from "./utils/logger.js";
+import requestId from "./middleware/requestId.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -81,8 +83,31 @@ const PORT = process.env.PORT || 3000;
 const SECRET = process.env.SECRET;
 const server = express();
 
+// Request correlation. Must run before any logging middleware so every log
+// line in the request lifecycle carries the same `req.id` / X-Request-ID.
+server.use(requestId);
+
 server.use(express.json({ limit: "10kb" }));
 server.use(express.urlencoded({ extended: true, limit: "10kb" }));
+
+// Request lifecycle logging — only mutating verbs, with status + duration.
+server.use((req, res, next) => {
+  if (["POST", "PUT", "DELETE", "PATCH"].includes(req.method)) {
+    const startedAt = process.hrtime.bigint();
+    res.on("finish", () => {
+      const durationMs = Number(process.hrtime.bigint() - startedAt) / 1e6;
+      const level = res.statusCode >= 500 ? "error" : res.statusCode >= 400 ? "warn" : "info";
+      logger[level]("request", {
+        requestId: req.id,
+        method: req.method,
+        path: req.path,
+        status: res.statusCode,
+        durationMs: Math.round(durationMs * 100) / 100,
+      });
+    });
+  }
+  next();
+});
 
 /* ─── Liveness probe — bypasses auth, used by load balancers and Docker HEALTHCHECK ─── */
 server.get("/health", (_req, res) => {
