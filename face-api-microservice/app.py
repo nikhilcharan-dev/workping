@@ -219,37 +219,23 @@ class ExtractEmbeddingRequest(BaseModel):
 # ---------------- STATS ----------------
 class StatsTracker:
     def __init__(self):
-        self.total_processed = 0
-        self.total_matches = 0
-        self.total_latency = 0.0
         self.history = deque(maxlen=HISTORY_LIMIT)
-        self._initialized = False
+        self._history_loaded = False
 
-    async def _init_if_needed(self):
-        if self._initialized:
+    async def _load_history(self):
+        if self._history_loaded:
             return
         try:
             redis = _get_redis()
-            data = await redis.get("face_stats:totals")
-            if data:
-                d = json.loads(data)
-                self.total_processed = d.get("processed", 0)
-                self.total_matches = d.get("matches", 0)
-                self.total_latency = d.get("latency", 0.0)
-            
             hist = await redis.get("face_stats:history")
             if hist:
                 self.history = deque(json.loads(hist), maxlen=HISTORY_LIMIT)
-            self._initialized = True
+            self._history_loaded = True
         except Exception as e:
-            log.warning("StatsTracker failed to load from Redis", extra={"err": str(e)})
+            log.warning("StatsTracker failed to load history from Redis", extra={"err": str(e)})
 
     async def add_entry(self, label, accuracy, time_ms, success):
-        await self._init_if_needed()
-        self.total_processed += 1
-        if success:
-            self.total_matches += 1
-        self.total_latency += time_ms
+        await self._load_history()
         entry = {
             "timestamp": datetime.now().strftime("%H:%M:%S"),
             "label": label,
@@ -258,26 +244,37 @@ class StatsTracker:
             "status": "MATCH" if success else "UNKNOWN",
         }
         self.history.appendleft(entry)
-        
+
         try:
             redis = _get_redis()
-            await redis.set("face_stats:totals", json.dumps({
-                "processed": self.total_processed,
-                "matches": self.total_matches,
-                "latency": self.total_latency
-            }))
-            await redis.set("face_stats:history", json.dumps(list(self.history)))
+            # HINCRBYFLOAT / HINCRBY are atomic — concurrent inference_worker tasks
+            # cannot lose an update the way a read-modify-write would under interleaving.
+            pipe = redis.pipeline()
+            pipe.hincrbyfloat("face_stats:counters", "latency", time_ms)
+            pipe.hincrby("face_stats:counters", "processed", 1)
+            if success:
+                pipe.hincrby("face_stats:counters", "matches", 1)
+            pipe.set("face_stats:history", json.dumps(list(self.history)))
+            await pipe.execute()
         except Exception as e:
             log.warning("StatsTracker failed to save to Redis", extra={"err": str(e)})
-            
+
         return entry
 
     async def get_analytics(self):
-        await self._init_if_needed()
-        avg = self.total_latency / self.total_processed if self.total_processed else 0
-        rate = (self.total_matches / self.total_processed * 100) if self.total_processed else 0
+        await self._load_history()
+        try:
+            redis = _get_redis()
+            counters = await redis.hgetall("face_stats:counters")
+            processed = int(counters.get("processed", 0) or 0)
+            matches = int(counters.get("matches", 0) or 0)
+            latency = float(counters.get("latency", 0) or 0)
+        except Exception:
+            processed, matches, latency = 0, 0, 0.0
+        avg = latency / processed if processed else 0
+        rate = (matches / processed * 100) if processed else 0
         return {
-            "total_processed": self.total_processed,
+            "total_processed": processed,
             "avg_latency": round(avg, 2),
             "match_rate": round(rate, 1),
             "uptime": int(time.time() - START_TIME),
@@ -526,6 +523,18 @@ async def startup_event():
     max_retries = 3
     retry_delay = 2
 
+    # Finalize any deletions that were interrupted by a crash: the delete endpoint
+    # marks documents status='deleting' before removing them from MongoDB, then
+    # rebuilds FAISS. If the process crashed between those steps the in-memory
+    # index would contain ghost embeddings until restart. Purge them here so FAISS
+    # is always rebuilt from a consistent, fully-deleted state.
+    try:
+        result = await col.delete_many({"status": "deleting"})
+        if result.deleted_count:
+            log.info("startup cleanup: removed interrupted deletions", extra={"count": result.deleted_count})
+    except Exception as e:
+        log.warning("startup cleanup of status='deleting' docs failed", extra={"err": str(e)})
+
     for attempt in range(max_retries):
         try:
             orgs: dict = {}
@@ -622,9 +631,15 @@ async def check_rate_limit(user_id: str):
     redis = _get_redis()
     key = f"rl:detect:{user_id}"
     try:
-        count = await redis.incr(key)
-        if count == 1:
-            await redis.expire(key, RATE_LIMIT_WINDOW_SECONDS)
+        # SET NX EX initialises the key with TTL in one atomic operation so the
+        # window expiry is always present before the first INCR.  The original
+        # INCR-then-EXPIRE pattern left a window where the key had no TTL and a
+        # concurrent EXPIRE could be skipped if count > 1.
+        pipe = redis.pipeline()
+        pipe.set(key, 0, nx=True, ex=RATE_LIMIT_WINDOW_SECONDS)
+        pipe.incr(key)
+        results = await pipe.execute()
+        count = results[1]
         if count > RATE_LIMIT_REQUESTS:
             raise HTTPException(
                 status_code=429,
@@ -1123,6 +1138,14 @@ async def ws_endpoint(websocket: WebSocket):
 
 @app.get("/dashboard", response_class=HTMLResponse, dependencies=[Depends(require_internal_secret)])
 async def get_dashboard():
+    # Pre-generate a one-time ws-ticket server-side so the secret never has to
+    # appear in the URL (query params land in nginx access logs and browser history).
+    # The ticket is embedded directly in the HTML and consumed on first connection.
+    # To reconnect after a disconnect the user must reload the page, which issues
+    # a fresh ticket via this endpoint (secret stays in the HTTP header, not the URL).
+    ws_ticket = secrets.token_urlsafe(32)
+    redis = _get_redis()
+    await redis.setex(f"ws_ticket:{ws_ticket}", 60, "1")
     return """
 <!DOCTYPE html>
 <html lang="en">
@@ -1205,19 +1228,11 @@ async def get_dashboard():
             tr.appendChild(td);
             return tr;
         }
-        async function connect() {
+        function connect() {
             const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const secret = new URLSearchParams(location.search).get('secret');
-            let qs = '';
-            if (secret) {
-                try {
-                    const resp = await fetch('/api/v1/ws-ticket', { headers: { 'x-internal-secret': secret } });
-                    if (!resp.ok) { conn.textContent = 'Auth Failed'; conn.style.color = '#f44'; return; }
-                    const { ticket } = await resp.json();
-                    qs = '?ticket=' + encodeURIComponent(ticket);
-                } catch (e) { conn.textContent = 'Auth Failed'; conn.style.color = '#f44'; return; }
-            }
-            const ws = new WebSocket(proto + '//' + location.host + '/ws/stats' + qs);
+            // Ticket is pre-generated server-side so the internal secret never
+            // appears in the URL (nginx logs, browser history, Referer headers).
+            const ws = new WebSocket(proto + '//' + location.host + '/ws/stats?ticket=__WS_TICKET__');
             ws.onopen = () => { conn.textContent = 'Connected / Live'; conn.style.color = '#fff'; };
             ws.onmessage = (ev) => {
                 const msg = JSON.parse(ev.data);
@@ -1231,10 +1246,10 @@ async def get_dashboard():
                     updateAnalytics(msg.analytics);
                 }
             };
-            ws.onclose = () => { conn.textContent = 'Reconnecting...'; conn.style.color = '#444'; setTimeout(connect, 3000); };
+            ws.onclose = () => { conn.textContent = 'Disconnected — reload page to reconnect.'; conn.style.color = '#444'; };
         }
         connect();
     </script>
 </body>
 </html>
-"""
+""".replace("__WS_TICKET__", ws_ticket)

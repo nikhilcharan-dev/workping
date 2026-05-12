@@ -27,6 +27,13 @@ const DB_NAME = "workping_offline.db";
 const ATTENDANCE_TIMEOUT_MS = 30000;
 const QUEUE_DIR = `${FileSystem.documentDirectory}offline-queue/`;
 
+function generateUUID() {
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+        const r = (Math.random() * 16) | 0;
+        return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
+    });
+}
+
 let db = null;
 let flushing = false;
 
@@ -63,6 +70,7 @@ async function flushAttendance(row) {
                 Authorization: `Bearer ${token}`,
                 "User-Agent": "WorkPing Agent",
                 Origin: "https://workping.live",
+                ...(row.idempotency_key && { "Idempotency-Key": row.idempotency_key }),
             },
             body: formData,
         }),
@@ -87,7 +95,7 @@ async function flushQueue() {
     flushing = true;
     try {
         const rows = await db.getAllAsync(
-            "SELECT id, kind, endpoint, payload FROM attendance_queue ORDER BY created_at ASC"
+            "SELECT id, kind, endpoint, payload, idempotency_key FROM attendance_queue ORDER BY created_at ASC"
         );
         for (const row of rows) {
             const handler = DISPATCH[row.kind] || flushJson;
@@ -114,12 +122,14 @@ async function flushQueue() {
 
 async function enqueue({ kind = "json", endpoint, payload }) {
     if (!db) throw new Error("Offline queue not ready");
+    const idempotency_key = generateUUID();
     await db.runAsync(
-        "INSERT INTO attendance_queue (created_at, kind, endpoint, payload) VALUES (?, ?, ?, ?)",
+        "INSERT INTO attendance_queue (created_at, kind, endpoint, payload, idempotency_key) VALUES (?, ?, ?, ?, ?)",
         Date.now(),
         kind,
         endpoint,
-        JSON.stringify(payload)
+        JSON.stringify(payload),
+        idempotency_key
     );
 }
 
@@ -158,9 +168,14 @@ export const offlineQueueReady = (async () => {
                 created_at INTEGER NOT NULL,
                 kind TEXT NOT NULL DEFAULT 'json',
                 endpoint TEXT NOT NULL,
-                payload TEXT NOT NULL
+                payload TEXT NOT NULL,
+                idempotency_key TEXT
             );
         `);
+        // Migrate existing installs that lack the idempotency_key column.
+        await db.execAsync(
+            "ALTER TABLE attendance_queue ADD COLUMN idempotency_key TEXT"
+        ).catch(() => { /* column already exists — safe to ignore */ });
         return true;
     } catch (err) {
         console.error("[WorkPing] Offline queue init failed:", err.message);

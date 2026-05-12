@@ -29,7 +29,7 @@ const authorizeManager = (req, res, next) => {
   // Check for organizationId in body, query, or params
   const reqOrgId = req.body?.organizationId || req.query?.organizationId || req.params?.organizationId;
 
-  if (reqOrgId && reqOrgId.toString() !== userOrgId.toString()) {
+  if (reqOrgId && String(reqOrgId) !== String(userOrgId)) {
     return errorResponse(res, "Forbidden: You do not have access to this organization's data", 403);
   }
 

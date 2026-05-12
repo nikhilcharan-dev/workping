@@ -11,11 +11,10 @@ import { getFlow, addMessage, clearFlow } from "../utils/conversation.state.js";
 import { checkGuards } from "../utils/rate.limiter.js";
 import { Queue } from "bullmq";
 import { logger } from "../utils/logger.js";
+import redisClient from "../utils/redis.client.js";
 
 const failedMessagesQueue = new Queue("failed-messages", {
-  connection: {
-    url: process.env.REDIS_URL || "redis://localhost:6379"
-  },
+  connection: redisClient,
   defaultJobOptions: {
     attempts: 5,
     backoff: {
