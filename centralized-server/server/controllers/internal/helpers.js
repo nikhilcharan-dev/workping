@@ -5,6 +5,11 @@ import ProjectMember from "#models/ProjectMember.js";
 import Holiday from "#models/Holiday.js";
 import { validatePhone } from "#utils/validators.js";
 import { sendWhatsApp, startApprovalFlow } from "#services/whatsapp/whatsapp.service.js";
+import { logger } from "#utils/logger.js";
+import { getTodayDateRange, getWeekStartDate, getCurrentYearDateRange, formatDateList, normalizeLeaveDates } from "#utils/date.utils.js";
+
+// Re-export date utilities for backward compatibility
+export { getTodayDateRange, getWeekStartDate, getCurrentYearDateRange, formatDateList, normalizeLeaveDates } from "#utils/date.utils.js";
 
 /**
  * Get user by phone with organization details
@@ -43,40 +48,6 @@ export async function getUserByPhone(phone) {
   };
 }
 
-/**
- * Get today's date range (00:00:00 to 23:59:59)
- */
-export function getTodayDateRange() {
-  const now = new Date();
-  const start = new Date(now);
-  start.setHours(0, 0, 0, 0);
-  const end = new Date(now);
-  end.setHours(23, 59, 59, 999);
-  return { start, end };
-}
-
-/**
- * Get week's start date (Monday at 00:00)
- */
-export function getWeekStartDate() {
-  const now = new Date();
-  const dayOfWeek = now.getDay();
-  const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-  const weekStart = new Date(now);
-  weekStart.setDate(now.getDate() + diff);
-  weekStart.setHours(0, 0, 0, 0);
-  return weekStart;
-}
-
-/**
- * Get current year's date range
- */
-export function getCurrentYearDateRange() {
-  const year = new Date().getFullYear();
-  const startOfYear = new Date(year, 0, 1);
-  const endOfYear = new Date(year, 11, 31, 23, 59, 59);
-  return { startOfYear, endOfYear };
-}
 
 /**
  * Calculate used leave days for a user
@@ -109,39 +80,6 @@ export function validateLeaveType(leaveType) {
   return validTypes.includes(leaveType);
 }
 
-/**
- * Normalize and validate leave dates
- */
-export function normalizeLeaveDates(dates) {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const normalizedDates = [];
-
-  for (const d of dates) {
-    const date = new Date(d);
-    if (isNaN(date.getTime())) {
-      return { valid: false, error: `Invalid date: ${d}` };
-    }
-    if (date < today) {
-      return { valid: false, error: `Date ${date.toLocaleDateString("en-IN")} is in the past` };
-    }
-    normalizedDates.push(date);
-  }
-
-  return { valid: true, dates: normalizedDates };
-}
-
-/**
- * Format date list for display
- */
-export function formatDateList(dates) {
-  const formatted =
-    dates
-      .slice(0, 3)
-      .map((d) => new Date(d).toLocaleDateString("en-IN"))
-      .join(", ") + (dates.length > 3 ? ` +${dates.length - 3} more` : "");
-  return formatted;
-}
 
 /**
  * Send leave submission confirmation to employee
@@ -151,7 +89,13 @@ export async function sendLeaveSubmissionConfirmation(user, leaveType, days, dat
     sendWhatsApp(
       user.phone,
       `*Leave Request Submitted* 📋\nHi ${user.name}, your *${leaveType}* leave for *${days} day(s)* (${dateList}) has been submitted and is awaiting approval.`
-    ).catch(() => {});
+    ).catch((err) => {
+      logger.error("Leave submission confirmation failed", {
+        userId: user._id,
+        phone: user.phone,
+        error: err.message,
+      });
+    });
   }
 }
 
@@ -160,11 +104,20 @@ export async function sendLeaveSubmissionConfirmation(user, leaveType, days, dat
  */
 export async function sendLeaveApprovalNotificationToAdmin(admin, user, leaveType, days, dateList, leaveId) {
   if (admin?.phone) {
-    sendWhatsApp(
-      admin.phone,
-      `*Leave Approval Required* 📋\n*${user.name}* (Project Manager) has applied for *${leaveType}* leave.\n*Days:* ${days} (${dateList})\n\nReply *yes* to approve or *no* to reject.`
-    ).catch(() => {});
-    startApprovalFlow(admin.phone, { leaveId, employeeName: user.name, days, dateList }).catch(() => {});
+    try {
+      await sendWhatsApp(
+        admin.phone,
+        `*Leave Approval Required* 📋\n*${user.name}* (Project Manager) has applied for *${leaveType}* leave.\n*Days:* ${days} (${dateList})\n\nReply *yes* to approve or *no* to reject.`
+      );
+      await startApprovalFlow(admin.phone, { leaveId, employeeName: user.name, days, dateList });
+    } catch (err) {
+      logger.error("Leave approval notification to admin failed", {
+        adminId: admin._id,
+        userId: user._id,
+        leaveId,
+        error: err.message,
+      });
+    }
   }
 }
 
@@ -173,11 +126,21 @@ export async function sendLeaveApprovalNotificationToAdmin(admin, user, leaveTyp
  */
 export async function sendLeaveApprovalNotificationToPM(pm, user, leaveType, days, dateList, projectName, leaveId) {
   if (pm?.phone) {
-    sendWhatsApp(
-      pm.phone,
-      `*Leave Approval Required* 📋\n*${user.name}* has applied for *${leaveType}* leave.\n*Project:* ${projectName}\n*Days:* ${days} (${dateList})\n\nReply *yes* to approve or *no* to reject.`
-    ).catch(() => {});
-    startApprovalFlow(pm.phone, { leaveId, employeeName: user.name, days, dateList }).catch(() => {});
+    try {
+      await sendWhatsApp(
+        pm.phone,
+        `*Leave Approval Required* 📋\n*${user.name}* has applied for *${leaveType}* leave.\n*Project:* ${projectName}\n*Days:* ${days} (${dateList})\n\nReply *yes* to approve or *no* to reject.`
+      );
+      await startApprovalFlow(pm.phone, { leaveId, employeeName: user.name, days, dateList });
+    } catch (err) {
+      logger.error("Leave approval notification to PM failed", {
+        pmId: pm._id,
+        userId: user._id,
+        leaveId,
+        projectName,
+        error: err.message,
+      });
+    }
   }
 }
 
@@ -236,7 +199,14 @@ export async function sendLeaveDecisionNotification(employee, leave, decider, de
       decision === "approved"
         ? `*Leave Approved* ✅\nHi ${employee.name}, your *${leave.leaveType}* leave for *${leave.dates.length} day(s)* (${dateList}) has been *approved* by ${decider.name}.`
         : `*Leave Rejected* ❌\nHi ${employee.name}, your *${leave.leaveType}* leave for *${leave.dates.length} day(s)* (${dateList}) has been *rejected* by ${decider.name}.`;
-    sendWhatsApp(employee.phone, msg).catch(() => {});
+    sendWhatsApp(employee.phone, msg).catch((err) => {
+      logger.error("Leave decision notification failed", {
+        employeeId: employee._id,
+        leaveId: leave._id,
+        decision,
+        error: err.message,
+      });
+    });
   }
 }
 

@@ -9,6 +9,7 @@ import Pagination from "#helpers/pagination.js";
 import { successResponse, errorResponse } from "#utils/response.helper.js";
 import { validateObjectId, validateEnum, validateString } from "#utils/validators.js";
 import { sendWhatsApp } from "#services/whatsapp/whatsapp.service.js";
+import { logger } from "#utils/logger.js";
 
 // GET /api/admin/leaves/all?organizationId=&status=&page=&limit=
 export const getAllLeaves = asyncHandler(async (req, res) => {
@@ -172,23 +173,30 @@ export const approveLeave = asyncHandler(async (req, res) => {
   leave.approvedBy = adminId;
   await leave.save();
 
-  // Notify employee — fire-and-forget
-  User.findById(leave.userId)
-    .select("name phone")
-    .lean()
-    .then((emp) => {
+  // Notify employee
+  (async () => {
+    try {
+      const emp = await User.findById(leave.userId).select("name phone").lean();
       if (!emp?.phone) return;
+
       const dateList =
         leave.dates
           .slice(0, 3)
           .map((d) => new Date(d).toLocaleDateString("en-IN"))
           .join(", ") + (leave.dates.length > 3 ? ` +${leave.dates.length - 3} more` : "");
-      sendWhatsApp(
+
+      await sendWhatsApp(
         emp.phone,
         `*Leave Approved* ✅\nHi ${emp.name}, your leave request for *${leave.dates.length} day(s)* (${dateList}) has been *approved*.`
-      ).catch(() => {});
-    })
-    .catch(() => {});
+      );
+    } catch (err) {
+      logger.error("Leave approval notification failed", {
+        leaveId,
+        userId: leave.userId,
+        error: err.message,
+      });
+    }
+  })();
 
   return successResponse(res, "Leave approved successfully", leave);
 }, "ADMIN_APPROVE_LEAVE");
@@ -226,23 +234,30 @@ export const rejectLeave = asyncHandler(async (req, res) => {
   if (reason) leave.reason = reason;
   await leave.save();
 
-  // Notify employee — fire-and-forget
-  User.findById(leave.userId)
-    .select("name phone")
-    .lean()
-    .then((emp) => {
+  // Notify employee
+  (async () => {
+    try {
+      const emp = await User.findById(leave.userId).select("name phone").lean();
       if (!emp?.phone) return;
+
       const dateList =
         leave.dates
           .slice(0, 3)
           .map((d) => new Date(d).toLocaleDateString("en-IN"))
           .join(", ") + (leave.dates.length > 3 ? ` +${leave.dates.length - 3} more` : "");
-      sendWhatsApp(
+
+      await sendWhatsApp(
         emp.phone,
         `*Leave Rejected* ❌\nHi ${emp.name}, your leave request for *${leave.dates.length} day(s)* (${dateList}) has been *rejected*.${reason ? `\nReason: ${reason}` : ""}`
-      ).catch(() => {});
-    })
-    .catch(() => {});
+      );
+    } catch (err) {
+      logger.error("Leave rejection notification failed", {
+        leaveId,
+        userId: leave.userId,
+        error: err.message,
+      });
+    }
+  })();
 
   return successResponse(res, "Leave rejected", leave);
 }, "ADMIN_REJECT_LEAVE");

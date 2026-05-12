@@ -11,6 +11,15 @@ import { validateEmail, validatePhone } from "#utils/validators.js";
 import { checkEmployeeLimit } from "#utils/plan.limits.js";
 import { enrollFace } from "#services/face_recognition/enroll.js";
 import { sendWhatsApp } from "#services/whatsapp/whatsapp.service.js";
+import {
+  validateRole,
+  validateGender,
+  validateAadhaar,
+  validatePAN,
+  validatePassport,
+  validateWorkType,
+} from "./helpers.js";
+import { logger } from "#utils/logger.js";
 
 const insertByForm = asyncHandler(async (req, res) => {
   // Extract fields
@@ -33,48 +42,39 @@ const insertByForm = asyncHandler(async (req, res) => {
     return errorResponse(res, "Mandatory fields are missing (name, email, phone, userId, doj, aadhaar, workType)");
   }
 
-  // Sanitize and validate email via shared validator
+  // Validate email
   const emailValidation = validateEmail(email);
   if (!emailValidation.valid) return errorResponse(res, emailValidation.error);
   const normalizedEmail = emailValidation.normalized;
+
   // Validate role
-  const validRoles = ["manager", "teamLead", "employee"];
-  if (role && !validRoles.includes(role)) {
-    return errorResponse(res, `Invalid role. Must be one of: ${validRoles.join(", ")}`);
-  }
+  const roleValidation = validateRole(role);
+  if (!roleValidation.valid) return errorResponse(res, roleValidation.error);
 
   // Validate gender
   if (gender) {
-    const validGenders = ["male", "female", "other"];
-    if (!validGenders.includes(gender.toLowerCase())) {
-      return errorResponse(res, `Invalid gender. Must be one of: ${validGenders.join(", ")}`);
-    }
-  }
-  const validWorkTypes = ["remote", "onsite", "hybrid"];
-  if (!validWorkTypes.includes(workType.toLowerCase())) {
-    return errorResponse(res, `Invalid workType. Must be one of: ${validWorkTypes.join(", ")}`);
+    const genderValidation = validateGender(gender);
+    if (!genderValidation.valid) return errorResponse(res, genderValidation.error);
   }
 
-  // Aadhaar validation
-  const aadhaarRegex = /^\d{12}$/;
-  if (!aadhaarRegex.test(String(aadhaar).trim())) {
-    return errorResponse(res, "Invalid aadhaar format. Must be exactly 12 digits");
-  }
+  // Validate work type
+  const workTypeValidation = validateWorkType(workType);
+  if (!workTypeValidation.valid) return errorResponse(res, workTypeValidation.error);
 
-  // PAN validation
+  // Validate aadhaar
+  const aadhaarValidation = validateAadhaar(aadhaar);
+  if (!aadhaarValidation.valid) return errorResponse(res, aadhaarValidation.error);
+
+  // Validate PAN
   if (pan) {
-    const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]$/;
-    if (!panRegex.test(String(pan).trim().toUpperCase())) {
-      return errorResponse(res, "Invalid PAN format. Expected format: AAAAA9999A");
-    }
+    const panValidation = validatePAN(pan);
+    if (!panValidation.valid) return errorResponse(res, panValidation.error);
   }
 
-  // Passport validation
+  // Validate passport
   if (passport) {
-    const passportRegex = /^[A-Z0-9]{4,15}$/;
-    if (!passportRegex.test(String(passport).trim().toUpperCase())) {
-      return errorResponse(res, "Invalid passport format. Expected 4-15 alphanumeric characters");
-    }
+    const passportValidation = validatePassport(passport);
+    if (!passportValidation.valid) return errorResponse(res, passportValidation.error);
   }
 
   // Find organization
@@ -187,18 +187,30 @@ const insertByForm = asyncHandler(async (req, res) => {
 
     await session.commitTransaction();
 
-    // Optional face enrollment — fire-and-log, does not affect employee creation
+    // Optional face enrollment — background task with error logging
     if (req.file) {
       enrollFace(req.file.buffer, String(employeeId).trim()).catch((err) => {
-        console.error(`[FaceAPI] Enrollment failed for ${employeeId}:`, err?.response?.data || err.message);
+        logger.error("Face enrollment failed during employee onboarding", {
+          employeeId: String(employeeId).trim(),
+          userId: newUser._id,
+          error: err?.message || err,
+          apiError: err?.response?.data,
+        });
       });
     }
 
-    // WhatsApp welcome — fire-and-log
+    // WhatsApp welcome notification — background task with error logging
     sendWhatsApp(
       String(phone).trim(),
       `*Welcome to ${organization.name}!* 🎉\nHi ${String(name).trim()}, your WorkPing account is ready.\n\n*Login:* ${normalizedEmail}\n*Password:* ${process.env.USER_DEFAULT_PASSWORD || "WorkPing@123"}\n*Employee ID:* ${String(employeeId).trim()}\n\nPlease change your password after first login.`
-    ).catch((err) => console.error("[WhatsApp] Welcome message failed:", err.message));
+    ).catch((err) => {
+      logger.error("Welcome WhatsApp notification failed", {
+        employeeId: String(employeeId).trim(),
+        userId: newUser._id,
+        phone: String(phone).trim(),
+        error: err.message,
+      });
+    });
 
     return successResponse(
       res,

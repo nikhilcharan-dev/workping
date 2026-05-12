@@ -21,10 +21,15 @@ export default async function socket(server) {
   const pubClient = makeRedisClient();
   const subClient = pubClient.duplicate();
 
-  await Promise.all([pubClient.connect(), subClient.connect()]);
-
   pubClient.on("error", (err) => console.error("[Socket.io pubClient]", err.message));
   subClient.on("error", (err) => console.error("[Socket.io subClient]", err.message));
+
+  try {
+    await Promise.all([pubClient.connect(), subClient.connect()]);
+  } catch (err) {
+    console.error("[Socket.io] CRITICAL: Redis connection failed, real-time payment events will not be delivered:", err.message);
+    throw new Error(`[Socket.io] Failed to initialize Redis adapter: ${err.message}`);
+  }
 
   globalThis.io = new Server(server, {
     cors: {

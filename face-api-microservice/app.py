@@ -423,13 +423,21 @@ async def startup_event():
                 orgs.setdefault(org, []).append(doc)
 
             loaded_orgs = 0
+            failed_orgs = []
             for org_id in orgs.keys():
                 if faiss_index.load(org_id):
                     loaded_orgs += 1
                 else:
-                    faiss_index.rebuild(org_id, orgs[org_id])
+                    try:
+                        faiss_index.rebuild(org_id, orgs[org_id])
+                        loaded_orgs += 1
+                    except Exception as org_err:
+                        print(f"[FAISS] Failed to rebuild index for {org_id}: {org_err}")
+                        failed_orgs.append(org_id)
             print(f"FAISS indexes: {loaded_orgs} loaded from disk, {len(orgs) - loaded_orgs} rebuilt from MongoDB")
-            FAISS_READY = True
+            if failed_orgs:
+                print(f"[FAISS] WARNING: Failed to initialize indexes for orgs: {failed_orgs}")
+            FAISS_READY = loaded_orgs > 0
             break
         except Exception as e:
             print(f"FAISS startup attempt {attempt + 1}/{max_retries} failed: {e}")
@@ -458,7 +466,7 @@ def validate_image_b64(image_b64: str) -> bytes:
 
 
 async def check_rate_limit(user_id: str):
-    """Redis sliding-window rate limit per user_id. Fails closed if Redis unavailable. Raises 429 when exceeded."""
+    """Redis sliding-window rate limit per user_id. Falls back to in-memory limiter if Redis unavailable."""
     global rate_limit_redis_failures
     redis = _get_redis()
     key = f"rl:detect:{user_id}"
@@ -475,11 +483,12 @@ async def check_rate_limit(user_id: str):
         raise
     except Exception as e:
         rate_limit_redis_failures += 1
-        print(f"[RateLimit] CRITICAL: Redis unavailable (attempt {rate_limit_redis_failures}): {e}. Denying request for user {user_id} to maintain rate limit integrity.")
-        raise HTTPException(
-            status_code=503,
-            detail="Rate limit service temporarily unavailable — request denied to maintain integrity",
-        )
+        print(f"[RateLimit] Redis unavailable (attempt {rate_limit_redis_failures}): {e}. Falling back to in-memory limiter.")
+        if not memory_limiter.is_allowed(user_id, RATE_LIMIT_REQUESTS):
+            raise HTTPException(
+                status_code=429,
+                detail=f"Rate limit exceeded: max {RATE_LIMIT_REQUESTS} requests per {RATE_LIMIT_WINDOW_SECONDS}s",
+            )
 
 
 # ---------------- HELPERS ----------------

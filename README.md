@@ -242,63 +242,242 @@ WorkPing delivers a complete, production-deployed workforce management platform 
 
 ```
 workping/
-├── nginx/                              # Reverse proxy + SSL/TLS termination
-│   └── nginx.conf
-├── docker-compose.yml                  # Multi-service container orchestration
-├── k8s/                                # OCI OKE Kubernetes manifests
-│   ├── api/deployment.yaml
-│   └── whatsapp/deployment.yaml
-├── centralized-server/                 # Core API (Express 5 + Mongoose)
-│   └── server/
-│       ├── app/
-│       │   ├── app.js                  # Express + middleware bootstrap
-│       │   └── socket.io.js            # Socket.io + Redis adapter
-│       ├── controllers/                # Route handlers
+│
+├── 📋 Configuration & Documentation
+│   ├── README.md                                    # This file
+│   ├── ARCHITECTURE.md                             # Deep system architecture reference
+│   ├── SCOPE_GUARD.md                              # Reviewer scope guidance
+│   ├── CONTRIBUTING.md                             # Contribution guidelines
+│   ├── SCORE_IMPROVEMENTS.md                       # Improvement roadmap
+│   ├── FINAL_SECURITY_ASSESSMENT.md                # Latest security audit
+│   ├── COMPREHENSIVE_SECURITY_AUDIT.md             # Complete audit report (24 vulnerabilities)
+│   ├── CRITICAL_SECURITY_INCIDENT.md               # Critical issue documentation
+│   ├── SECURITY_FIXES.md                           # Security patches (14 fixes)
+│   ├── package-lock.json                           # Root lockfile
+│   ├── .env.example                                # Environment template
+│   ├── .gitignore                                  # Git ignore rules
+│   ├── .gitattributes                              # Git attributes
+│   ├── .nvmrc                                      # Node version (18+)
+│   ├── .prettierrc                                 # Code formatter config
+│   ├── .prettierignore                             # Prettier ignore rules
+│   ├── .reviewer.json                              # Automated reviewer manifest
+│   ├── LICENSE                                     # ISC License
+│   └── create-zip.ps1                              # PowerShell build script
+│
+├── 📚 Documentation & Guides
+│   ├── documents/
+│   │   ├── README.md                               # Docs index
+│   │   ├── FUTURE_SCOPE.md                         # Planned enhancements
+│   │   ├── INFRASTRUCTURE.md                       # Infra architecture deep dive
+│   │   ├── SECURITY.md                             # Security posture & best practices
+│   │   └── nginx/
+│   │       └── nginx.conf                          # Nginx configuration (alternative location)
+│   └── .github/
+│       ├── workflows/
+│       │   ├── ci.yml                              # CI/CD pipeline
+│       │   └── secret-scan.yml                     # Secret scanning workflow
+│       └── dependabot.yml                          # Dependabot configuration
+│
+├── 🔧 Scripts & Tools
+│   ├── scripts/
+│   │   ├── fetch-reviewer-reports.mjs              # Fetch ultrareview results
+│   │   ├── quickstart.sh                           # Setup & bootstrap script
+│   │   ├── reviewer-summary.json                   # Reviewer results summary
+│   │   └── .reviewer-cache/                        # Cached reviewer reports
+│   │       └── PS-*.json                           # Individual issue reports (150+ files)
+│
+├── 🏗️ Infrastructure & Deployment
+│   ├── nginx/
+│   │   └── nginx.conf                              # Reverse proxy, SSL/TLS, routing
+│   ├── docker-compose.yml                          # Multi-service container orchestration
+│   ├── docker-compose.monitoring.yml               # (in centralized-server) Monitoring stack
+│   └── k8s/                                        # Kubernetes manifests (OCI OKE)
+│       ├── api/
+│       │   ├── deployment.yaml                     # Deployment + HPA (2-10 replicas)
+│       │   └── service.yaml                        # ClusterIP service
+│       └── whatsapp/
+│           ├── deployment.yaml                     # Deployment + HPA
+│           └── service.yaml                        # ClusterIP service
+│
+├── 🖥️ Microservices
+│   │
+│   ├── centralized-server/                         # Core API (Express 5 + MongoDB)
+│   │   ├── server/
+│   │   │   ├── server.js                           # Entry point (cluster mode)
+│   │   │   ├── app/
+│   │   │   │   ├── app.js                          # Express bootstrap, middleware, routes
+│   │   │   │   └── socket.io.js                    # Socket.io + Redis adapter
+│   │   │   ├── config/                             # Mongoose, Redis config
+│   │   │   ├── controllers/                        # Route handlers (admin, user, auth, otp, 2fa)
+│   │   │   ├── middleware/
+│   │   │   │   ├── jwtBearer.js                    # JWT verify + revocation check
+│   │   │   │   ├── requireRole.js                  # RBAC guard
+│   │   │   │   └── authorizeManager.js             # Manager-tier RBAC
+│   │   │   ├── models/                             # 27 Mongoose schemas (Salary, User, Order, Payment, etc.)
+│   │   │   ├── routes/                             # Web (admin/user) + app/internal routes
+│   │   │   ├── services/
+│   │   │   │   ├── 2fa/index.js                    # TOTP (speakeasy)
+│   │   │   │   ├── google/google.signin.js         # Google OAuth2
+│   │   │   │   ├── microsoft/microsoft.signin.js   # Microsoft OAuth2
+│   │   │   │   ├── phonepe/phonepe.webhook.js      # PhonePe webhook handler
+│   │   │   │   ├── storage/oracle.service.js       # OCI Object Storage client
+│   │   │   │   └── subscription/renewal.cron.js    # Renewal reminders (7d/3d/1d)
+│   │   │   ├── utils/
+│   │   │   │   ├── token.helper.js                 # JWT issue + Redis blacklist
+│   │   │   │   ├── location.js                     # Geofence + haversine validation
+│   │   │   │   └── metrics.js                      # Prometheus prom-client
+│   │   │   ├── helpers/                            # Formatting, date utilities
+│   │   │   ├── __tests__/
+│   │   │   │   ├── setup/
+│   │   │   │   │   ├── globalSetup.js              # Docker mongo:7 replica set
+│   │   │   │   │   ├── globalTeardown.js           # Cleanup
+│   │   │   │   │   └── db.js                       # Test DB helpers
+│   │   │   │   ├── auth.integration.test.js        # Register/login/refresh/logout (real MongoDB)
+│   │   │   │   ├── security.test.js                # JWT + blacklist unit tests
+│   │   │   │   ├── auth.test.js                    # Auth validation paths
+│   │   │   │   ├── otp.test.js                     # OTP validation
+│   │   │   │   ├── health.test.js                  # Health + metrics smoke tests
+│   │   │   │   └── validators.test.js              # 55+ validator unit tests
+│   │   │   ├── jest.config.js                      # Unit + security tests
+│   │   │   ├── jest.integration.config.js          # DB integration tests
+│   │   │   ├── .env.example                        # Sample environment variables
+│   │   │   ├── package.json                        # Dependencies (Express, Mongoose, Redis, JWT, bcrypt, speakeasy, etc.)
+│   │   │   └── docker-compose.monitoring.yml       # Monitoring stack (Prometheus, Grafana, etc.)
+│   │   └── package-lock.json                       # Lockfile
+│   │
+│   ├── admin-ui/                                   # React 18 + Vite 5 (admin dashboard)
+│   │   ├── src/
+│   │   │   ├── main.jsx                            # React entry point
+│   │   │   ├── routes/
+│   │   │   │   └── index.jsx                       # Route definitions
+│   │   │   ├── pages/                              # Page components
+│   │   │   ├── components/                         # Reusable components
+│   │   │   ├── hooks/                              # Custom React hooks
+│   │   │   ├── context/                            # Context providers
+│   │   │   ├── services/                           # API client services
+│   │   │   ├── utils/                              # Utilities
+│   │   │   ├── styles/                             # CSS/Tailwind styles
+│   │   │   └── assets/                             # Images, icons
+│   │   ├── public/                                 # Static assets
+│   │   ├── dist/                                   # Build output (served by Nginx)
+│   │   ├── package.json                            # React + Vite + UI libraries
+│   │   ├── vite.config.js                          # Vite bundler config
+│   │   └── index.html                              # HTML template
+│   │
+│   ├── employees-ui/                               # React 18 + Vite 5 (employee portal)
+│   │   ├── src/
+│   │   │   ├── main.jsx
+│   │   │   ├── routes/index.jsx
+│   │   │   ├── pages/
+│   │   │   ├── components/
+│   │   │   ├── hooks/
+│   │   │   ├── context/
+│   │   │   ├── services/
+│   │   │   ├── utils/
+│   │   │   ├── styles/
+│   │   │   └── assets/
+│   │   ├── public/
+│   │   ├── dist/                                   # Build output (served by Nginx)
+│   │   ├── package.json
+│   │   ├── vite.config.js
+│   │   └── index.html
+│   │
+│   ├── mobile-app/                                 # React Native 0.83 (Expo 55)
+│   │   ├── index.js                                # App entry point + offline sync + NetInfo listener
+│   │   ├── app.json                                # Expo config
+│   │   ├── src/
+│   │   │   ├── components/
+│   │   │   │   └── ThirdPartyAuth.jsx              # OAuth provider buttons
+│   │   │   ├── context/
+│   │   │   │   └── useAuthContext.jsx              # Auth state
+│   │   │   ├── hooks/
+│   │   │   │   ├── useOAuth.js                     # PKCE OAuth flow (RFC 7636)
+│   │   │   │   ├── useLocationLock.js              # Geofence validation hook
+│   │   │   │   └── useFaceCapture.js               # Face detection + capture
+│   │   │   ├── screens/
+│   │   │   │   ├── FaceCaptureScreen.jsx           # Face capture + verification
+│   │   │   │   └── AuthNavigator.jsx               # Auth flow navigation
+│   │   │   ├── utils/
+│   │   │   │   └── locationLock.js                 # Haversine + WiFi validation
+│   │   │   ├── services/
+│   │   │   │   └── api.js                          # API client
+│   │   │   └── navigation/
+│   │   │       └── AuthNavigator.jsx
+│   │   ├── package.json                            # Expo, React Native, SDKs
+│   │   └── package-lock.json
+│   │
+│   ├── face-api-microservice/                      # FastAPI + InsightFace (Python 3.10)
+│   │   ├── app.py                                  # Single-file FastAPI service
+│   │   │                                           # - InsightFace AntelopeV2 (SCRFD + ArcFace R100)
+│   │   │                                           # - FAISS IndexFlatIP per-org 1:N search
+│   │   │                                           # - Phase 1 liveness detection (optical flow)
+│   │   │                                           # - AI productivity insights (StatsTracker)
+│   │   │                                           # - Redis embedding cache + task queue
+│   │   │                                           # - Async inference via ThreadPoolExecutor
+│   │   ├── embedding.py                            # InsightFace + embedding extraction
+│   │   ├── db.py                                   # MongoDB client
+│   │   ├── cache.py                                # Redis caching layer
+│   │   ├── face_search.py                          # FAISS index management
+│   │   ├── Dockerfile                              # GPU-capable container
+│   │   ├── requirements.txt                        # Python dependencies
+│   │   ├── docker-compose.yaml                     # Service docker-compose
+│   │   └── .env.example
+│   │
+│   ├── mailer-microservice/                        # Nodemailer + Redis (Node.js)
+│   │   ├── server.js                               # OTP service entry point
+│   │   ├── routes/                                 # /send-otp, /verify-otp
+│   │   ├── services/                               # Email templates + Redis helpers
+│   │   ├── package.json                            # Nodemailer, Redis, Express
+│   │   ├── Dockerfile
+│   │   └── .env.example
+│   │
+│   ├── phonepe-gateway-microservice/               # PhonePe UPI Integration (Node.js)
+│   │   ├── service.js                              # Entry point
+│   │   ├── webhook/
+│   │   │   └── phonepe.webhook.js                  # Webhook signature verification (timing-safe HMAC)
+│   │   ├── routes/
+│   │   │   └── payment.routes.js                   # /initiate, /status
+│   │   ├── test/
+│   │   │   └── sandbox.test.js                     # HMAC + state machine tests
+│   │   ├── package.json                            # Axios, Redis, Helmet, Express
+│   │   ├── Dockerfile
+│   │   └── .env.example
+│   │
+│   ├── whatsapp-microservice/                      # WhatsApp Cloud API + LLM (Node.js)
+│   │   ├── server.js                               # Entry point
+│   │   ├── pipeline/
+│   │   │   └── message.pipeline.js                 # BullMQ + intent routing
+│   │   ├── intent/
+│   │   │   └── rule.engine.js                      # Hand-written rule engine (LLM-replaceable)
+│   │   ├── utils/
+│   │   │   └── llm.provider.js                     # Provider-agnostic LLM (Bedrock, Ollama, OpenAI, Groq, OpenRouter)
+│   │   ├── routes/                                 # /message, /callback
+│   │   ├── package.json                            # BullMQ, AWS SDKs (Bedrock, Transcribe, Polly), Express, Redis
+│   │   ├── Dockerfile
+│   │   ├── docker-compose.yml                      # Service docker-compose
+│   │   └── .env.example
+│   │
+│   └── oracle-cloud-object-microservice/           # OCI Object Storage Proxy (Node.js)
+│       ├── app.js                                  # Single-file Express service
+│       │                                           # - Pre-signed URL generation (15-min TTL)
+│       │                                           # - Multipart upload
+│       │                                           # - Prometheus metrics + CSV export
+│       │                                           # - Graceful shutdown (metrics flush)
 │       ├── middleware/
-│       │   ├── jwtBearer.js            # JWT verify + revocation check
-│       │   ├── requireRole.js          # RBAC guard
-│       │   └── authorizeManager.js     # Manager-tier RBAC
-│       ├── models/                     # 27 Mongoose schemas
-│       ├── routes/                     # admin / user / app routes
-│       ├── services/
-│       │   ├── 2fa/index.js            # TOTP (speakeasy)
-│       │   ├── google/google.signin.js # Google OAuth2
-│       │   ├── microsoft/microsoft.signin.js
-│       │   ├── phonepe/phonepe.webhook.js
-│       │   └── subscription/renewal.cron.js
-│       ├── utils/
-│       │   ├── token.helper.js         # JWT issue + Redis blacklist
-│       │   ├── location.js             # Geofence + haversine
-│       │   └── metrics.js              # Prometheus prom-client
-│       └── __tests__/
-│           ├── auth.test.js
-│           ├── auth.integration.test.js
-│           ├── otp.test.js
-│           ├── security.test.js
-│           ├── validators.test.js
-│           └── health.test.js
-├── admin-ui/                           # React 18 + Vite 5 — HR/admin dashboard
-├── employees-ui/                       # React 18 + Vite 5 — employee portal
-├── mobile-app/                         # React Native 0.83 (Expo 55)
-│   ├── index.js                        # Offline sync + NetInfo listener
-│   └── src/
-│       ├── utils/locationLock.js       # Geofence validation
-│       ├── hooks/useLocationLock.js
-│       ├── hooks/useFaceCapture.js
-│       └── screens/FaceCaptureScreen.jsx
-├── face-api-microservice/              # FastAPI + InsightFace
-│   └── app.py                          # Single-file FastAPI service
-├── mailer-microservice/                # Nodemailer + Redis OTP
-├── phonepe-gateway-microservice/       # PhonePe UPI integration
-│   ├── webhook/phonepe.webhook.js
-│   └── test/sandbox.test.js
-├── whatsapp-microservice/              # WhatsApp Cloud API + LLM
-│   ├── pipeline/message.pipeline.js
-│   └── utils/llm.provider.js
-├── oracle-cloud-object-microservice/   # OCI Object Storage proxy
-│   └── app.js
-├── ARCHITECTURE.md                     # Deep architecture reference
-└── SCOPE_GUARD.md                      # Reviewer scope guidance
+│       │   ├── auth.js                             # API key auth (constant-time comparison)
+│       │   ├── metrics.js                          # Request metrics (P50/P95 latency)
+│       │   └── error-handler.js                    # Error handling
+│       ├── routes/
+│       │   ├── bucket.routes.js                    # Upload, fetch, delete
+│       │   └── presigned.routes.js                 # Pre-signed URL generation
+│       ├── package.json                            # OCI SDK, Helmet, Express, Morgan
+│       ├── Dockerfile
+│       ├── docker-compose.yaml                     # Service docker-compose
+│       └── .env.example
+│
+└── bin/                                             # Utility scripts
+    ├── package.json                                # Global scripts (if any)
+    └── ...
 ```
 
 ---

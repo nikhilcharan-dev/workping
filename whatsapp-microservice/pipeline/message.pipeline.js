@@ -9,6 +9,7 @@ import { isFirstTimeUser, getWelcomeMessage } from "../utils/user.tracker.js";
 import { trackMessage, trackError } from "../utils/analytics.js";
 import { getFlow, addMessage, clearFlow } from "../utils/conversation.state.js";
 import { checkGuards } from "../utils/rate.limiter.js";
+import { Queue } from "bullmq";
 
 async function resolveFlowIntent(phone, text, ruleIntent) {
   const flow = await getFlow(phone);
@@ -201,8 +202,7 @@ async function process(internalMessage) {
     trackError();
     console.error("[PIPELINE] Failure:", error.message);
     try {
-      const queue = require("bull");
-      const failedMessagesQueue = new queue("failed-messages", process.env.REDIS_URL || "redis://localhost:6379");
+      const failedMessagesQueue = new Queue("failed-messages", { connection: { url: process.env.REDIS_URL || "redis://localhost:6379" } });
       await failedMessagesQueue.add(
         {
           internalMessage,

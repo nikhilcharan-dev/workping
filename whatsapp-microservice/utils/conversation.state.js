@@ -9,13 +9,22 @@ function key(phone) {
 }
 
 async function getSession(phone) {
-  const raw = await redis.get(key(phone));
-  return raw ? JSON.parse(raw) : null;
+  try {
+    const raw = await redis.get(key(phone));
+    return raw ? JSON.parse(raw) : null;
+  } catch (error) {
+    console.error("[ConversationState] Failed to retrieve session, treating as new:", error.message);
+    return null;
+  }
 }
 
 async function saveSession(phone, session) {
-  session.lastActivity = Date.now();
-  await redis.set(key(phone), JSON.stringify(session), "EX", SESSION_TTL);
+  try {
+    session.lastActivity = Date.now();
+    await redis.set(key(phone), JSON.stringify(session), "EX", SESSION_TTL);
+  } catch (error) {
+    console.error("[ConversationState] Failed to save session (context will be lost on reload):", error.message);
+  }
 }
 
 function emptySession() {

@@ -9,6 +9,7 @@ import ProjectMember from "#models/ProjectMember.js";
 import Organization from "#models/Organization.js";
 import User from "#models/User.js";
 import { successResponse, errorResponse } from "#utils/response.helper.js";
+import { getTodayDateRange, getMonthDateRange, getCurrentYearDateRange } from "#utils/date.utils.js";
 
 export const getEmployeeDashboard = asyncHandler(async (req, res) => {
   const { userId } = req.user;
@@ -18,14 +19,10 @@ export const getEmployeeDashboard = asyncHandler(async (req, res) => {
 
   const orgId = user.organizationId;
   const uid = new mongoose.Types.ObjectId(userId);
-  const now = new Date();
 
-  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
-  const startOfYear = new Date(now.getFullYear(), 0, 1);
-  const endOfYear = new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999);
+  const { start: startOfToday, end: endOfToday } = getTodayDateRange();
+  const { startOfMonth, endOfMonth } = getMonthDateRange();
+  const { startOfYear, endOfYear } = getCurrentYearDateRange();
 
   const [todayAtt, monthAtt, recentLeaves, usedLeaveAgg, upcomingHolidays, membership, projectMembers, organization] =
     await Promise.all([

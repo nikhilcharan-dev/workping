@@ -9,6 +9,7 @@ import mongoose from "mongoose";
 import Pagination from "#helpers/pagination.js";
 import { successResponse, errorResponse } from "#utils/response.helper.js";
 import { validateObjectId, validateArray, validateString, validateDate, validateEnum } from "#utils/validators.js";
+import { logger } from "#utils/logger.js";
 
 export const applyLeave = asyncHandler(async (req, res) => {
   const { userId } = req.user;
@@ -68,23 +69,47 @@ export const applyLeave = asyncHandler(async (req, res) => {
     sendWhatsApp(
       user.phone,
       `*Leave Request Submitted* 📋\nHi ${user.name}, your *${leaveType}* leave for *${days} day(s)* (${dateList}) has been submitted and is awaiting approval.`
-    ).catch((err) => console.error("[WhatsApp] Employee leave notification failed:", err.message));
+    ).catch((err) => {
+      logger.error("Leave employee notification failed", {
+        userId,
+        leaveId,
+        error: err.message,
+      });
+    });
   }
 
   // Notify the employee's team manager (domain team, not project team)
-  TeamMembership.findOne({ userId, isActive: true })
-    .then(async (membership) => {
+  (async () => {
+    try {
+      const membership = await TeamMembership.findOne({ userId, isActive: true });
       if (!membership) return;
+
       const team = await Team.findById(membership.teamId).populate({ path: "managerId", select: "name phone" }).lean();
       const manager = team?.managerId;
       if (!manager?.phone) return;
-      sendWhatsApp(
-        manager.phone,
-        `*Leave Approval Required* 📋\n*${user.name}* has applied for *${leaveType}* leave.\n*Team:* ${team.teamName}\n*Days:* ${days} (${dateList})\n\nOpen WorkPing to approve or reject.`
-      ).catch(() => {});
-      startApprovalFlow(manager.phone, { leaveId, employeeName: user.name, days, dateList }).catch(() => {});
-    })
-    .catch(() => {});
+
+      try {
+        await sendWhatsApp(
+          manager.phone,
+          `*Leave Approval Required* 📋\n*${user.name}* has applied for *${leaveType}* leave.\n*Team:* ${team.teamName}\n*Days:* ${days} (${dateList})\n\nOpen WorkPing to approve or reject.`
+        );
+        await startApprovalFlow(manager.phone, { leaveId, employeeName: user.name, days, dateList });
+      } catch (notificationErr) {
+        logger.error("Leave manager notification failed", {
+          managerId: manager._id,
+          userId,
+          leaveId,
+          error: notificationErr.message,
+        });
+      }
+    } catch (err) {
+      logger.error("Leave team lookup failed", {
+        userId,
+        leaveId,
+        error: err.message,
+      });
+    }
+  })();
 
   return successResponse(res, "Leave application submitted successfully", leave, 201);
 }, "USER_APPLY_LEAVE_ERROR");

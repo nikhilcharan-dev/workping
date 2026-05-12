@@ -120,7 +120,7 @@ router.get("/download/:bucketName/:objectName", validateBucketName, validateObje
       if (!res.headersSent) {
         res.status(500).json({ error: "Download stream failed" });
       } else {
-        res.destroy();
+        res.end();
       }
     });
 

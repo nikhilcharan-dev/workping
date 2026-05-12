@@ -59,60 +59,65 @@ function containsProfanity(text) {
 }
 
 export async function checkGuards(phone, text) {
-  // 1. Check active ban
-  const banRaw = await redis.get(banKey(phone));
-  const ban = banRaw ? JSON.parse(banRaw) : { warnings: 0, bannedUntil: 0 };
+  try {
+    // 1. Check active ban
+    const banRaw = await redis.get(banKey(phone));
+    const ban = banRaw ? JSON.parse(banRaw) : { warnings: 0, bannedUntil: 0 };
 
-  if (ban.bannedUntil > Date.now()) {
-    const hoursLeft = Math.ceil((ban.bannedUntil - Date.now()) / (60 * 60 * 1000));
-    return {
-      allowed: false,
-      reason: "BANNED",
-      replyText: `You have been temporarily banned for inappropriate language. You can use the bot again in *${hoursLeft} hours*.`,
-    };
-  }
-
-  // 2. Profanity check
-  if (containsProfanity(text)) {
-    ban.warnings++;
-    if (ban.warnings > MAX_WARNINGS) {
-      ban.bannedUntil = Date.now() + BAN_DURATION_SEC * 1000;
-      await redis.set(banKey(phone), JSON.stringify(ban), "EX", BAN_DURATION_SEC);
+    if (ban.bannedUntil > Date.now()) {
+      const hoursLeft = Math.ceil((ban.bannedUntil - Date.now()) / (60 * 60 * 1000));
       return {
         allowed: false,
         reason: "BANNED",
-        replyText:
-          "You have been *banned for 2 days* due to repeated inappropriate language. Please be respectful when using this service.",
+        replyText: `You have been temporarily banned for inappropriate language. You can use the bot again in *${hoursLeft} hours*.`,
       };
     }
-    await redis.set(banKey(phone), JSON.stringify(ban), "EX", BAN_DURATION_SEC);
-    return {
-      allowed: false,
-      reason: "PROFANITY_WARNING",
-      replyText: `Please avoid inappropriate language. This is warning *${ban.warnings}/${MAX_WARNINGS}*. Further violations will result in a 2-day ban.`,
-    };
+
+    // 2. Profanity check
+    if (containsProfanity(text)) {
+      ban.warnings++;
+      if (ban.warnings > MAX_WARNINGS) {
+        ban.bannedUntil = Date.now() + BAN_DURATION_SEC * 1000;
+        await redis.set(banKey(phone), JSON.stringify(ban), "EX", BAN_DURATION_SEC);
+        return {
+          allowed: false,
+          reason: "BANNED",
+          replyText:
+            "You have been *banned for 2 days* due to repeated inappropriate language. Please be respectful when using this service.",
+        };
+      }
+      await redis.set(banKey(phone), JSON.stringify(ban), "EX", BAN_DURATION_SEC);
+      return {
+        allowed: false,
+        reason: "PROFANITY_WARNING",
+        replyText: `Please avoid inappropriate language. This is warning *${ban.warnings}/${MAX_WARNINGS}*. Further violations will result in a 2-day ban.`,
+      };
+    }
+
+    // 3. Daily rate limit — INCR + expire at end of day
+    const count = await redis.incr(rateKey(phone));
+    if (count === 1) {
+      // First message today — expire key at midnight UTC+5:30
+      const secondsUntilMidnight = 86400 - (Math.floor(Date.now() / 1000) % 86400);
+      await redis.expire(rateKey(phone), secondsUntilMidnight + 19800); // +5:30h offset
+    }
+
+    if (count > DAILY_LIMIT) {
+      return {
+        allowed: false,
+        reason: "RATE_LIMITED",
+        replyText: "You've reached your daily message limit (*10 messages/day*). Please try again tomorrow!",
+      };
+    }
+
+    const remaining = DAILY_LIMIT - count;
+    const warning = count === WARN_AT ? `Note: You have *${remaining} messages* remaining for today.` : null;
+
+    return { allowed: true, warning, remaining };
+  } catch (error) {
+    console.error("[RateLimit] Redis unavailable, allowing message without enforcement:", error.message);
+    return { allowed: true, warning: null, remaining: null };
   }
-
-  // 3. Daily rate limit — INCR + expire at end of day
-  const count = await redis.incr(rateKey(phone));
-  if (count === 1) {
-    // First message today — expire key at midnight UTC+5:30
-    const secondsUntilMidnight = 86400 - (Math.floor(Date.now() / 1000) % 86400);
-    await redis.expire(rateKey(phone), secondsUntilMidnight + 19800); // +5:30h offset
-  }
-
-  if (count > DAILY_LIMIT) {
-    return {
-      allowed: false,
-      reason: "RATE_LIMITED",
-      replyText: "You've reached your daily message limit (*10 messages/day*). Please try again tomorrow!",
-    };
-  }
-
-  const remaining = DAILY_LIMIT - count;
-  const warning = count === WARN_AT ? `Note: You have *${remaining} messages* remaining for today.` : null;
-
-  return { allowed: true, warning, remaining };
 }
 
 export async function getGuardedUsers() {

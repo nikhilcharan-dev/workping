@@ -84,7 +84,11 @@ NetInfo.addEventListener(state => {
     if (typeof global.__WP_FLUSH_OFFLINE_QUEUE__ !== 'function') {
       throw new Error('[WorkPing] Offline queue handler not registered. offlineQueue.js must be imported in index.js before registerRootComponent.');
     }
-    global.__WP_FLUSH_OFFLINE_QUEUE__();
+    try {
+      global.__WP_FLUSH_OFFLINE_QUEUE__();
+    } catch (error) {
+      console.error('[WorkPing] Error flushing offline queue:', error.message);
+    }
   }
 });
 
