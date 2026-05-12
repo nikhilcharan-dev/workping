@@ -18,7 +18,11 @@ export default function useLocalStorage(key, initialValue, override) {
     if (key) {
       const item = window.localStorage.getItem(key)
       if (item) {
-        setStoredValue(JSON.parse(item))
+        try {
+          setStoredValue(JSON.parse(item))
+        } catch (error) {
+          console.error(error)
+        }
       }
     }
   }

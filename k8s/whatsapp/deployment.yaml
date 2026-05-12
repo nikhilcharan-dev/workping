@@ -17,9 +17,25 @@ spec:
         app: workping-chatbot
         tier: backend
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: workping-chatbot
-          image: workping/whatsapp:latest
+          # Replace with workping/whatsapp@sha256:... at deploy time so a
+          # re-pushed tag cannot silently swap the binary.
+          image: workping/whatsapp:v1.0.0
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
           ports:
             - containerPort: 3002
           env:

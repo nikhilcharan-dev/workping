@@ -17,9 +17,31 @@ spec:
         app: workping-api
         tier: backend
     spec:
+      # Pod-level securityContext applies to all containers and any volumes
+      # the kubelet creates. runAsNonRoot is a hard guard — if the image's
+      # default user is uid 0, the pod fails to schedule rather than launching
+      # with root.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: workping-api
-          image: workping/api:latest
+          # Replace :latest with an immutable reference before deploying. The
+          # CI/CD pipeline should write the digest here (image: workping/api@sha256:...)
+          # so rollouts are reproducible and a re-pushed tag cannot silently swap
+          # binaries. Tag form is kept here only as a placeholder.
+          image: workping/api:v1.0.0
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
           ports:
             - containerPort: 5000
           env:

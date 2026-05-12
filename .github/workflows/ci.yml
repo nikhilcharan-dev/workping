@@ -6,6 +6,13 @@ on:
   pull_request:
     branches: ["**"]
 
+# Default workflow permissions to read-only. Individual jobs can opt in to
+# additional scopes as needed. Without this, the default GITHUB_TOKEN gets
+# `contents: write` and other write scopes — far more than CI needs and a
+# real exfil risk if a malicious dependency runs during `npm install`.
+permissions:
+  contents: read
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -35,7 +42,7 @@ jobs:
           cache-dependency-path: ${{ matrix.service }}/package-lock.json
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
         working-directory: ${{ matrix.service }}
 
       - name: Lint
@@ -92,11 +99,14 @@ jobs:
           cache-dependency-path: ${{ matrix.service }}/package-lock.json
 
       - name: Install dependencies
-        # Use `npm install` (not `npm ci`) so newly-added devDeps (jest,
-        # cross-env) for the mailer/whatsapp/storage services are picked up
-        # even before their lockfiles are regenerated locally. Subsequent
-        # commits can switch back to `npm ci` once lockfiles are refreshed.
-        run: npm install --no-audit --no-fund
+        # --ignore-scripts blocks postinstall/preinstall hooks from running
+        # during dependency setup. Without this, a malicious package or PR can
+        # execute arbitrary code on the runner during install — with access
+        # to whatever secrets the workflow expose-able to that job.
+        # Switched from `npm install` to `npm ci` for reproducible builds.
+        # If a service's lockfile is missing/stale, regenerate it locally
+        # rather than relaxing this guard in CI.
+        run: npm ci --ignore-scripts --no-audit --no-fund
         working-directory: ${{ matrix.service }}
 
       - name: Run tests (with coverage)
@@ -175,7 +185,7 @@ jobs:
           cache-dependency-path: ${{ matrix.service }}/package-lock.json
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
         working-directory: ${{ matrix.service }}
 
       - name: Audit for high/critical vulnerabilities

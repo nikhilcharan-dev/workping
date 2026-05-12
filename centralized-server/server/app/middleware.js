@@ -4,7 +4,7 @@ import cookieParser from "cookie-parser";
 import helmet from "helmet";
 import { rateLimit } from "express-rate-limit";
 import sanitizeMongo from "#middleware/sanitizeMongo.js";
-import csrf from "csurf";
+import originGuard from "#middleware/originGuard.js";
 
 const MODE = process.env.MODE;
 
@@ -112,15 +112,12 @@ export default function middlewares(app) {
 
   app.use(cookieParser());
 
-  // CSRF protection for state-changing operations (POST, PUT, DELETE, PATCH)
-  // Use session-based tokens (stored in cookie)
-  const csrfProtection = csrf({ cookie: false });
-
-  // Apply CSRF to state-changing routes only
-  app.post('*', csrfProtection);
-  app.put('*', csrfProtection);
-  app.delete('*', csrfProtection);
-  app.patch('*', csrfProtection);
+  // CSRF defense: enforce Origin/Referer against the CORS allowlist on
+  // state-changing requests. Browsers always set Origin on POST/PUT/PATCH/DELETE,
+  // and the allowlist is the same set CORS already trusts, so legitimate UIs
+  // pass without any client-side token plumbing. Server-to-server callers
+  // (PhonePe webhook, /internal routes) are exempt and use their own auth.
+  app.use(originGuard);
 
   // Request logging — reduced to warn/error level only
   app.use((req, res, next) => {
