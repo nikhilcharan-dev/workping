@@ -69,10 +69,10 @@ const secrets = JSON.parse(SecretString);
 
 ## 3. API Gateway (Enhancement)
 
-**Current state:** Nginx serves as reverse proxy + API gateway — SSL termination, path/subdomain routing, WebSocket upgrade, and static file serving are all handled at the Nginx layer.
+**Current state:** The reverse proxy serves as API gateway — SSL termination, path/subdomain routing, WebSocket upgrade, and static file serving are all handled at the edge layer.
 
 **Enhancement opportunity:**
-- Upgrade to **Kong** (built on Nginx) or add **Nginx Plus** plugins.
+- Upgrade to **Kong** or add gateway plugins.
 - Centralise JWT validation at the gateway level so microservices don't each need auth middleware.
 - Add gateway-level rate limiting, request logging, and CORS — removing the boilerplate from each service.
 - This is a **low-priority enhancement**, not a missing feature.
@@ -127,8 +127,8 @@ const secrets = JSON.parse(SecretString);
 
 ## 8. Kubernetes / Container Orchestration
 
-**Current state:** Docker Compose for individual services; PM2 for Node.js processes.  
-**Problem:** Manual scaling, no rolling deployments, no automatic pod replacement.
+**Current state:** Docker Compose for orchestration; manifests authored in `k8s/` for OCI OKE.  
+**Problem:** Cluster not yet provisioned; scaling and pod replacement still manual on VMs.
 
 **Planned:**
 - Migrate to **Kubernetes** (OKE — Oracle Kubernetes Engine, consistent with OCI storage).
@@ -150,7 +150,7 @@ const secrets = JSON.parse(SecretString);
 ## 10. Biometric Accuracy Improvements
 
 - Allow multiple enrolled embeddings per employee (different lighting, angles).
-- Anti-spoofing liveness detection (detect printed photos / screen replay).
+- Anti-spoofing Phase 2 integration (Phase 1 optical-flow implemented; Phase 2 slot documented).
 - Periodic re-enrollment prompt after 6 months (embeddings drift with ageing/appearance changes).
 
 ---
@@ -164,7 +164,7 @@ const secrets = JSON.parse(SecretString);
 | Pre-commit secret scanning | HIGH | Low | 2.1 |
 | OpenAPI / Swagger | MEDIUM | Medium | 2.2 |
 | CSRF protection | MEDIUM | Low | 2.2 |
-| API gateway enhancement (Kong/Nginx Plus) | LOW | High | 3.0 |
+| API gateway enhancement (Kong/plugins) | LOW | High | 3.0 |
 | Prometheus + Grafana | MEDIUM | Medium | 2.3 |
 | Distributed tracing (OTel) | LOW | High | 2.4 |
 | Kubernetes migration | LOW | Very High | 3.0 |

@@ -4,12 +4,12 @@
   WorkPing Employee Portal — Vite SPA shell
   ============================================================================
 
-  Compiled by `vite build` and served by nginx at employee.workping.live.
+  Compiled by `vite build` and served by the reverse proxy at employee.workping.live.
 
   ── BUILD ──────────────────────────────────────────────────────────────────
   • Vite 5 + React 18; entry is /src/main.jsx (BrowserRouter + <App />)
-  • nginx serves /portal/* from /var/www/workping/employees-ui/dist/
-    (see nginx/nginx.conf — "Employee portal SPA" location block)
+  • The reverse proxy serves /portal/* from /var/www/workping/employees-ui/dist/
+    (see the edge proxy config — "Employee portal SPA" location block)
   • API calls hit api.workping.live (centralized-server/server)
 
   ── EMPLOYEE PORTAL CAPABILITIES ──────────────────────────────────────────

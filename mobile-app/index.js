@@ -92,8 +92,12 @@ import { offlineQueueReady, flushQueue } from '@/services/offlineQueue';
 // where the device has WiFi but no actual internet — common in office routers
 // with captive portals or expired DHCP leases).
 NetInfo.configure({ reachabilityUrl: 'https://api.workping.live/api/v1/health' });
+let isFlushing = false;
 NetInfo.addEventListener(async state => {
   if (!(state.isConnected && state.isInternetReachable)) return;
+  if (isFlushing) return;
+  isFlushing = true;
+
   try {
     // Await the offline-queue init promise instead of polling a global. If the
     // DB failed to open (SQLite unavailable, disk full, etc.) `ready` is false
@@ -106,6 +110,8 @@ NetInfo.addEventListener(async state => {
     await flushQueue();
   } catch (error) {
     console.error('[WorkPing] Unhandled error in NetInfo listener:', error.message);
+  } finally {
+    isFlushing = false;
   }
 });
 

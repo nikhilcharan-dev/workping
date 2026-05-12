@@ -154,27 +154,7 @@ Request format options:
 - `ollama` - Ollama-compatible remote server
 - `raw` - Pass messages + options as-is to your server
 
-## 5. Reverse Proxy (Nginx)
-
-```nginx
-server {
-    listen 443 ssl;
-    server_name your-domain.com;
-
-    ssl_certificate /path/to/cert.pem;
-    ssl_certificate_key /path/to/key.pem;
-
-    location / {
-        proxy_pass http://127.0.0.1:3000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
-```
-
-## 6. Health Monitoring
+## 5. Health Monitoring
 
 ```bash
 # Basic health check

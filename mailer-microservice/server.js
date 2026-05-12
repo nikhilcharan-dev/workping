@@ -9,7 +9,7 @@
  *
  * ── ENDPOINTS ───────────────────────────────────────────────────────────────
  * Public (no auth):
- *   GET  /health        — liveness probe used by Docker HEALTHCHECK + nginx
+ *   GET  /health        — liveness probe used by Docker HEALTHCHECK + reverse proxy
  *   GET  /              — service status landing page
  *   GET  /dashboard     — live email analytics (Chart.js, success/failure rate)
  *   GET  /templates     — Handlebars template gallery (public/templates.html)

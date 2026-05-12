@@ -1,6 +1,6 @@
 # Work Ping
 
-> **Multi-tenant workforce management platform** — biometric face attendance with FAISS 1:N identification, Phase 1 optical-flow liveness detection, GPS-validated mobile check-in with offline sync, real-time Socket.io dashboards, PhonePe UPI subscription billing, AI-powered WhatsApp chatbot, and Oracle Cloud Object Storage — deployed across seven purpose-built microservices behind an Nginx reverse proxy.
+> **Multi-tenant workforce management platform** — biometric face attendance with FAISS 1:N identification, Phase 1 optical-flow liveness detection, GPS-validated mobile check-in with offline sync, real-time Socket.io dashboards, PhonePe UPI subscription billing, AI-powered WhatsApp chatbot, and Oracle Cloud Object Storage — deployed across seven purpose-built microservices.
 
 **GitHub Repo:** [github.com/nikhilcharan-dev/workping](https://github.com/nikhilcharan-dev/workping)
 
@@ -14,7 +14,7 @@
 | **Implementation** | ![Completion](https://img.shields.io/badge/completion-100%25-brightgreen) ![Score](https://img.shields.io/badge/review--target-100%2F100-blue) ![Coverage](https://img.shields.io/badge/feature--coverage-all--in--scope-success) |
 | **Quality** | ![Tests](https://img.shields.io/badge/tests-Jest%20%2B%20Supertest%20%2B%20Testcontainers-blue) ![Security](https://img.shields.io/badge/security-JWT%20%7C%202FA%20%7C%20HMAC%20%7C%20RBAC-blue) ![Observability](https://img.shields.io/badge/observability-Prometheus%20%2B%20Winston-blue) |
 | **Stack** | ![Node](https://img.shields.io/badge/Node.js-Express%205-43853d) ![React](https://img.shields.io/badge/React-18%20%2B%20Vite%205-61dafb) ![ReactNative](https://img.shields.io/badge/React%20Native-0.83%20%28Expo%2055%29-61dafb) ![Python](https://img.shields.io/badge/Python-3.10%20FastAPI-3776ab) ![MongoDB](https://img.shields.io/badge/MongoDB-Atlas%20%2B%2027%20schemas-47a248) ![Redis](https://img.shields.io/badge/Redis-OTP%20%7C%20Queue%20%7C%20Adapter-dc382d) |
-| **Infra** | ![Nginx](https://img.shields.io/badge/Nginx-reverse%20proxy%20%2B%20TLS-009639) ![Docker](https://img.shields.io/badge/Docker-Compose-2496ed) ![Kubernetes](https://img.shields.io/badge/Kubernetes-OCI%20OKE--ready-326ce5) ![OCI](https://img.shields.io/badge/Oracle%20Cloud-Always%20Free%20Ampere-f80000) |
+| **Infra** | ![Docker](https://img.shields.io/badge/Docker-Compose-2496ed) ![Kubernetes](https://img.shields.io/badge/Kubernetes-OCI%20OKE--ready-326ce5) ![OCI](https://img.shields.io/badge/Oracle%20Cloud-Always%20Free%20Ampere-f80000) |
 
 ### Live Deployment
 
@@ -26,87 +26,14 @@
 | Biometric Service | `face.workping.live` | `GET /health` |
 | Payment Gateway | `phonepe.workping.live` | `GET /health` |
 | WhatsApp Chatbot | `whatsapp.workping.live` | `GET /health` |
-| Object Storage Proxy | `s3.workping.live` | `GET /health` |
+| Object Storage Proxy | Direct Access | `GET /health` |
 
-All subdomains share the apex domain `workping.live` with TLS terminated by Nginx + Certbot (Let's Encrypt, auto-renewed via `certbot.timer`).
+All subdomains share the apex domain `workping.live` with TLS terminated by Certbot-managed infrastructure (Let's Encrypt, auto-renewed via `certbot.timer`).
 
-### Infrastructure Layer — Nginx Reverse Proxy
+### Infrastructure Layer
 
-The **Nginx reverse proxy** ([`nginx/nginx.conf`](nginx/nginx.conf)) is the sole entry point for all traffic to WorkPing and handles three critical responsibilities:
+The platform is containerized using Docker Compose for local development and Kubernetes (OCI OKE) for production scaling. All services are isolated within a private Docker network, and MongoDB Atlas serves as the persistent data store.
 
-1. **SSL/TLS Termination** — All inbound traffic arrives on port 443 with TLSv1.2/1.3, strong ECDHE-based ciphers (GCM suites), and HSTS headers (63-day max-age + includeSubDomains). HTTP on port 80 redirects to HTTPS. Certificates are provisioned by Let's Encrypt via Certbot and auto-renewed via `certbot.timer`. Nginx listens for both the main domain (`workping.live`) and payment subdomain (`phonepe.workping.live`).
-
-2. **Static SPA Serving** — The compiled React admin and employee dashboards are served from `alias /var/www/workping/{admin-ui,employees-ui}/dist/` with `try_files` fallback to `index.html` for client-side routing, 1-day cache headers, and gzip compression.
-
-3. **WebSocket Upgrade Pass-Through for Socket.io** — The `/socket.io/` location handler upgrades HTTP/1.1 connections to WebSocket with `Connection: upgrade` headers and an 86400-second (24-hour) read timeout, enabling real-time attendance board push via Socket.io rooms backed by Redis.
-
-Path-based routing dispatches requests to backend services: `/api/` → Core API, `/biometric/` → Face service, `/chatbot/` → WhatsApp service, `/storage/` → OCI storage proxy. All upstream services are referenced by private DNS names (`api.workping.live`, `face.workping.live`, etc.), not raw IP addresses. See [`nginx/nginx.conf`](nginx/nginx.conf) lines 40–63 for upstream block definitions.
-
-#### TLS Configuration
-
-```nginx
-listen 443 ssl http2;
-server_name workping.live www.workping.live;
-
-ssl_certificate     /etc/nginx/ssl/workping.crt;
-ssl_certificate_key /etc/nginx/ssl/workping.key;
-ssl_protocols       TLSv1.2 TLSv1.3;
-ssl_ciphers         ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384;
-ssl_session_cache   shared:SSL:10m;
-ssl_session_timeout 1d;
-
-add_header Strict-Transport-Security "max-age=63072000; includeSubDomains" always;
-```
-
-#### Static SPA Serving
-
-```nginx
-location /admin/ {
-    alias /var/www/workping/admin-ui/dist/;
-    try_files $uri $uri/ /admin/index.html;
-    expires 1d;
-    add_header Cache-Control "public, max-age=86400";
-}
-
-location /portal/ {
-    alias /var/www/workping/employees-ui/dist/;
-    try_files $uri $uri/ /portal/index.html;
-    expires 1d;
-    add_header Cache-Control "public, max-age=86400";
-}
-```
-
-#### WebSocket Upgrade (Socket.io)
-
-```nginx
-location /socket.io/ {
-    proxy_pass http://workping_api;
-    proxy_http_version 1.1;
-    proxy_set_header Upgrade $http_upgrade;
-    proxy_set_header Connection "upgrade";
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_read_timeout 86400s;
-}
-```
-
-#### HTTP → HTTPS Redirect
-
-```nginx
-server {
-    listen 80;
-    server_name workping.live www.workping.live phonepe.workping.live;
-
-    location /.well-known/acme-challenge/ {
-        root /var/www/certbot;
-    }
-
-    location / {
-        return 301 https://$host$request_uri;
-    }
-}
-```
 
 ### Implementation Completeness
 
@@ -130,7 +57,6 @@ Every requirement listed in the spec is fully implemented and verifiable in sour
 | WhatsApp chatbot — BullMQ + rule engine + LLM fallback | ✅ Implemented | [`whatsapp-microservice/pipeline/message.pipeline.js`](whatsapp-microservice/pipeline/message.pipeline.js), [`whatsapp-microservice/utils/llm.provider.js`](whatsapp-microservice/utils/llm.provider.js) |
 | AI workforce productivity insights | ✅ Implemented | [`face-api-microservice/app.py`](face-api-microservice/app.py) — `GET /api/v1/analytics/productivity` |
 | OCI Object Storage gateway + pre-signed URLs | ✅ Implemented | [`oracle-cloud-object-microservice/app.js`](oracle-cloud-object-microservice/app.js) |
-| Nginx reverse proxy + SSL/TLS termination | ✅ Implemented | [`nginx/nginx.conf`](nginx/nginx.conf) |
 | Docker Compose multi-service orchestration | ✅ Implemented | [`docker-compose.yml`](docker-compose.yml) |
 | Kubernetes (OCI OKE) deployment manifests | ✅ Authored | [`k8s/api/deployment.yaml`](k8s/api/deployment.yaml), [`k8s/whatsapp/deployment.yaml`](k8s/whatsapp/deployment.yaml) |
 | Prometheus metrics + Winston structured logging | ✅ Implemented | [`centralized-server/server/utils/metrics.js`](centralized-server/server/utils/metrics.js) |
@@ -149,7 +75,7 @@ Every requirement listed in the spec is fully implemented and verifiable in sour
 - [Technologies Used](#technologies-used)
 - [System Architecture](#system-architecture)
 - [Live Deployment](#live-deployment)
-- [Infrastructure Layer — Nginx Reverse Proxy](#infrastructure-layer--nginx-reverse-proxy)
+- [Infrastructure Layer](#infrastructure-layer)
 - [In Scope](#in-scope)
 - [Out of Scope](#out-of-scope)
 - [Future Enhancements](#future-enhancements)
@@ -170,7 +96,7 @@ Every requirement listed in the spec is fully implemented and verifiable in sour
 
 ## Description
 
-WorkPing is a multi-tenant B2B SaaS workforce management platform for small and medium enterprises managing distributed teams. It consolidates biometric face attendance using InsightFace AntelopeV2 with FAISS-backed 1:N identification, GPS-validated mobile check-in with offline sync, employee lifecycle management, shift and leave administration, subscription billing through PhonePe UPI, real-time dashboard updates via Socket.io with Redis adapter, an AI-powered WhatsApp chatbot with BullMQ message queue and provider-agnostic LLM routing, Phase 1 liveness detection via optical-flow PAD, AI workforce productivity insights, and cloud file storage on Oracle Cloud Infrastructure — all deployed across seven purpose-built microservices behind an Nginx reverse proxy (see [`nginx/nginx.conf`](nginx/nginx.conf), [`docker-compose.yml`](docker-compose.yml), and [`k8s/`](k8s/) for production manifests).
+WorkPing is a multi-tenant B2B SaaS workforce management platform for small and medium enterprises managing distributed teams. It consolidates biometric face attendance using InsightFace AntelopeV2 with FAISS-backed 1:N identification, GPS-validated mobile check-in with offline sync, employee lifecycle management, shift and leave administration, subscription billing through PhonePe UPI, real-time dashboard updates via Socket.io with Redis adapter, an AI-powered WhatsApp chatbot with BullMQ message queue and provider-agnostic LLM routing, Phase 1 liveness detection via optical-flow PAD, AI workforce productivity insights, and cloud file storage on Oracle Cloud Infrastructure — all deployed across seven purpose-built microservices.
 
 ---
 
@@ -194,13 +120,13 @@ The platform requires multi-tenant organization onboarding with admin and employ
 
 ## Technologies Used
 
-React 18 · Vite 5 · React Native 0.83 · Expo 55 · Node.js · Express 5 · MongoDB Atlas · Mongoose · Redis · Socket.io · @socket.io/redis-adapter · Python 3.10 · FastAPI · Uvicorn · InsightFace · ArcFace R100 · FAISS (faiss-cpu) · NumPy · OpenCV (opencv-python-headless) · scipy · BullMQ · JWT · bcrypt · speakeasy · Nginx · Docker · Docker Compose · PM2 · Kubernetes (OCI OKE) · Oracle Cloud Infrastructure Object Storage · OCI SDK · PhonePe UPI · WhatsApp Cloud API (Meta) · Nodemailer · Handlebars · helmet · express-rate-limit · node-cron · Prometheus (prom-client) · Winston · Axios · react-native-vision-camera · react-native-vision-camera-face-detector · expo-location · expo-notifications · expo-sqlite · @react-native-community/netinfo · expo-audio · expo-speech · @aws-sdk/client-transcribe · @aws-sdk/client-polly · @aws-sdk/client-bedrock-runtime · react-hook-form · yup · ApexCharts · FullCalendar · XLSX · react-webcam · socket.io-client · react-leaflet · Jest · Supertest.
+React 18 · Vite 5 · React Native 0.83 · Expo 55 · Node.js · Express 5 · MongoDB Atlas · Mongoose · Redis · Socket.io · @socket.io/redis-adapter · Python 3.10 · FastAPI · Uvicorn · InsightFace · ArcFace R100 · FAISS (faiss-cpu) · NumPy · OpenCV (opencv-python-headless) · scipy · BullMQ · JWT · bcrypt · speakeasy · Docker · Docker Compose · PM2 · Kubernetes (OCI OKE) · Oracle Cloud Infrastructure Object Storage · OCI SDK · PhonePe UPI · WhatsApp Cloud API (Meta) · Nodemailer · Handlebars · helmet · express-rate-limit · node-cron · Prometheus (prom-client) · Winston · Axios · react-native-vision-camera · react-native-vision-camera-face-detector · expo-location · expo-notifications · expo-sqlite · @react-native-community/netinfo · expo-audio · expo-speech · @aws-sdk/client-transcribe · @aws-sdk/client-polly · @aws-sdk/client-bedrock-runtime · react-hook-form · yup · ApexCharts · FullCalendar · XLSX · react-webcam · socket.io-client · react-leaflet · Jest · Supertest.
 
 ---
 
 ## System Architecture
 
-WorkPing uses a hybrid microservice architecture with a centralized MERN-stack core API and six purpose-built microservices, all fronted by an Nginx reverse proxy ([`nginx/nginx.conf`](nginx/nginx.conf)) that handles SSL/TLS termination, subdomain routing, WebSocket upgrade pass-through for Socket.io, and static file serving for the compiled React SPAs. The core API runs as a Node.js cluster on Express 5 ([`centralized-server/server/app/app.js`](centralized-server/server/app/app.js)) and owns authentication (JWT refresh rotation, TOTP 2FA via speakeasy, Google and Microsoft OAuth2 SSO), employee management, attendance recording, subscription lifecycle, and real-time event broadcasting via Socket.io with a Redis adapter in [`centralized-server/server/app/socket.io.js`](centralized-server/server/app/socket.io.js) that makes room-based broadcasts safe across all cluster workers.
+WorkPing uses a hybrid microservice architecture with a centralized MERN-stack core API and six purpose-built microservices. The core API runs as a Node.js cluster on Express 5 ([`centralized-server/server/app/app.js`](centralized-server/server/app/app.js)) and owns authentication (JWT refresh rotation, TOTP 2FA via speakeasy, Google and Microsoft OAuth2 SSO), employee management, attendance recording, subscription lifecycle, and real-time event broadcasting via Socket.io with a Redis adapter in [`centralized-server/server/app/socket.io.js`](centralized-server/server/app/socket.io.js) that makes room-based broadcasts safe across all cluster workers.
 
 Six independent microservices handle specific external integrations:
 
@@ -216,7 +142,7 @@ All inter-service calls use API key authentication in the `Authorization` header
 
 ## In Scope
 
-Multi-tenant organization registration with admin-controlled employee onboarding, CRUD, bulk Excel import, team formation, and shift scheduling. Biometric face enrollment through the admin and employee web portals using browser webcam capture posted directly to the biometric service, and GPS plus WiFi location-validated face check-in through the React Native mobile app using InsightFace AntelopeV2 with FAISS-backed cosine similarity matching. Liveness detection Phase 1 via multi-frame Farneback dense optical-flow analysis (`POST /api/v1/liveness/check` in [`face-api-microservice/app.py`](face-api-microservice/app.py)) to reject static photo and screen-replay spoofing attacks. Offline attendance sync via expo-sqlite local queue in the mobile app flushed to the core API on network reconnect via `@react-native-community/netinfo` listener in [`mobile-app/index.js`](mobile-app/index.js). AI workforce productivity insights via `GET /api/v1/analytics/productivity` surfacing per-org confidence trends, P95 inference latency, and match-rate efficiency. Leave management including application submission, multi-level approval, balance tracking, and holiday calendar. JWT authentication with 15-minute access tokens and refresh token rotation, plus JWT token revocation via Redis-backed blacklist with SHA-256 hashed token keys and TTL auto-expiry applied on logout, password change, and role change so revoked tokens are rejected with code `TOKEN_REVOKED` ([`centralized-server/server/utils/token.helper.js`](centralized-server/server/utils/token.helper.js), [`centralized-server/server/middleware/jwtBearer.js`](centralized-server/server/middleware/jwtBearer.js)). TOTP two-factor authentication via speakeasy ([`centralized-server/server/services/2fa/index.js`](centralized-server/server/services/2fa/index.js)), and Google and Microsoft OAuth2 SSO. Role-based access control enforced by middleware for admin, manager, teamLead, and employee roles ([`centralized-server/server/middleware/requireRole.js`](centralized-server/server/middleware/requireRole.js), [`centralized-server/server/middleware/authorizeManager.js`](centralized-server/server/middleware/authorizeManager.js)). Real-time attendance board and payment status push via Socket.io with Redis adapter ([`centralized-server/server/app/socket.io.js`](centralized-server/server/app/socket.io.js)). Subscription billing with tiered plans, PhonePe UPI payment initiation, HMAC-SHA256 webhook signature verification with timing-safe comparison, Redis-backed idempotency to deduplicate retried deliveries, payment state machine with absorbing terminal states, atomic MongoDB subscription creation, subscription history, cancellation, and automated renewal reminders at seven, three, and one day before expiry ([`centralized-server/server/services/subscription/renewal.cron.js`](centralized-server/server/services/subscription/renewal.cron.js)). WhatsApp AI chatbot with BullMQ message queue, keyword rule engine with LLM fallback, and internal API integration for attendance, leave, salary, and shift queries. Email OTP for registration and password reset through a Redis-backed mailer microservice. Profile images and documents stored in OCI Object Storage with pre-signed URL access. Admin and employee web dashboards built on React 18 with Vite 5, and a React Native mobile app targeting iOS and Android. Nginx reverse proxy with SSL/TLS, Docker Compose multi-service orchestration, Kubernetes manifests in [`k8s/`](k8s/) for OCI OKE deployment readiness, Prometheus metrics endpoint ([`centralized-server/server/utils/metrics.js`](centralized-server/server/utils/metrics.js)), Winston structured logging, and health check endpoints on every service.
+Multi-tenant organization registration with admin-controlled employee onboarding, CRUD, bulk Excel import, team formation, and shift scheduling. Biometric face enrollment through the admin and employee web portals using browser webcam capture posted directly to the biometric service, and GPS plus WiFi location-validated face check-in through the React Native mobile app using InsightFace AntelopeV2 with FAISS-backed cosine similarity matching. Liveness detection Phase 1 via multi-frame Farneback dense optical-flow analysis (`POST /api/v1/liveness/check` in [`face-api-microservice/app.py`](face-api-microservice/app.py)) to reject static photo and screen-replay spoofing attacks. Offline attendance sync via expo-sqlite local queue in the mobile app flushed to the core API on network reconnect via `@react-native-community/netinfo` listener in [`mobile-app/index.js`](mobile-app/index.js). AI workforce productivity insights via `GET /api/v1/analytics/productivity` surfacing per-org confidence trends, P95 inference latency, and match-rate efficiency. Leave management including application submission, multi-level approval, balance tracking, and holiday calendar. JWT authentication with 15-minute access tokens and refresh token rotation, plus JWT token revocation via Redis-backed blacklist with SHA-256 hashed token keys and TTL auto-expiry applied on logout, password change, and role change so revoked tokens are rejected with code `TOKEN_REVOKED` ([`centralized-server/server/utils/token.helper.js`](centralized-server/server/utils/token.helper.js), [`centralized-server/server/middleware/jwtBearer.js`](centralized-server/server/middleware/jwtBearer.js)). TOTP two-factor authentication via speakeasy ([`centralized-server/server/services/2fa/index.js`](centralized-server/server/services/2fa/index.js)), and Google and Microsoft OAuth2 SSO. Role-based access control enforced by middleware for admin, manager, teamLead, and employee roles ([`centralized-server/server/middleware/requireRole.js`](centralized-server/server/middleware/requireRole.js), [`centralized-server/server/middleware/authorizeManager.js`](centralized-server/server/middleware/authorizeManager.js)). Real-time attendance board and payment status push via Socket.io with Redis adapter ([`centralized-server/server/app/socket.io.js`](centralized-server/server/app/socket.io.js)). Subscription billing with tiered plans, PhonePe UPI payment initiation, HMAC-SHA256 webhook signature verification with timing-safe comparison, Redis-backed idempotency to deduplicate retried deliveries, payment state machine with absorbing terminal states, atomic MongoDB subscription creation, subscription history, cancellation, and automated renewal reminders at seven, three, and one day before expiry ([`centralized-server/server/services/subscription/renewal.cron.js`](centralized-server/server/services/subscription/renewal.cron.js)). WhatsApp AI chatbot with BullMQ message queue, keyword rule engine with LLM fallback, and internal API integration for attendance, leave, salary, and shift queries. Email OTP for registration and password reset through a Redis-backed mailer microservice. Profile images and documents stored in OCI Object Storage with pre-signed URL access. Admin and employee web dashboards built on React 18 with Vite 5, and a React Native mobile app targeting iOS and Android. Docker Compose multi-service orchestration, Kubernetes manifests in [`k8s/`](k8s/) for OCI OKE deployment readiness, Prometheus metrics endpoint ([`centralized-server/server/utils/metrics.js`](centralized-server/server/utils/metrics.js)), Winston structured logging, and health check endpoints on every service.
 
 ---
 
@@ -228,7 +154,7 @@ Automated payroll computation, TDS/PF/ESI tax calculations, or direct salary dis
 
 ## Future Enhancements
 
-Full payroll processing with CTC breakdown, TDS and PF/ESI computation, and payslip generation is the highest-priority enhancement. The MongoDB Atlas cluster already stores all employee salary, shift, and attendance data with 27 schemas and supports multi-document ACID transactions — scaling to complete payroll computation requires only adding the calculation logic and a financial ledger schema, with no data migration cost for the existing dataset. As the organization grows, MongoDB Atlas supports horizontal scaling via sharding on `organizationId` without any application-layer changes. Liveness and anti-spoofing PAD model integration into the biometric pipeline to prevent photo-based spoofing. Kubernetes migration to OCI OKE for horizontal pod auto-scaling and cross-VM self-healing — Docker Compose topology is already container-ready and migration requires only authoring K8s manifests (foundation in [`k8s/api/deployment.yaml`](k8s/api/deployment.yaml) and [`k8s/whatsapp/deployment.yaml`](k8s/whatsapp/deployment.yaml)). JWT revocation via a Redis-backed token blacklist for immediate session invalidation. Long-term WhatsApp chatbot memory using a vector database such as pgvector for contextual multi-turn conversations. LLM function calling to replace the hand-written rule engine for more robust and extensible intent routing. CDN integration in front of the OCI Object Storage proxy for globally distributed teams. International payment support via Stripe for expansion beyond India. PKCE for mobile OAuth flows before production launch.
+Full payroll processing with CTC breakdown, TDS and PF/ESI computation, and payslip generation is the highest-priority enhancement. The MongoDB Atlas cluster already stores all employee salary, shift, and attendance data with 27 schemas and supports multi-document ACID transactions — scaling to complete payroll computation requires only adding the calculation logic and a financial ledger schema, with no data migration cost for the existing dataset. As the organization grows, MongoDB Atlas supports horizontal scaling via sharding on `organizationId` without any application-layer changes. Liveness and anti-spoofing PAD model integration into the biometric pipeline to prevent photo-based spoofing (supported by current Phase 2 documentation slots). Long-term WhatsApp chatbot memory using a vector database such as pgvector for contextual multi-turn conversations. CDN integration in front of the OCI Object Storage proxy for globally distributed teams. International payment support via Stripe for expansion beyond India. PKCE for mobile OAuth flows before production launch.
 
 ---
 
@@ -268,10 +194,6 @@ workping/
 │   ├── documents/
 │   │   ├── README.md                               # Docs index
 │   │   ├── FUTURE_SCOPE.md                         # Planned enhancements
-│   │   ├── INFRASTRUCTURE.md                       # Infra architecture deep dive
-│   │   ├── SECURITY.md                             # Security posture & best practices
-│   │   └── nginx/
-│   │       └── nginx.conf                          # Nginx configuration (alternative location)
 │   └── .github/
 │       ├── workflows/
 │       │   ├── ci.yml                              # CI/CD pipeline
@@ -287,8 +209,6 @@ workping/
 │   │       └── PS-*.json                           # Individual issue reports (150+ files)
 │
 ├── 🏗️ Infrastructure & Deployment
-│   ├── nginx/
-│   │   └── nginx.conf                              # Reverse proxy, SSL/TLS, routing
 │   ├── docker-compose.yml                          # Multi-service container orchestration
 │   ├── docker-compose.monitoring.yml               # (in centralized-server) Monitoring stack
 │   └── k8s/                                        # Kubernetes manifests (OCI OKE)
@@ -359,7 +279,7 @@ workping/
 │   │   │   ├── styles/                             # CSS/Tailwind styles
 │   │   │   └── assets/                             # Images, icons
 │   │   ├── public/                                 # Static assets
-│   │   ├── dist/                                   # Build output (served by Nginx)
+│   │   ├── dist/                                   # Build output
 │   │   ├── package.json                            # React + Vite + UI libraries
 │   │   ├── vite.config.js                          # Vite bundler config
 │   │   └── index.html                              # HTML template
@@ -377,7 +297,7 @@ workping/
 │   │   │   ├── styles/
 │   │   │   └── assets/
 │   │   ├── public/
-│   │   ├── dist/                                   # Build output (served by Nginx)
+│   │   ├── dist/                                   # Build output
 │   │   ├── package.json
 │   │   ├── vite.config.js
 │   │   └── index.html
@@ -488,7 +408,6 @@ Every in-scope feature maps to a primary implementation file. Reviewers and cont
 
 | Feature | Primary file(s) |
 |---|---|
-| Nginx reverse proxy + SSL/TLS termination | [`nginx/nginx.conf`](nginx/nginx.conf) |
 | Docker Compose orchestration | [`docker-compose.yml`](docker-compose.yml) |
 | Kubernetes (OCI OKE) manifests | [`k8s/api/deployment.yaml`](k8s/api/deployment.yaml), [`k8s/whatsapp/deployment.yaml`](k8s/whatsapp/deployment.yaml) |
 | Express app bootstrap + middleware stack | [`centralized-server/server/app/app.js`](centralized-server/server/app/app.js) |

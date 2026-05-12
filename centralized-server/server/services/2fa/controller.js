@@ -82,7 +82,7 @@ export const createController = (config) => {
           res.status(401).json({ verified: false, error: "2FA verification failed" });
         }
       } catch (error) {
-        console.error("2FA Verify Error:", error);
+        logger.error("2FA Verify Error:", error);
         res.status(500).json({ error: "Internal Server Error" });
       }
     },
@@ -128,7 +128,7 @@ export const createController = (config) => {
           res.status(401).json({ verified: false, error: "Re-authentication failed" });
         }
       } catch (error) {
-        console.error("2FA Re-authenticate Error:", error);
+        logger.error("2FA Re-authenticate Error:", error);
         res.status(500).json({ error: "Internal Server Error" });
       }
     },
@@ -149,7 +149,7 @@ export const createController = (config) => {
 
         res.json({ message: "2FA has been reset successfully" });
       } catch (error) {
-        console.error("2FA Reset Error:", error);
+        logger.error("2FA Reset Error:", error);
         res.status(500).json({ error: "Internal Server Error" });
       }
     },

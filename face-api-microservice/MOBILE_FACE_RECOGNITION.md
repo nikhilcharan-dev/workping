@@ -56,7 +56,7 @@
 ┌─────────────────────────────────────────────────────────┐
 │              FACE API SERVER (GPU VM or CPU VM)          │
 │                                                         │
-│  Nginx ──▶ FastAPI ──▶ AntelopeV2 ──▶ FAISS ──▶ Result  │
+│  Mobile App ──▶ FastAPI ──▶ AntelopeV2 ──▶ FAISS ──▶ Result  │
 │                                                         │
 └─────────────────────────────────────────────────────────┘
 ```

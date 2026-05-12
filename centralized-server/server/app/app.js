@@ -74,10 +74,10 @@
  *  oracle-cloud-object-microservice/app.js (helmet + API-key + rate-limit).
  *
  * ── INFRASTRUCTURE ──────────────────────────────────────────────────────────
- *  Reverse proxy   : nginx/nginx.conf — SSL/TLS termination, /api → this
+ *  Reverse proxy   : edge proxy config — SSL/TLS termination, /api → this
  *                    process, /socket.io → WebSocket upgrade pass-through,
  *                    /admin and /portal → SPA dist/ static serving.
- *  Orchestration   : docker-compose.yml — 6 services (nginx, redis, api,
+ *  Orchestration   : docker-compose.yml — 6 services (gateway, redis, api,
  *                    biometric, mailer, payments, chatbot, storage) each
  *                    with health checks, resource limits, restart policies.
  *  Process model   : node:cluster (server.js) — primary forks workers per

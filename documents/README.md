@@ -6,11 +6,11 @@ This folder contains the long-form documentation for WorkPing. The top-level [RE
 
 | File | What's inside |
 |---|---|
-| [INFRASTRUCTURE.md](INFRASTRUCTURE.md) | Deployment topology — VMs, Docker Compose, NGINX routing, Redis/MongoDB layout, and the OCI resources backing the live environment. |
+| [INFRASTRUCTURE.md](INFRASTRUCTURE.md) | Deployment topology — VMs, Docker Compose, Redis/MongoDB layout, and the OCI resources backing the live environment. |
 | [SECURITY.md](SECURITY.md) | Security model — auth (JWT + 2FA + OAuth), token revocation, Phase 1 liveness detection, rate limiting, secret handling, and the threat model the implementation defends against. |
 | [FUTURE_SCOPE.md](FUTURE_SCOPE.md) | Phase 2 roadmap — work that is intentionally *not* in the current build (centralised logging, distributed tracing, Secrets Manager, PKCE for mobile OAuth, Phase 2 ML anti-spoofing, etc.) with rationale for each deferral. |
 | [openapi.yaml](openapi.yaml) | OpenAPI 3.x specification for the core API. Import into Swagger UI / Postman / Insomnia to explore endpoints. |
-| [nginx/](nginx/) | Reference NGINX configuration used in production (reverse proxy, path/subdomain routing, SSL termination). |
+
 
 ## How the project is scoped
 

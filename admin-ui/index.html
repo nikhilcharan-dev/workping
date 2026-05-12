@@ -4,14 +4,14 @@
   WorkPing Admin Dashboard — Vite SPA shell
   ============================================================================
 
-  Compiled by `vite build` and served by nginx at admin.workping.live.
+  Compiled by `vite build` and served by the reverse proxy at admin.workping.live.
 
   ── BUILD ──────────────────────────────────────────────────────────────────
   • Vite 5 hashes /src/main.jsx into /assets/index-<hash>.js at build time
-  • nginx serves /admin/* from /var/www/workping/admin-ui/dist/
-    (see nginx/nginx.conf — "Admin dashboard SPA" location block)
+  • The reverse proxy serves /admin/* from /var/www/workping/admin-ui/dist/
+    (see the edge proxy config — "Admin dashboard SPA" location block)
   • API calls from this SPA hit api.workping.live (centralized-server/server)
-    via the nginx upstream defined in nginx/nginx.conf
+    via the upstream defined in the edge proxy config
 
   ── ENTRY ──────────────────────────────────────────────────────────────────
   • <div id="root"> is hydrated by src/main.jsx (BrowserRouter + <App />)

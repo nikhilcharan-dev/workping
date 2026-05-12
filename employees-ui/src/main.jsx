@@ -7,7 +7,7 @@
  * dashboard). Mounted by index.html (<script type="module" src="/src/main.jsx">).
  *
  * ── DEPLOYMENT ──────────────────────────────────────────────────────────────
- * Built with `vite build` into ./dist, served by nginx at
+ * Built with `vite build` into ./dist, served by the reverse proxy at
  * employee.workping.live. Every API call proxied to api.workping.live
  * (centralized-server/server/server.js).
  *

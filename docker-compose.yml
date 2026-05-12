@@ -16,7 +16,7 @@
 #   3. OCI credentials (.oci/config + .pem) must be present for workping-storage.
 #
 # NOTE: The React frontends (admin-ui, employees-ui) are SPA builds deployed to
-#       a CDN or served by Nginx. They are not included here — build with
+#       a CDN. They are not included here — build with
 #       `npm run build` and serve the dist/ folder.
 
 version: "3.9"
@@ -30,64 +30,9 @@ networks:
 volumes:
   redis_data:
   biometric_models:
-  nginx_ssl:
 
 # ─── Services ───────────────────────────────────────────────────────────────
 services:
-
-  # ── Nginx (reverse proxy / API gateway) ────────────────────────────────
-  nginx:
-    image: nginx:alpine
-    container_name: workping-nginx
-    restart: unless-stopped
-    # Drop every Linux capability except the ones needed to bind <1024 ports.
-    # CHOWN/SETGID/SETUID are needed for nginx's own user-drop after starting
-    # as root to bind 80/443. no-new-privileges blocks any setuid binary in
-    # the image from elevating mid-flight.
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
-    cap_add:
-      - NET_BIND_SERVICE
-      - CHOWN
-      - SETGID
-      - SETUID
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      # Mount SSL certificates — place workping.crt and workping.key here
-      - nginx_ssl:/etc/nginx/ssl:ro
-      # Mount compiled SPA builds for static serving
-      - ./admin-ui/dist:/var/www/workping/admin-ui/dist:ro
-      - ./employees-ui/dist:/var/www/workping/employees-ui/dist:ro
-    depends_on:
-      workping-api:
-        condition: service_healthy
-      workping-biometric:
-        condition: service_healthy
-      workping-mailer:
-        condition: service_healthy
-      workping-payments:
-        condition: service_healthy
-      workping-chatbot:
-        condition: service_healthy
-      workping-storage:
-        condition: service_healthy
-    networks:
-      - workping
-    healthcheck:
-      test: ["CMD", "nginx", "-t"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-    deploy:
-      resources:
-        limits:
-          memory: 128M
-          cpus: "0.25"
 
   # ── Redis (shared by all backend services) ──────────────────────────────
   # Only reachable on the `workping` Docker network — no host port published.
@@ -131,9 +76,9 @@ services:
           cpus: "0.50"
 
   # ── Core API (workping-api) ──────────────────────────────────────────────
-  # Reachable only via nginx (which terminates TLS and proxies internally).
+  # Reachable only via the proxy (which terminates TLS and proxies internally).
   # Previously port 5000 was published to host 0.0.0.0 which bypassed every
-  # nginx rate-limit / header / TLS guard. The `expose` directive documents
+  # proxy rate-limit / header / TLS guard. The `expose` directive documents
   # the port without binding it to the host.
   workping-api:
     build:

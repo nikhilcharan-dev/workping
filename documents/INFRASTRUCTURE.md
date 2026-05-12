@@ -7,7 +7,7 @@ Internet
    │  HTTPS :443
    ▼
 ┌──────────────────────────────────────────────────────────────────────────┐
-│  Nginx  (Reverse Proxy + API Gateway)                                    │
+│  Reverse Proxy  (API Gateway)                                            │
 │                                                                          │
 │  Routing rules:                                                          │
 │   api.workping.live        → :5000  (Core API)                          │
@@ -52,7 +52,6 @@ Internet
 
 | Service | Process Manager | Port | Notes |
 |---|---|---|---|
-| **Nginx** | systemd | 80 / 443 | Reverse proxy, SSL termination, static file serving, WebSocket upgrade |
 | Redis | systemd | 6379 | Shared by all backend services |
 | Core API | PM2 cluster mode | 5000 | All workers share the Redis pub/sub bus |
 | Biometric | Docker | 8001 | GPU passthrough if NVIDIA drivers available |
@@ -128,7 +127,6 @@ docker compose down && docker compose up -d --build
 
 | Port | Service | Protocol |
 |---|---|---|
-| 80/443 | Nginx reverse proxy | HTTP/HTTPS |
 | 5000 | Core API (workping-api) | HTTP |
 | 5173 | Admin UI (dev only) | HTTP |
 | 5174 | Employee UI (dev only) | HTTP |

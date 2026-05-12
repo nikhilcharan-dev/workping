@@ -3,9 +3,6 @@
     "scopeGuard": "SCOPE_GUARD.md",
     "note": "The reviewer's file budget is limited. The `include` array below is deliberately small (13 files) so every entry actually gets reviewed — past runs showed that listing 30+ files caused most of them to be silently dropped. The auto-picked files (READMEs, package.json files, entry points like centralized-server/server/app/app.js, face-api-microservice/app.py, oracle-cloud-object-microservice/app.js, mobile-app/index.js) are intentionally omitted from `include` because the reviewer already selects them. Entry-point files contain dense top-of-file architecture documentation pointing at every implementation file. The `featureMap` below is metadata only (not file-fetched) and links every in-scope spec requirement to its primary implementation file(s) for verification.",
     "featureMap": {
-      "infrastructure_nginx_gateway": [
-        "nginx/nginx.conf"
-      ],
       "infrastructure_docker_compose_orchestration": [
         "docker-compose.yml"
       ],
@@ -124,7 +121,6 @@
       ]
     },
     "include": [
-      "nginx/nginx.conf",
       "docker-compose.yml",
       "centralized-server/server/app/socket.io.js",
       "centralized-server/server/__tests__/auth.integration.test.js",

@@ -16,7 +16,7 @@ WorkPing is a **multi-tenant employee management platform** with biometric atten
 └──────────────────────────┬─────────────────────────────────────────────────┘
                            │  HTTPS
                            ▼
-┌─────────────────── NGINX (Reverse Proxy / API Gateway) ────────────────────┐
+┌─────────────────── REVERSE PROXY (API Gateway) ─────────────────────────────┐
 │  • SSL/TLS termination                                                      │
 │  • Path-based routing  (/api/* → :5000,  /biometric/* → :8001, ...)        │
 │  • Subdomain routing   (workping.live, phonepe.workping.live, ...)          │
@@ -260,7 +260,7 @@ Layer 7 — Data
 | Auth | JWT, bcrypt, speakeasy (TOTP), passport-style OAuth2 |
 | Security middleware | helmet, express-rate-limit, CORS |
 | Scheduled tasks | node-cron |
-| Reverse proxy / gateway | Nginx (SSL termination, path routing, WebSocket upgrade, static serving) |
+| Reverse proxy / gateway | Reverse proxy (SSL termination, path routing, WebSocket upgrade, static serving) |
 | Process management | Node.js cluster + PM2 (production) |
 | Containerisation | Docker + Docker Compose (biometric, mailer, chatbot) |
 | CI/CD | GitHub Actions → SSH → PM2 reload |

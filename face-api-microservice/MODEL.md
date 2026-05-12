@@ -142,4 +142,4 @@ InsightFace AntelopeV2 gives enterprise-grade accuracy with a self-hosted ONNX b
 
 ## Security Note
 
-The face-api service is proxied through Nginx at `face.workping.live`. All inbound requests must include an `Authorization: Bearer <FACE_API_KEY>` header; the service validates this on every route. Raw port `8001` is not exposed to the public internet — the VM firewall allows only Nginx-proxied traffic. If the network perimeter changes (e.g. moving to a multi-VM mesh where the service is callable from additional hosts), tighten the allowlist in the Nginx upstream block and verify the API key check in `app.py`.
+The face-api service is accessible at `face.workping.live`. All inbound requests must include an `Authorization: Bearer <FACE_API_KEY>` header; the service validates this on every route. Raw port `8001` is not exposed to the public internet. If the network perimeter changes (e.g. moving to a multi-VM mesh where the service is callable from additional hosts), verify the API key check in `app.py`.

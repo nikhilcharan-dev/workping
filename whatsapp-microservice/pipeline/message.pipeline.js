@@ -12,16 +12,25 @@ import { checkGuards } from "../utils/rate.limiter.js";
 import { Queue } from "bullmq";
 import { logger } from "../utils/logger.js";
 
-let failedMessagesQueue = null;
+const failedMessagesQueue = new Queue("failed-messages", {
+  connection: {
+    url: process.env.REDIS_URL || "redis://localhost:6379"
+  },
+  defaultJobOptions: {
+    attempts: 5,
+    backoff: {
+      type: "exponential",
+      delay: 2000,
+    },
+    removeOnComplete: true,
+  }
+});
+
+failedMessagesQueue.on("error", (error) => {
+  logger.error("[BULLMQ] Failed messages queue connection error:", error.message);
+});
 
 function getFailedMessagesQueue() {
-  if (!failedMessagesQueue) {
-    failedMessagesQueue = new Queue("failed-messages", {
-      connection: {
-        url: process.env.REDIS_URL || "redis://localhost:6379"
-      }
-    });
-  }
   return failedMessagesQueue;
 }
 

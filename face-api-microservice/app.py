@@ -215,8 +215,29 @@ class StatsTracker:
         self.total_matches = 0
         self.total_latency = 0.0
         self.history = deque(maxlen=HISTORY_LIMIT)
+        self._initialized = False
 
-    def add_entry(self, label, accuracy, time_ms, success):
+    async def _init_if_needed(self):
+        if self._initialized:
+            return
+        try:
+            redis = _get_redis()
+            data = await redis.get("face_stats:totals")
+            if data:
+                d = json.loads(data)
+                self.total_processed = d.get("processed", 0)
+                self.total_matches = d.get("matches", 0)
+                self.total_latency = d.get("latency", 0.0)
+            
+            hist = await redis.get("face_stats:history")
+            if hist:
+                self.history = deque(json.loads(hist), maxlen=HISTORY_LIMIT)
+            self._initialized = True
+        except Exception as e:
+            log.warning("StatsTracker failed to load from Redis", extra={"err": str(e)})
+
+    async def add_entry(self, label, accuracy, time_ms, success):
+        await self._init_if_needed()
         self.total_processed += 1
         if success:
             self.total_matches += 1
@@ -229,9 +250,22 @@ class StatsTracker:
             "status": "MATCH" if success else "UNKNOWN",
         }
         self.history.appendleft(entry)
+        
+        try:
+            redis = _get_redis()
+            await redis.set("face_stats:totals", json.dumps({
+                "processed": self.total_processed,
+                "matches": self.total_matches,
+                "latency": self.total_latency
+            }))
+            await redis.set("face_stats:history", json.dumps(list(self.history)))
+        except Exception as e:
+            log.warning("StatsTracker failed to save to Redis", extra={"err": str(e)})
+            
         return entry
 
-    def get_analytics(self):
+    async def get_analytics(self):
+        await self._init_if_needed()
         avg = self.total_latency / self.total_processed if self.total_processed else 0
         rate = (self.total_matches / self.total_processed * 100) if self.total_processed else 0
         return {
@@ -420,8 +454,8 @@ async def inference_worker():
 
                 total_time = (time.time() - start_total) * 1000
 
-                entry = stats.add_entry(matched_id, score, total_time, success)
-                await manager.broadcast({"type": "NEW_ENTRY", "data": entry, "analytics": stats.get_analytics()})
+                entry = await stats.add_entry(matched_id, score, total_time, success)
+                await manager.broadcast({"type": "NEW_ENTRY", "data": entry, "analytics": await stats.get_analytics()})
 
                 result = {
                     "success": success,
@@ -491,6 +525,7 @@ async def startup_event():
                 else:
                     try:
                         faiss_index.rebuild(org_id, orgs[org_id])
+                        faiss_index.save(org_id)
                         loaded_orgs += 1
                     except Exception as org_err:
                         log.error("FAISS rebuild failed", extra={"org_id": org_id, "err": str(org_err)})
@@ -627,12 +662,13 @@ async def home():
 async def health():
     if not FAISS_READY:
         raise HTTPException(status_code=503, detail="FAISS indexes not ready. MongoDB connection failed or startup incomplete.")
+    analytics = await stats.get_analytics()
     return {
         "status": "ok",
         "gpu_available": is_gpu_available(),
         "inference_provider": _active_provider,
         "uptime_seconds": int(time.time() - START_TIME),
-        "avg_latency_ms": stats.get_analytics()["avg_latency"],
+        "avg_latency_ms": analytics["avg_latency"],
     }
 
 
@@ -931,7 +967,7 @@ async def get_productivity_insights(organization_id: str, days: int = 30):
     for the admin analytics dashboard.
     """
     hist = list(stats.history)
-    analytics = stats.get_analytics()
+    analytics = await stats.get_analytics()
     scores = [e["accuracy"] for e in hist if "accuracy" in e and e["accuracy"] > 0]
     latencies = [e["time_ms"] for e in hist if "time_ms" in e]
 
@@ -1021,7 +1057,13 @@ async def ws_endpoint(websocket: WebSocket):
     # gated by the same INTERNAL_SECRET as the HTTP routes. The header pattern
     # is awkward in browser WebSocket APIs, so we accept it as a query param
     # (?secret=...) too. Compared timing-safely.
-    secret = websocket.query_params.get("secret") or websocket.headers.get("x-internal-secret")
+    secret_query = websocket.query_params.get("secret")
+    secret_header = websocket.headers.get("x-internal-secret")
+    
+    if secret_query and not secret_header:
+        log.warning("WebSocket auth using query param 'secret' is deprecated. Use 'x-internal-secret' header instead.")
+    
+    secret = secret_header or secret_query
     expected = os.environ.get("INTERNAL_SECRET")
     if not expected or not secret or not hmac.compare_digest(secret, expected):
         await websocket.close(code=4401)
@@ -1032,7 +1074,7 @@ async def ws_endpoint(websocket: WebSocket):
         await websocket.send_json({
             "type": "INITIAL_STATE",
             "history": list(stats.history),
-            "analytics": stats.get_analytics(),
+            "analytics": await stats.get_analytics(),
         })
         while True:
             await websocket.receive_text()

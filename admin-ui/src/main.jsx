@@ -8,9 +8,9 @@
  * off to <App />, which composes every provider in the app.
  *
  * ── DEPLOYMENT ──────────────────────────────────────────────────────────────
- * Built with `vite build` into ./dist, then served by nginx at
- * admin.workping.live (nginx/nginx.conf — see "Admin dashboard SPA" block).
- * Nginx serves the static dist/ files; every API call is proxied to
+ * Built with `vite build` into ./dist, then served by the reverse proxy at
+ * admin.workping.live (edge proxy config — see "Admin dashboard SPA" block).
+ * The reverse proxy serves the static dist/ files; every API call is proxied to
  * api.workping.live (which is centralized-server/server/server.js).
  *
  * ── ADMIN DASHBOARD CAPABILITIES ────────────────────────────────────────────

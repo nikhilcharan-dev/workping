@@ -23,8 +23,8 @@
  *     7d / 3d / 1d expiry alerts via email + WhatsApp.
  *  7. startShiftReminderCron() — fires at 06:30 IST. Notifies employees
  *     whose shift starts within 90 minutes (multi-tenant per-org).
- *  8. server.listen(PORT, "0.0.0.0") — binds for Nginx upstream
- *     (nginx/nginx.conf forwards api.workping.live → upstream workping_api).
+ *  8. server.listen(PORT, "0.0.0.0") — binds for the edge proxy upstream
+ *     (the proxy forwards api.workping.live → upstream workping_api).
  *
  * ── WHY CLUSTER + REDIS ADAPTER ─────────────────────────────────────────────
  * Each cluster worker is its own Node process with its own memory + sockets.
@@ -45,7 +45,7 @@
  *  • phonepe-gateway-microservice/service.js  — UPI payments + webhook
  *  • whatsapp-microservice/server.js  — Meta Cloud API + LLM chatbot
  *  • oracle-cloud-object-microservice/app.js  — OCI Object Storage proxy
- * Each runs on its own Ubuntu VM behind nginx (see ../README.md → Infrastructure).
+ * Each runs on its own Ubuntu VM behind the reverse proxy (see ../README.md → Infrastructure).
  *
  * ── KUBERNETES MIGRATION FOUNDATION ────────────────────────────────────────
  * k8s/api/deployment.yaml — Deployment (replicas: 3) + HorizontalPodAutoscaler
