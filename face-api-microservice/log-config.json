@@ -3,7 +3,7 @@
   "disable_existing_loggers": false,
   "formatters": {
     "json": {
-      "()": "logger._JsonFormatter"
+      "()": "logger.JsonFormatter"
     }
   },
   "handlers": {

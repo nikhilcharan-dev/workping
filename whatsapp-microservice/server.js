@@ -82,6 +82,7 @@ import { healthCheck } from "./utils/llm.provider.js";
 import { startReminderWorker } from "./scheduler/shift.reminder.js";
 import logger from "./utils/logger.js";
 import requestId from "./middleware/requestId.js";
+import mongoose, { connectDB } from "./utils/mongodb.client.js";
 
 // Dashboard auth — password is stored as a bcrypt hash in the env var.
 // To generate: node -e "const b=require('bcryptjs');console.log(b.hashSync('yourpass',12))"
@@ -167,9 +168,13 @@ server.get("/keepmealive", (req, res) => {
 
 server.get("/health", async (req, res) => {
   const llm = await healthCheck();
-  return res.status(llm.ok ? 200 : 503).send({
-    status: llm.ok ? "OK" : "DEGRADED",
+  const mongoStatus = mongoose.connection.readyState === 1 ? "OK" : "DISCONNECTED";
+  const ok = llm.ok && mongoStatus === "OK";
+  
+  return res.status(ok ? 200 : 503).send({
+    status: ok ? "OK" : "DEGRADED",
     llm,
+    mongo: mongoStatus,
   });
 });
 
@@ -181,6 +186,7 @@ server.use("/api/secure/whatsapp", whatsAppRoutes);
 
 if (process.env.NODE_ENV !== "test") {
   (async () => {
+    await connectDB();
     const llm = await healthCheck();
     console.log("LLM status:", llm);
 

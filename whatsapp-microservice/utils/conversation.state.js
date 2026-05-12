@@ -1,4 +1,5 @@
 import redis from "./redis.client.js";
+import Session from "../models/session.model.js";
 import { logger } from "./logger.js";
 
 const SESSION_TTL = 48 * 60 * 60; // 48 hours (seconds) - allows multi-step flows over multiple days
@@ -9,22 +10,69 @@ function key(phone) {
   return `wa:session:${phone}`;
 }
 
+/**
+ * Retrieves the session for a given phone number.
+ * Strategy: Redis (Primary) -> MongoDB (Fallback)
+ */
 async function getSession(phone) {
+  // 1. Try Redis
   try {
     const raw = await redis.get(key(phone));
-    return raw ? JSON.parse(raw) : null;
+    if (raw) return JSON.parse(raw);
   } catch (error) {
-    logger.error("[ConversationState] Failed to retrieve session, treating as new:", error.message);
-    return null;
+    logger.error(`[ConversationState] Redis read failed for ${phone}:`, error.message);
   }
+
+  // 2. Fallback to MongoDB
+  try {
+    const doc = await Session.findOne({ phone }).lean();
+    if (doc) {
+      logger.info(`[ConversationState] Recovered session from MongoDB for ${phone}`);
+      // Asynchronously attempt to re-populate Redis
+      redis.set(key(phone), JSON.stringify(doc), "EX", SESSION_TTL).catch((e) => {
+        logger.warn(`[ConversationState] Failed to re-populate Redis for ${phone}:`, e.message);
+      });
+      return doc;
+    }
+  } catch (error) {
+    logger.error(`[ConversationState] MongoDB read failed for ${phone}:`, error.message);
+  }
+
+  return null;
 }
 
+/**
+ * Saves the session for a given phone number.
+ * Strategy: Dual-write to Redis and MongoDB.
+ */
 async function saveSession(phone, session) {
+  session.lastActivity = Date.now();
+
+  // 1. Save to Redis (fast path)
   try {
-    session.lastActivity = Date.now();
     await redis.set(key(phone), JSON.stringify(session), "EX", SESSION_TTL);
   } catch (error) {
-    logger.error("[ConversationState] Failed to save session (context will be lost on reload):", error.message);
+    logger.error(`[ConversationState] Redis save failed for ${phone}:`, error.message);
+  }
+
+  // 2. Save to MongoDB (persistent backup)
+  try {
+    await Session.findOneAndUpdate(
+      { phone },
+      {
+        $set: {
+          flow: session.flow,
+          step: session.step,
+          pendingData: session.pendingData,
+          history: session.history,
+          lastActivity: session.lastActivity,
+          lastActivityAt: new Date(),
+        },
+      },
+      { upsert: true }
+    );
+  } catch (error) {
+    logger.error(`[ConversationState] MongoDB save failed for ${phone}:`, error.message);
   }
 }
 

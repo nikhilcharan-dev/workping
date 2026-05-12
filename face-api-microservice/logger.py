@@ -23,7 +23,9 @@ import sys
 from datetime import datetime, timezone
 
 
-class _JsonFormatter(logging.Formatter):
+# Public alias used by log-config.json's dictConfig `()` factory reference.
+# dictConfig resolves "logger.JsonFormatter" → this module's JsonFormatter class.
+class JsonFormatter(logging.Formatter):
     """Format every record as a single-line JSON object."""
 
     # Standard LogRecord attributes we never want to leak into the output
@@ -71,11 +73,11 @@ def _configure_root_logger() -> logging.Logger:
     root.handlers.clear()
 
     stdout_handler = logging.StreamHandler(sys.stdout)
-    stdout_handler.setFormatter(_JsonFormatter())
+    stdout_handler.setFormatter(JsonFormatter())
     stdout_handler.addFilter(lambda record: record.levelno < logging.WARNING)
 
     stderr_handler = logging.StreamHandler(sys.stderr)
-    stderr_handler.setFormatter(_JsonFormatter())
+    stderr_handler.setFormatter(JsonFormatter())
     stderr_handler.setLevel(logging.WARNING)
 
     root.addHandler(stdout_handler)
