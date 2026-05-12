@@ -22,7 +22,7 @@
     "@syncfusion/ej2-base": "^32.1.24",
     "@syncfusion/ej2-react-dropdowns": "^32.1.25",
     "@syncfusion/ej2-react-grids": "^32.1.25",
-    "@syncfusion/ej2-react-inputs": "^32.1.24",
+    "@syncfusion/ej2-react-inputs": "^33.2.5",
     "@tanstack/react-table": "^8.17.3",
     "apexcharts": "3.41.0",
     "axios": "^1.13.5",
