@@ -32,8 +32,8 @@ NOTE: FAISS IndexFlatIP is used for org-level bulk search (/faiss/* routes).
       Single-user verification uses direct cosine similarity (faster for 1:1 match).
 """
 
-import hmac
 import json
+import secrets
 import numpy as np
 import base64
 import time
@@ -1051,21 +1051,27 @@ async def get_search_history(search_type: Optional[str] = None, limit: int = 100
 
 # ---------------- WEBSOCKET ----------------
 
+@app.get("/api/v1/ws-ticket", dependencies=[Depends(require_internal_secret)])
+async def get_ws_ticket():
+    """Issue a one-time WebSocket auth ticket (30s TTL) so INTERNAL_SECRET never appears in WS URLs or server logs."""
+    ticket = secrets.token_urlsafe(32)
+    redis = _get_redis()
+    await redis.setex(f"ws_ticket:{ticket}", 30, "1")
+    return {"ticket": ticket}
+
+
 @app.websocket("/ws/stats")
 async def ws_endpoint(websocket: WebSocket):
-    # WebSocket auth: the stats stream leaks employee IDs and scores, so it is
-    # gated by the same INTERNAL_SECRET as the HTTP routes. The header pattern
-    # is awkward in browser WebSocket APIs, so we accept it as a query param
-    # (?secret=...) too. Compared timing-safely.
-    secret_query = websocket.query_params.get("secret")
-    secret_header = websocket.headers.get("x-internal-secret")
-    
-    if secret_query and not secret_header:
-        log.warning("WebSocket auth using query param 'secret' is deprecated. Use 'x-internal-secret' header instead.")
-    
-    secret = secret_header or secret_query
-    expected = os.environ.get("INTERNAL_SECRET")
-    if not expected or not secret or not hmac.compare_digest(secret, expected):
+    ticket = websocket.query_params.get("ticket")
+    if not ticket:
+        await websocket.close(code=4401)
+        return
+    redis = _get_redis()
+    try:
+        deleted = await redis.delete(f"ws_ticket:{ticket}")
+    except Exception:
+        deleted = 0
+    if not deleted:
         await websocket.close(code=4401)
         return
 
@@ -1168,10 +1174,18 @@ async def get_dashboard():
             tr.appendChild(td);
             return tr;
         }
-        function connect() {
+        async function connect() {
             const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
             const secret = new URLSearchParams(location.search).get('secret');
-            const qs = secret ? '?secret=' + encodeURIComponent(secret) : '';
+            let qs = '';
+            if (secret) {
+                try {
+                    const resp = await fetch('/api/v1/ws-ticket', { headers: { 'x-internal-secret': secret } });
+                    if (!resp.ok) { conn.textContent = 'Auth Failed'; conn.style.color = '#f44'; return; }
+                    const { ticket } = await resp.json();
+                    qs = '?ticket=' + encodeURIComponent(ticket);
+                } catch (e) { conn.textContent = 'Auth Failed'; conn.style.color = '#f44'; return; }
+            }
             const ws = new WebSocket(proto + '//' + location.host + '/ws/stats' + qs);
             ws.onopen = () => { conn.textContent = 'Connected / Live'; conn.style.color = '#fff'; };
             ws.onmessage = (ev) => {
