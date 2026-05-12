@@ -51,7 +51,7 @@
     "multer": "^2.0.2",
     "oci-common": "^2.125.2",
     "oci-objectstorage": "^2.125.2",
-    "oci-sdk": "^2.125.2",
+    "oci-sdk": "^2.131.1",
     "pino": "^10.3.1",
     "pino-pretty": "^13.1.3"
   }
