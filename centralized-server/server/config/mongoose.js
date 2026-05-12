@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { logger } from "#utils/logger.js";
 
 const backoff = (retries, base = 1000, cap = 30000) => Math.min(cap, base * Math.pow(2, retries));
 
@@ -10,11 +11,11 @@ const connect = async () => {
       maxPoolSize: 50,
       minPoolSize: 10,
     });
-    console.log("[MongoDB] Connected");
+    logger.info("[MongoDB] Connected");
     retries = 0;
   } catch (err) {
     const delay = backoff(retries++);
-    console.error(`[MongoDB] Connection failed, retrying in ${delay}ms`);
+    logger.error("[MongoDB] Connection failed, retrying", { delayMs: delay });
     setTimeout(connect, delay);
   }
 };
@@ -23,7 +24,7 @@ mongoose.set("autoCreate", false);
 
 mongoose.connection.on("disconnected", () => {
   const delay = backoff(retries++);
-  console.warn(`[MongoDB] Disconnected, retrying in ${delay}ms`);
+  logger.warn("[MongoDB] Disconnected, retrying", { delayMs: delay });
   setTimeout(connect, delay);
 });
 

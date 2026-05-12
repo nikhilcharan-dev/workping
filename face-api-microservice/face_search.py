@@ -7,6 +7,7 @@ with integrated metrics collection for confidence scores and latency tracking.
 
 import numpy as np
 import time
+from collections import deque
 from dataclasses import dataclass
 from typing import Optional, List
 from datetime import datetime
@@ -42,13 +43,10 @@ class SearchMetricsTracker:
     """Track search metrics for observability and model drift detection."""
 
     def __init__(self):
-        self.metrics: List[SearchMetrics] = []
-        self.window_size = 1000  # Keep last 1000 searches
+        self.metrics: deque = deque(maxlen=1000)
 
     def record(self, metrics: SearchMetrics):
         self.metrics.append(metrics)
-        if len(self.metrics) > self.window_size:
-            self.metrics.pop(0)
 
     def get_confidence_trend(self, search_type: str) -> dict:
         """Analyze confidence score trend for drift detection."""

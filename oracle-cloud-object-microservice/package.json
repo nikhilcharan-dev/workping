@@ -1,7 +1,7 @@
 {
   "name": "oracle-cloud-express-for-object-storage",
   "version": "1.0.0",
-  "description": "WorkPing Storage — REST proxy for Oracle Cloud Infrastructure Object Storage. Pre-signed URL issuance for direct browser uploads (15-min TTL), helmet + CORS allowlist + per-IP rate-limit (100/15min) + constant-time X-API-KEY auth, multipart upload fallback, Prometheus + CSV metrics export with disk-persisted snapshots survivable across restarts, graceful shutdown flushes metrics, Winston structured logging, OCI SDK reads credentials from mounted ~/.oci config.",
+  "description": "WorkPing Storage — REST proxy for Oracle Cloud Infrastructure Object Storage. Pre-signed URL issuance for direct browser uploads (15-min TTL), helmet + CORS allowlist + per-IP rate-limit (100/15min) + constant-time X-API-KEY auth, multipart upload fallback, Prometheus + CSV metrics export with disk-persisted snapshots survivable across restarts, graceful shutdown flushes metrics, Pino structured logging with pino-pretty formatting, OCI SDK reads credentials from mounted ~/.oci config.",
   "main": "app.js",
   "scripts": {
     "start": "node app.js",

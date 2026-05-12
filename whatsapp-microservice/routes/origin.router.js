@@ -34,7 +34,7 @@ function authGuard(req, res, next) {
  * Designed to be called by external services (e.g. your main backend).
  *
  * Headers (required):
- *   Authorization: earthisflat
+ *   Authorization: <WHATSAPP_VERIFY_TOKEN>
  *
  * Request body:
  *   {
@@ -53,7 +53,7 @@ function authGuard(req, res, next) {
  * Example (curl):
  *   curl -X POST https://your-host/api/secure/whatsapp/send \
  *     -H "Content-Type: application/json" \
- *     -H "Authorization: earthisflat" \
+ *     -H "Authorization: <WHATSAPP_VERIFY_TOKEN>" \
  *     -d '{"to": "919876543210", "text": "Your leave has been approved."}'
  *
  * Example (axios from another service):

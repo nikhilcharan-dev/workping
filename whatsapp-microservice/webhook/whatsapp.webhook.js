@@ -2,6 +2,7 @@ import { Router } from "express";
 import crypto from "crypto";
 import messagePipeline from "../pipeline/message.pipeline.js";
 import { normalizeWhatsAppPayload } from "./whatsapp.normalizer.js";
+import { logger } from "../utils/logger.js";
 
 const WHATSAPP_APP_SECRET = process.env.WHATSAPP_APP_SECRET;
 
@@ -23,7 +24,7 @@ const router = Router();
 
 function handleStatusUpdate(status) {
   const { id, status: state } = status;
-  console.log(`Message ${id} → ${state}`);
+  logger.info("WhatsApp message status update", { messageId: id, state });
 }
 
 const processedMessageIds = new Set();
@@ -42,7 +43,7 @@ function isDuplicate(messageId) {
 
 router.post("/webhook", async (req, res) => {
   if (!verifyMetaSignature(req)) {
-    console.warn("[Webhook] X-Hub-Signature-256 verification failed");
+    logger.warn("[Webhook] X-Hub-Signature-256 verification failed");
     return res.sendStatus(401);
   }
 
@@ -80,7 +81,7 @@ router.post("/webhook", async (req, res) => {
 
     return res.sendStatus(200);
   } catch (err) {
-    console.error("[WEBHOOK] Error:", err.message);
+    logger.error("[WEBHOOK] Error:", { error: err.message });
     return res.sendStatus(500);
   }
 });

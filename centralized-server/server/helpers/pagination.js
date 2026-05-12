@@ -1,3 +1,5 @@
+import { logger } from "#utils/logger.js";
+
 const pagination = async (MODEL, page = 1, limit, filter = []) => {
   try {
     const count = await MODEL.aggregate([
@@ -28,13 +30,8 @@ const pagination = async (MODEL, page = 1, limit, filter = []) => {
       totalPages,
     };
   } catch (err) {
-    console.log("error in pagination ");
-    console.log(err);
-    return {
-      documents: [],
-      totalRecords: 0,
-      totalPages: 0,
-    };
+    logger.error("Pagination query failed", { error: err.message });
+    throw err;
   }
 };
 export default pagination;

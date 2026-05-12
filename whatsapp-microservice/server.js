@@ -188,11 +188,11 @@ if (process.env.NODE_ENV !== "test") {
   (async () => {
     await connectDB();
     const llm = await healthCheck();
-    console.log("LLM status:", llm);
+    logger.info("LLM status", { llm });
 
     server.listen(PORT, () => {
-      console.log(`Listening on ${PORT}`);
-      console.log(`Dashboard: http://localhost:${PORT}/dashboard`);
+      logger.info("Server listening", { port: PORT });
+      logger.info("Dashboard available", { url: `http://localhost:${PORT}/dashboard` });
       startReminderWorker();
     });
   })();

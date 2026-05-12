@@ -147,8 +147,15 @@ class FAISSIndex:
         with self._lock_for(org_id):
             return self._indexes[org_id].ntotal if org_id in self._indexes else 0
 
+    @staticmethod
+    def _validate_org_id(org_id: str):
+        import re
+        if not re.fullmatch(r"[a-zA-Z0-9_-]+", org_id):
+            raise ValueError(f"Invalid org_id: must contain only alphanumerics, hyphens, and underscores")
+
     def save(self, org_id: str):
         """Persist index and id_map to disk."""
+        self._validate_org_id(org_id)
         with self._lock_for(org_id):
             if org_id not in self._indexes:
                 return
@@ -163,6 +170,7 @@ class FAISSIndex:
 
     def load(self, org_id: str) -> bool:
         """Load index and id_map from disk. Returns True if successful."""
+        self._validate_org_id(org_id)
         with self._lock_for(org_id):
             try:
                 index_path = self._persist_dir / f"{org_id}.index"
@@ -281,17 +289,28 @@ stats = StatsTracker()
 class ConnectionManager:
     def __init__(self):
         self.active: List[WebSocket] = []
+        self._lock = asyncio.Lock()
 
     async def connect(self, ws: WebSocket):
         await ws.accept()
-        self.active.append(ws)
+        async with self._lock:
+            self.active.append(ws)
 
-    def disconnect(self, ws: WebSocket):
-        self.active.remove(ws)
+    async def disconnect(self, ws: WebSocket):
+        async with self._lock:
+            try:
+                self.active.remove(ws)
+            except ValueError:
+                pass
 
     async def broadcast(self, msg: dict):
-        for ws in self.active:
-            await ws.send_json(msg)
+        async with self._lock:
+            connections = list(self.active)
+        for ws in connections:
+            try:
+                await ws.send_json(msg)
+            except Exception as e:
+                log.warning("WebSocket broadcast send failed", extra={"err": str(e)})
 
 manager = ConnectionManager()
 
@@ -360,8 +379,8 @@ app.add_middleware(
         "https://phonepe.workping.live"
     ],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "X-Internal-Secret"],
 )
 
 log.info("preloading InsightFace antelopev2 model")
@@ -797,9 +816,13 @@ async def delete_embedding(employee_id: str):
 @app.get("/api/v1/embeddings", dependencies=[Depends(require_internal_secret)])
 async def list_embeddings(organization_id: Optional[str] = None, skip: int = 0, limit: int = 50):
     """List enrolled employee IDs, optionally filtered by org."""
+    if skip < 0 or skip > 1_000_000:
+        raise HTTPException(status_code=400, detail="skip must be between 0 and 1,000,000")
+    if limit < 1 or limit > 1000:
+        raise HTTPException(status_code=400, detail="limit must be between 1 and 1000")
     col = get_embeddings_collection()
     query = {"organization_id": organization_id} if organization_id else {}
-    
+
     total = await col.count_documents(query)
     docs = await col.find(query, {"_id": 0, "employee_id": 1, "organization_id": 1}).skip(skip).limit(limit).to_list(length=limit)
     
@@ -953,7 +976,13 @@ async def check_liveness(req: LivenessRequest):
         raise HTTPException(status_code=400, detail="Provide between 2 and 10 sequential frames")
     frames_bytes = [validate_image_b64(f) for f in req.frames]
     loop = asyncio.get_running_loop()
-    result = await loop.run_in_executor(executor, _analyze_liveness_frames, frames_bytes)
+    try:
+        result = await asyncio.wait_for(
+            loop.run_in_executor(executor, _analyze_liveness_frames, frames_bytes),
+            timeout=10.0,
+        )
+    except asyncio.TimeoutError:
+        raise HTTPException(status_code=504, detail="Liveness analysis timed out")
     return result
 
 
@@ -1069,8 +1098,10 @@ async def ws_endpoint(websocket: WebSocket):
     redis = _get_redis()
     try:
         deleted = await redis.delete(f"ws_ticket:{ticket}")
-    except Exception:
-        deleted = 0
+    except Exception as e:
+        log.error("WebSocket ticket validation failed — Redis unavailable", extra={"err": str(e)})
+        await websocket.close(code=4503)
+        return
     if not deleted:
         await websocket.close(code=4401)
         return
@@ -1085,7 +1116,7 @@ async def ws_endpoint(websocket: WebSocket):
         while True:
             await websocket.receive_text()
     except WebSocketDisconnect:
-        manager.disconnect(websocket)
+        await manager.disconnect(websocket)
 
 
 # ---------------- DASHBOARD ----------------

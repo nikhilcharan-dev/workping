@@ -93,14 +93,14 @@ async function flushQueue() {
             const handler = DISPATCH[row.kind] || flushJson;
             try {
                 await handler(row);
-                await db.runAsync("DELETE FROM attendance_queue WHERE id = ?", row.id);
                 await deleteRowSideEffects(row);
+                await db.runAsync("DELETE FROM attendance_queue WHERE id = ?", row.id);
             } catch (err) {
                 console.error("[WorkPing] Flush failed at row", row.id, err.message);
                 if (isPermanentFailure(err)) {
                     console.warn("[WorkPing] Dropping permanently-failed row", row.id);
+                    try { await deleteRowSideEffects(row); } catch { /* best-effort */ }
                     await db.runAsync("DELETE FROM attendance_queue WHERE id = ?", row.id);
-                    await deleteRowSideEffects(row);
                     continue;
                 }
                 // Transient — stop to preserve chronological order on the next retry.
@@ -143,13 +143,9 @@ async function persistImageForQueue(sourceUri) {
 // a prefix check so we never delete a file outside the queue directory.
 async function deleteRowSideEffects(row) {
     if (row.kind !== "attendance") return;
-    try {
-        const { imageUri } = JSON.parse(row.payload);
-        if (imageUri && imageUri.startsWith(QUEUE_DIR)) {
-            await FileSystem.deleteAsync(imageUri, { idempotent: true });
-        }
-    } catch (err) {
-        console.warn("[WorkPing] Queue file cleanup failed:", err?.message);
+    const { imageUri } = JSON.parse(row.payload);
+    if (imageUri && imageUri.startsWith(QUEUE_DIR)) {
+        await FileSystem.deleteAsync(imageUri, { idempotent: true });
     }
 }
 

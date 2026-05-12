@@ -202,7 +202,7 @@ const insertByForm = asyncHandler(async (req, res) => {
     // WhatsApp welcome notification — background task with error logging
     sendWhatsApp(
       String(phone).trim(),
-      `*Welcome to ${organization.name}!* 🎉\nHi ${String(name).trim()}, your WorkPing account is ready.\n\n*Login:* ${normalizedEmail}\n*Password:* ${process.env.USER_DEFAULT_PASSWORD || "WorkPing@123"}\n*Employee ID:* ${String(employeeId).trim()}\n\nPlease change your password after first login.`
+      `*Welcome to ${organization.name}!* 🎉\nHi ${String(name).trim()}, your WorkPing account is ready.\n\n*Login:* ${normalizedEmail}\n*Employee ID:* ${String(employeeId).trim()}\n\nOpen the WorkPing app to set your password and get started.`
     ).catch((err) => {
       logger.error("Welcome WhatsApp notification failed", {
         employeeId: String(employeeId).trim(),

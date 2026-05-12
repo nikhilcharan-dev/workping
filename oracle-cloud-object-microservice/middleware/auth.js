@@ -5,8 +5,8 @@ export function apiKeyAuth(req, res, next) {
   const apiKey = req.headers["x-api-key"];
 
   if (!process.env.API_KEY) {
-    logger.warn("API_KEY not set — authentication disabled");
-    return next();
+    logger.error("API_KEY not set — refusing request to prevent open access");
+    return res.status(503).json({ error: "Service not configured" });
   }
 
   if (!apiKey) {

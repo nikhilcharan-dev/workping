@@ -1,5 +1,6 @@
 import { Queue, Worker, QueueEvents } from "bullmq";
 import { sendWhatsAppMessage } from "../whatsapp/sender.js";
+import { logger } from "../utils/logger.js";
 
 const REMINDER_MINUTES = 15;
 const QUEUE_NAME = "shift-reminders";
@@ -80,7 +81,7 @@ export async function scheduleShiftReminder({ userId, shiftDate, phone, name, ro
   const delay = fireAt.getTime() - Date.now();
 
   if (delay <= 0) {
-    console.log(`[SHIFT-REMINDER] Skipped ${userId}/${shiftDate} — fire time already passed`);
+    logger.info("[SHIFT-REMINDER] Skipped — fire time already passed", { userId, shiftDate });
     return { skipped: true, reason: "fire time in the past" };
   }
 
@@ -97,9 +98,7 @@ export async function scheduleShiftReminder({ userId, shiftDate, phone, name, ro
     }
   );
 
-  console.log(
-    `[SHIFT-REMINDER] Scheduled for ${name} (${userId}) on ${shiftDate} — fires in ${Math.round(delay / 60000)} min`
-  );
+  logger.info("[SHIFT-REMINDER] Scheduled", { name, userId, shiftDate, firesInMin: Math.round(delay / 60000) });
   return { scheduled: true, fireAt };
 }
 
@@ -110,7 +109,7 @@ export async function cancelShiftReminder(userId, shiftDate) {
   const job = await reminderQueue.getJob(jobId(userId, shiftDate));
   if (!job) return { cancelled: false, reason: "not found" };
   await job.remove();
-  console.log(`[SHIFT-REMINDER] Cancelled for ${userId}/${shiftDate}`);
+  logger.info("[SHIFT-REMINDER] Cancelled", { userId, shiftDate });
   return { cancelled: true };
 }
 
@@ -118,22 +117,32 @@ export async function cancelShiftReminder(userId, shiftDate) {
  * Start the BullMQ worker that processes reminder jobs.
  * Call once at server startup.
  */
+let _worker = null;
+
 export function startReminderWorker() {
-  const worker = new Worker(
+  _worker = new Worker(
     QUEUE_NAME,
     async (job) => {
       const { phone, name, role, shift } = job.data;
       const text = buildReminderMessage(name || "there", shift, role);
       await sendWhatsAppMessage({ to: phone, text });
-      console.log(`[SHIFT-REMINDER] Sent to ${phone} (${name})`);
+      logger.info("[SHIFT-REMINDER] Sent", { phone, name });
     },
     { connection }
   );
 
-  worker.on("failed", (job, err) => {
-    console.error(`[SHIFT-REMINDER] Job ${job?.id} failed: ${err.message}`);
+  _worker.on("failed", (job, err) => {
+    logger.error("[SHIFT-REMINDER] Job failed", { jobId: job?.id, error: err.message });
   });
 
-  console.log("[SHIFT-REMINDER] Worker started — waiting for jobs");
-  return worker;
+  logger.info("[SHIFT-REMINDER] Worker started — waiting for jobs");
+  return _worker;
 }
+
+async function shutdown() {
+  if (_worker) await _worker.close();
+  await reminderQueue.close();
+}
+
+process.on("SIGTERM", shutdown);
+process.on("SIGINT", shutdown);

@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "WorkPing Admin Dashboard — React 18 + Vite 5 SPA for employee CRUD (bulk Excel import via xlsx), attendance/leave/holiday/shift management, subscription billing with PhonePe checkout, face enrollment via react-webcam (frame sent to face-api-microservice for InsightFace embedding extraction), Socket.io real-time payment status, Syncfusion grids + TanStack table, apexcharts analytics consuming face-api /api/v1/analytics/productivity (confidence trends, P95 latency, system efficiency).",
+  "description": "WorkPing Admin Dashboard — React 18 + Vite 5 SPA for employee CRUD (bulk Excel import via xlsx), attendance/leave/holiday/shift management, subscription billing with PhonePe checkout, face enrollment via react-webcam + MediaPipe client-side bounding-box detection (frame sent to face-api-microservice for InsightFace embedding extraction), Socket.io real-time payment status, Syncfusion grids + TanStack table, apexcharts analytics consuming face-api /api/v1/analytics/productivity (confidence trends, P95 latency, system efficiency).",
   "scripts": {
     "dev": "vite --host",
     "build": "vite build",

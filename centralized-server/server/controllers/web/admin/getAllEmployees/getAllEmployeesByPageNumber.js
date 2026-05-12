@@ -70,7 +70,7 @@ export const getAllEmployeesByPageNumber = asyncHandler(async (req, res) => {
   }
 
   if (teamId) {
-    if (teamId != "none") {
+    if (teamId !== "none") {
       filter.push({
         $match: {
           teamId: new mongoose.Types.ObjectId(teamId),

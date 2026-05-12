@@ -91,8 +91,6 @@ export async function detect(imageData, meta = {}, onProgress = null) {
         type: "image/jpeg",
     });
 
-    console.log("[faceApi] detect() → fetch POST", `${baseUrl}/api/user/attendance/verify-mark-attendance`);
-
     let fetchResp;
     try {
         fetchResp = await Promise.race([
@@ -109,14 +107,10 @@ export async function detect(imageData, meta = {}, onProgress = null) {
             new Promise((_, reject) => setTimeout(() => reject(new Error("Request timed out")), API_TIMEOUT)),
         ]);
     } catch (err) {
-        console.error("[faceApi] fetch failed:", err.message);
         throw err;
     }
 
-    console.log("[faceApi] fetch response status:", fetchResp.status);
-
     const rawBody = await fetchResp.json().catch(() => ({}));
-    console.log("[faceApi] fetch response body:", JSON.stringify(rawBody).slice(0, 200));
 
     if (!fetchResp.ok) {
         const serverMsg = rawBody?.message || rawBody?.data?.message || `HTTP ${fetchResp.status}`;

@@ -1,7 +1,7 @@
 {
   "name": "whatsapp-microservice",
   "version": "1.0.1",
-  "description": "WorkPing Chatbot — Meta WhatsApp Cloud API + provider-agnostic LLM intent pipeline (OpenAI-compatible: Bedrock / Ollama / OpenAI / Groq / OpenRouter). Multi-step conversational flows (leave request, complaint, manager approval) with Redis-backed conversation state. BullMQ shift-reminder worker, bcrypt + JWT dashboard auth, x-hub-signature webhook verification. Voice foundation: @aws-sdk/client-transcribe + @aws-sdk/client-polly installed for STT→intent→TTS pipeline.",
+  "description": "WorkPing Chatbot — Meta WhatsApp Cloud API + provider-agnostic LLM intent pipeline (OpenAI-compatible: Bedrock / Ollama / OpenAI / Groq / OpenRouter). Multi-step conversational flows (leave request, complaint, manager approval) with dual-write conversation state: Redis primary (fast, 48h TTL) + MongoDB persistent fallback for cross-restart session recovery. BullMQ shift-reminder worker, bcrypt + JWT dashboard auth, x-hub-signature webhook verification. Voice foundation: @aws-sdk/client-transcribe + @aws-sdk/client-polly installed for STT→intent→TTS pipeline.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

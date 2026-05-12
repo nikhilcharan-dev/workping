@@ -16,6 +16,9 @@ const VALID_AMOUNTS = new Set(
     .map((s) => parseInt(s.trim(), 10))
     .filter((n) => !isNaN(n) && n > 0)
 );
+if (VALID_AMOUNTS.size === 0) {
+  logger.warn("[Payment] VALID_PLAN_AMOUNTS_PAISE is not set — all payment amounts will be accepted. Set this env var in production.");
+}
 
 const router = Router();
 

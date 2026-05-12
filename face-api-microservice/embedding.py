@@ -3,6 +3,7 @@ import cv2
 import numpy as np
 import onnxruntime as ort
 from insightface.app import FaceAnalysis
+from logger import log
 
 # Directory that contains the models/ folder — works for both Docker and venv
 APP_ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -69,7 +70,7 @@ def _build_providers():
             "trt_fp16_enable":         True,
             "trt_max_workspace_size":  4 * 1024 ** 3,
         }
-        print("Provider: TensorRT + CUDA + CPU  (FP16 on)")
+        log.info("inference provider: TensorRT + CUDA + CPU (FP16 on)")
         return [
             ("TensorrtExecutionProvider", trt_opts),
             "CUDAExecutionProvider",
@@ -78,10 +79,10 @@ def _build_providers():
 
     if "CUDAExecutionProvider" in available:
         cuda_opts = {"cudnn_conv_algo_search": "DEFAULT"}
-        print("Provider: CUDA + CPU")
+        log.info("inference provider: CUDA + CPU")
         return [("CUDAExecutionProvider", cuda_opts), "CPUExecutionProvider"]
 
-    print("Provider: CPU only")
+    log.info("inference provider: CPU only")
     return ["CPUExecutionProvider"]
 
 
@@ -94,7 +95,7 @@ def load_face_app():
     global _app, _active_provider
     if _app is None:
         providers = _build_providers()
-        print("Loading InsightFace antelopev2 model (local, no download)...")
+        log.info("loading InsightFace antelopev2 model (local, no download)")
 
         _app = FaceAnalysis(
             name="antelopev2",
@@ -117,7 +118,7 @@ def load_face_app():
         else:
             _active_provider = "cpu"
 
-        print(f"InsightFace antelopev2 ready  provider={_active_provider}")
+        log.info("InsightFace antelopev2 ready", extra={"provider": _active_provider})
     return _app
 
 

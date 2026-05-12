@@ -1,5 +1,6 @@
 import { createClient } from "redis";
 import "dotenv/config";
+import { logger } from "#utils/logger.js";
 
 const backoff = (retries, base = 1000, cap = 30000) => Math.min(cap, base * Math.pow(2, retries));
 
@@ -10,7 +11,7 @@ const redis = createClient({
     keepAlive: 10_000,
     reconnectStrategy: (retries) => {
       const delay = backoff(retries);
-      console.warn(`[Redis] Reconnecting in ${delay}ms (attempt ${retries + 1})`);
+      logger.warn("[Redis] Reconnecting", { delayMs: delay, attempt: retries + 1 });
       return delay;
     },
   },
@@ -18,11 +19,11 @@ const redis = createClient({
 });
 
 redis.on("ready", () => {
-  console.log("[Redis Client] Ready");
+  logger.info("[Redis Client] Ready");
 });
 
 redis.on("error", (err) => {
-  console.error("[Redis Client] Error: " + err);
+  logger.error("[Redis Client] Error", { error: err.message });
 });
 
 export default redis;

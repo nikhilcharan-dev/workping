@@ -4,6 +4,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { fileURLToPath } from "url";
+import logger from "../logger.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -76,8 +77,8 @@ function loadFromDisk() {
         errorCount: rs.errorCount ?? 0,
       });
     }
-  } catch {
-    // Corrupted file — start fresh
+  } catch (err) {
+    logger.warn({ err: err.message }, "metrics: failed to load from disk — starting fresh");
   }
 }
 
